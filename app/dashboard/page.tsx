@@ -1,67 +1,103 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabase";
 
 /* ═══════════════════════════════════════════════════
-   DATA — Google-only for MVP
+   TYPES
    ═══════════════════════════════════════════════════ */
 
-const DATA = {
-  businessName: "Crystal Clear Pools",
-  google: {
-    rating: 4.8,
-    totalReviews: 47,
-    reviewsThisMonth: 12,
-    ratingLastMonth: 4.6,
-  },
-  funnel: {
-    sent: 24,
-    clicked: 18,
-    drafted: 14,
-    posted: 12,
-  },
-  needsAttention: [
-    { name: "James R.", detail: "Drafted a review 5 hours ago but hasn't posted it", status: "drafted" },
-    { name: "Linda P.", detail: "Started the flow 2 days ago but didn't finish", status: "abandoned" },
-  ],
-  recentReviews: [
-    {
-      name: "Maria G.",
-      stars: 5,
-      snippet: "Marcus was fantastic. He showed up right on time for our weekly pool cleaning and the pool looks crystal clear. Really impressed with the attention to detail — highly recommend Crystal Clear Pools.",
-      time: "2 hours ago",
-    },
-    {
-      name: "Dave M.",
-      stars: 5,
-      snippet: "Really impressed with the attention to detail. The pool area was spotless after the cleaning, and Marcus even pointed out a small crack in the tile that we hadn't noticed. Going above and beyond.",
-      time: "3 days ago",
-    },
-    {
-      name: "Rachel T.",
-      stars: 4,
-      snippet: "Good service overall. Quick and professional. Would recommend to neighbors. Only reason for 4 stars instead of 5 is that communication about arrival time could be a bit better.",
-      time: "5 days ago",
-    },
-  ],
-  activity: [
-    { name: "Maria G.", action: "posted a 5-star review", time: "2 hours ago", status: "posted" },
-    { name: "James R.", action: "drafted a review", time: "5 hours ago", status: "drafted" },
-    { name: "Sarah K.", action: "opened the link", time: "yesterday", status: "clicked" },
-    { name: "Tom W.", action: "review link sent", time: "yesterday", status: "sent" },
-    { name: "Linda P.", action: "started but didn't finish", time: "2 days ago", status: "abandoned" },
-    { name: "Dave M.", action: "posted a 5-star review", time: "3 days ago", status: "posted" },
-  ],
+type DashboardStats = {
+  reviewsThisMonth: number;
+  avgRating: number;
+  completionRate: number;
+  totalLinks: number;
 };
 
-const STATUS_DOT: Record<string, string> = {
-  posted: "#10B981",
-  drafted: "#F59E0B",
-  abandoned: "#EF4444",
-  sent: "#A1A1AA",
-  clicked: "#3B82F6",
+type FunnelData = {
+  sent: number;
+  clicked: number;
+  drafted: number;
+  posted: number;
 };
+
+type AttentionItem = {
+  name: string;
+  detail: string;
+  status: string;
+  sessionId: string;
+};
+
+type ActivityItem = {
+  name: string;
+  action: string;
+  time: string;
+  status: string;
+  stars: number | null;
+  snippet: string | null;
+};
+
+/* ═══════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════ */
+
+const STATUS_DOT: Record<string, string> = {
+  copied: "#10B981",
+  drafted: "#F59E0B",
+  in_progress: "#3B82F6",
+  created: "#A1A1AA",
+};
+
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const seconds = Math.floor((now - then) / 1000);
+
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days}d ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
+function statusToAction(status: string, stars: number | null): string {
+  switch (status) {
+    case "copied":
+      return stars ? `posted a ${stars}-star review` : "posted a review";
+    case "drafted":
+      return "drafted a review";
+    case "in_progress":
+      return "started the review flow";
+    case "created":
+      return "opened the link";
+    default:
+      return "activity recorded";
+  }
+}
+
+function statusToAttentionDetail(status: string, updatedAt: string): string {
+  const ago = timeAgo(updatedAt);
+  switch (status) {
+    case "drafted":
+      return `Drafted a review ${ago} but hasn't posted it`;
+    case "in_progress":
+      return `Started the flow ${ago} but didn't finish`;
+    case "created":
+      return `Opened the link ${ago} but didn't start`;
+    default:
+      return `Last activity ${ago}`;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   SHARED COMPONENTS
+   ═══════════════════════════════════════════════════ */
 
 /* ─── Google Logo ─── */
 function GoogleLogo({ size = 14 }: { size?: number }) {
@@ -138,8 +174,65 @@ function ReviewCard({ review, index = 0 }: { review: { name: string; stars: numb
   );
 }
 
+/* ─── Stats Cards ─── */
+function StatsCards({ stats, loading }: { stats: DashboardStats; loading: boolean }) {
+  const cards = [
+    {
+      label: "Reviews this month",
+      value: stats.reviewsThisMonth.toString(),
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      ),
+      bg: "#E8F5E9",
+    },
+    {
+      label: "Avg rating",
+      value: stats.avgRating > 0 ? stats.avgRating.toFixed(1) : "—",
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B" stroke="none">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+        </svg>
+      ),
+      bg: "#FEF3C7",
+    },
+    {
+      label: "Completion rate",
+      value: stats.totalLinks > 0 ? `${stats.completionRate}%` : "—",
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        </svg>
+      ),
+      bg: "#EFF6FF",
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-3 gap-2.5">
+      {cards.map((card) => (
+        <div
+          key={card.label}
+          className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: card.bg }}>
+            {card.icon}
+          </div>
+          {loading ? (
+            <div className="mt-3 h-[28px] w-12 animate-pulse rounded-[6px] bg-[#F4F4F5]" />
+          ) : (
+            <p className="mt-3 text-[24px] font-bold leading-none text-[#18181B]">{card.value}</p>
+          )}
+          <p className="mt-1.5 text-[11px] text-[#A1A1AA]">{card.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ─── Funnel ─── */
-function Funnel({ funnel }: { funnel: { sent: number; clicked: number; drafted: number; posted: number } }) {
+function Funnel({ funnel, loading }: { funnel: FunnelData; loading: boolean }) {
   const [open, setOpen] = useState(true);
   const rate = funnel.sent > 0 ? Math.round((funnel.posted / funnel.sent) * 100) : 0;
 
@@ -159,9 +252,11 @@ function Funnel({ funnel }: { funnel: { sent: number; clicked: number; drafted: 
       >
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-semibold text-[#18181B]">Review Funnel</span>
-          <span className="rounded-full bg-[#E8F5E9] px-2 py-0.5 text-[11px] font-semibold text-[#10B981]">
-            {rate}% conversion
-          </span>
+          {!loading && (
+            <span className="rounded-full bg-[#E8F5E9] px-2 py-0.5 text-[11px] font-semibold text-[#10B981]">
+              {rate}% conversion
+            </span>
+          )}
         </div>
         <svg
           width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
@@ -173,7 +268,6 @@ function Funnel({ funnel }: { funnel: { sent: number; clicked: number; drafted: 
 
       {open && (
         <div className="border-t border-[rgba(228,228,231,0.3)] px-4 pb-4 pt-3">
-          {/* Bar visualization */}
           <div className="flex flex-col gap-2.5">
             {steps.map((step) => {
               const pct = funnel.sent > 0 ? (step.value / funnel.sent) * 100 : 0;
@@ -181,17 +275,25 @@ function Funnel({ funnel }: { funnel: { sent: number; clicked: number; drafted: 
                 <div key={step.label} className="flex items-center gap-3">
                   <span className="w-[52px] text-right text-[12px] text-[#A1A1AA]">{step.label}</span>
                   <div className="relative h-[22px] flex-1 overflow-hidden rounded-full bg-[#F4F4F5]">
-                    <div
-                      className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: step.color }}
-                    />
+                    {loading ? (
+                      <div className="absolute inset-y-0 left-0 w-1/3 animate-pulse rounded-full bg-[#E4E4E7]" />
+                    ) : (
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+                        style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: step.color }}
+                      />
+                    )}
                   </div>
-                  <span className="w-[24px] text-[13px] font-semibold text-[#18181B]">{step.value}</span>
+                  {loading ? (
+                    <div className="h-[16px] w-[24px] animate-pulse rounded bg-[#F4F4F5]" />
+                  ) : (
+                    <span className="w-[24px] text-[13px] font-semibold text-[#18181B]">{step.value}</span>
+                  )}
                 </div>
               );
             })}
           </div>
-          <p className="mt-3 text-[11px] text-[#A1A1AA]">This month</p>
+          <p className="mt-3 text-[11px] text-[#A1A1AA]">All time</p>
         </div>
       )}
     </div>
@@ -202,13 +304,140 @@ function Funnel({ funnel }: { funnel: { sent: number; clicked: number; drafted: 
    PAGE
    ═══════════════════════════════════════════════════ */
 
+// Status progression order for "at or beyond" funnel logic
+const STATUS_PROGRESSION = ["created", "in_progress", "drafted", "copied"];
+
+function isAtOrBeyond(status: string, target: string): boolean {
+  const statusIdx = STATUS_PROGRESSION.indexOf(status);
+  const targetIdx = STATUS_PROGRESSION.indexOf(target);
+  return statusIdx >= targetIdx;
+}
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"reviews" | "activity">("reviews");
-  const { google, funnel, needsAttention, recentReviews, activity } = DATA;
+  const [stats, setStats] = useState<DashboardStats>({
+    reviewsThisMonth: 0,
+    avgRating: 0,
+    completionRate: 0,
+    totalLinks: 0,
+  });
+  const [funnel, setFunnel] = useState<FunnelData>({ sent: 0, clicked: 0, drafted: 0, posted: 0 });
+  const [attention, setAttention] = useState<AttentionItem[]>([]);
+  const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [recentReviews, setRecentReviews] = useState<{ name: string; stars: number; snippet: string; time: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { business } = useAuth();
 
-  const delta = google.rating - google.ratingLastMonth;
-  const deltaStr = delta > 0 ? `+${delta.toFixed(1)}` : delta === 0 ? "—" : delta.toFixed(1);
-  const isUp = delta > 0;
+  useEffect(() => {
+    if (!business) return;
+
+    async function fetchAll() {
+      const businessId = business!.id;
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+      // 1. Total review links (= "sent")
+      const { count: totalLinks } = await supabase
+        .from("review_links")
+        .select("*", { count: "exact", head: true })
+        .eq("business_id", businessId);
+
+      const linkCount = totalLinks ?? 0;
+
+      // 2. All sessions for this business
+      const { data: allSessions } = await supabase
+        .from("review_sessions")
+        .select("id, star_rating, status, generated_review, created_at, updated_at, review_links!inner(business_id, customer_name)")
+        .eq("review_links.business_id", businessId)
+        .order("updated_at", { ascending: false });
+
+      const sessions = allSessions || [];
+
+      // ── Stats ──
+      const completedSessions = sessions.filter((s) => s.status === "copied");
+      const reviewsThisMonth = completedSessions.filter(
+        (s) => s.created_at >= monthStart
+      ).length;
+      const ratings = completedSessions
+        .map((s) => s.star_rating)
+        .filter((r): r is number => r !== null);
+      const avgRating = ratings.length > 0
+        ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length
+        : 0;
+      const completionRate = linkCount > 0
+        ? Math.round((completedSessions.length / linkCount) * 100)
+        : 0;
+
+      setStats({ reviewsThisMonth, avgRating, completionRate, totalLinks: linkCount });
+
+      // ── Funnel ──
+      // "Clicked" = any session was created (meaning the link was opened)
+      // "Drafted" = session reached drafted or beyond
+      // "Posted" = session status is "copied"
+      const clicked = sessions.filter((s) => isAtOrBeyond(s.status, "created")).length;
+      const drafted = sessions.filter((s) => isAtOrBeyond(s.status, "drafted")).length;
+      const posted = completedSessions.length;
+
+      setFunnel({ sent: linkCount, clicked, drafted, posted });
+
+      // ── Needs Attention ──
+      // Sessions that are stalled: drafted but not posted, or in_progress/created but not finished
+      const attentionSessions = sessions.filter(
+        (s) => s.status === "drafted" || s.status === "in_progress" || s.status === "created"
+      ).slice(0, 5);
+
+      setAttention(
+        attentionSessions.map((s) => {
+          const link = s.review_links as unknown as { customer_name: string };
+          return {
+            name: link.customer_name,
+            detail: statusToAttentionDetail(s.status, s.updated_at),
+            status: s.status,
+            sessionId: s.id,
+          };
+        })
+      );
+
+      // ── Recent Reviews (completed with review text) ──
+      const reviewsWithText = completedSessions
+        .filter((s) => s.generated_review && s.star_rating)
+        .slice(0, 5);
+
+      setRecentReviews(
+        reviewsWithText.map((s) => {
+          const link = s.review_links as unknown as { customer_name: string };
+          return {
+            name: link.customer_name,
+            stars: s.star_rating!,
+            snippet: s.generated_review!,
+            time: timeAgo(s.updated_at),
+          };
+        })
+      );
+
+      // ── Activity Feed ──
+      const recentActivity = sessions.slice(0, 20);
+      setActivityItems(
+        recentActivity.map((s) => {
+          const link = s.review_links as unknown as { customer_name: string };
+          return {
+            name: link.customer_name,
+            action: statusToAction(s.status, s.star_rating),
+            time: timeAgo(s.updated_at),
+            status: s.status,
+            stars: s.star_rating,
+            snippet: s.generated_review,
+          };
+        })
+      );
+
+      setLoading(false);
+    }
+
+    fetchAll();
+  }, [business]);
+
+  const monthName = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   return (
     <div className="min-h-dvh bg-[#F8F9FA] font-dashboard sm:pl-[200px]">
@@ -216,59 +445,42 @@ export default function Dashboard() {
 
         {/* ─── Header ─── */}
         <div className="mb-6">
-          <h1 className="text-[20px] font-bold text-[#18181B]">{DATA.businessName}</h1>
-          <p className="mt-1 text-[13px] text-[#A1A1AA]">March 2026</p>
+          <h1 className="text-[20px] font-bold text-[#18181B]">{business?.name || "Dashboard"}</h1>
+          <p className="mt-1 text-[13px] text-[#A1A1AA]">{monthName}</p>
         </div>
 
-        {/* ─── Google Hero Card — full width ─── */}
-        <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
+        {/* ─── Google Hero Card — coming soon ─── */}
+        <div className="rounded-[16px] border border-dashed border-[#E4E4E7] bg-white p-5">
           <div className="flex items-center gap-1.5 text-[12px] text-[#A1A1AA]">
             <GoogleLogo size={14} />
             Google Reviews
+            <span className="ml-1 rounded-[6px] bg-[#F4F4F5] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#A1A1AA]">Coming soon</span>
           </div>
-
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-[42px] font-bold leading-none tracking-tight text-[#18181B]">
-              {google.rating}
-            </span>
-            <div className="mb-1 flex flex-col">
-              <Stars count={Math.round(google.rating)} size={14} />
-              <span className="mt-0.5 text-[12px] text-[#A1A1AA]">{google.totalReviews} reviews</span>
-            </div>
-          </div>
-
-          <div className="mt-2 flex items-center gap-3">
-            {delta !== 0 && (
-              <div className={`flex items-center gap-0.5 text-[12px] font-semibold ${isUp ? "text-[#10B981]" : "text-[#EF4444]"}`}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                  style={{ transform: isUp ? "rotate(0)" : "rotate(180deg)" }}>
-                  <polyline points="18 15 12 9 6 15" />
-                </svg>
-                {deltaStr} this month
-              </div>
-            )}
-            <div className="flex items-center gap-1.5 rounded-[8px] bg-[#EFF6FF] px-2.5 py-1.5">
-              <span className="text-[18px] font-bold text-[#4285F4]">{google.reviewsThisMonth}</span>
-              <span className="text-[12px] text-[#5B9BD5]">new this month</span>
-            </div>
-          </div>
+          <p className="mt-3 text-[13px] leading-relaxed text-[#A1A1AA]">
+            Connect your Google Business Profile to see your live rating, review count, and trends here.
+          </p>
         </div>
 
-        {/* ─── Funnel — collapsible ─── */}
+        {/* ─── Stats ─── */}
         <div className="mt-4">
-          <Funnel funnel={funnel} />
+          <StatsCards stats={stats} loading={loading} />
+        </div>
+
+        {/* ─── Funnel ─── */}
+        <div className="mt-4">
+          <Funnel funnel={funnel} loading={loading} />
         </div>
 
         {/* ─── Needs Attention ─── */}
-        {needsAttention.length > 0 && (
+        {attention.length > 0 && (
           <div className="mt-5">
             <h2 className="mb-2.5 px-1 text-[12px] font-semibold uppercase tracking-wider text-[#F59E0B]">
               Needs attention
             </h2>
             <div className="flex flex-col gap-2">
-              {needsAttention.map((item, i) => (
+              {attention.map((item) => (
                 <div
-                  key={i}
+                  key={item.sessionId}
                   className="flex items-center gap-3 rounded-[16px] border border-[#FEF3C7] bg-[#FFFBEB] px-4 py-3.5"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FEF3C7]">
@@ -322,7 +534,11 @@ export default function Dashboard() {
           {/* Reviews tab */}
           {activeTab === "reviews" && (
             <div className="mt-3 flex flex-col gap-2.5">
-              {recentReviews.length > 0 ? (
+              {loading ? (
+                Array.from({ length: 2 }).map((_, i) => (
+                  <div key={i} className="h-[120px] animate-pulse rounded-[16px] bg-[#F4F4F5]" />
+                ))
+              ) : recentReviews.length > 0 ? (
                 recentReviews.map((review, i) => (
                   <ReviewCard key={i} review={review} index={i} />
                 ))
@@ -341,15 +557,21 @@ export default function Dashboard() {
 
           {/* Activity tab */}
           {activeTab === "activity" && (
-            activity.length > 0 ? (
+            loading ? (
+              <div className="mt-3 flex flex-col gap-0">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-[52px] animate-pulse border-b border-[rgba(228,228,231,0.3)] bg-[#F4F4F5] first:rounded-t-[16px] last:rounded-b-[16px] last:border-b-0" />
+                ))}
+              </div>
+            ) : activityItems.length > 0 ? (
             <div className="mt-3 rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
-              {activity.map((item, i) => {
+              {activityItems.map((item, i) => {
                 const initials = item.name.split(" ").map((n) => n[0]).join("");
                 return (
                   <div
                     key={i}
                     className={`flex items-center gap-3 px-4 py-3.5 ${
-                      i < activity.length - 1 ? "border-b border-[rgba(228,228,231,0.3)]" : ""
+                      i < activityItems.length - 1 ? "border-b border-[rgba(228,228,231,0.3)]" : ""
                     }`}
                   >
                     <div className="relative shrink-0">
@@ -366,6 +588,11 @@ export default function Dashboard() {
                         <span className="font-semibold">{item.name}</span>{" "}
                         <span className="text-[#71717A]">{item.action}</span>
                       </p>
+                      {item.snippet && (
+                        <p className="mt-0.5 truncate text-[12px] text-[#A1A1AA]">
+                          &ldquo;{item.snippet.slice(0, 80)}{item.snippet.length > 80 ? "..." : ""}&rdquo;
+                        </p>
+                      )}
                     </div>
                     <span className="shrink-0 text-[11px] text-[#A1A1AA]">{item.time}</span>
                   </div>

@@ -1,60 +1,81 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabase";
 
 /* ═══════════════════════════════════════════════════
-   SEED DATA
+   TYPES
    ═══════════════════════════════════════════════════ */
 
-const SEED_SERVICES = [
-  "Weekly Pool Cleaning",
-  "One-Time Deep Clean",
-  "Equipment Repair",
-  "Pool Opening (Seasonal)",
-  "Pool Closing (Seasonal)",
-  "Chemical Balancing",
-];
-
-const SEED_EMPLOYEES = [
-  { name: "Marcus", role: "Lead Technician" },
-  { name: "Daniel", role: "Technician" },
-  { name: "Priya", role: "Technician" },
-  { name: "Kenji", role: "Apprentice" },
-];
-
-const TOPIC_TIERS = {
-  shared: ["Timeliness", "Work Quality", "Communication", "Pricing", "Professionalism", "Cleanliness"],
-  positive: ["Went Above & Beyond", "Would Recommend"],
-  neutral: ["What Went Well", "What Could Improve"],
-  negative: ["Responsiveness", "Follow-Through", "Didn't Fix the Problem"],
+type ServiceRow = { id: string; name: string };
+type EmployeeRow = { id: string; name: string };
+type TopicRow = {
+  id: string;
+  label: string;
+  tier: string;
+  follow_up_question: string;
+  follow_up_options: string[];
+  sort_order: number;
+  business_id: string | null;
 };
 
 /* ═══════════════════════════════════════════════════
-   BUSINESS PROFILE — the identity section
+   BUSINESS PROFILE
    ═══════════════════════════════════════════════════ */
 
-function BusinessProfile() {
-  const [name, setName] = useState("Crystal Clear Pools");
-  const [googleUrl, setGoogleUrl] = useState("https://search.google.com/local/writereview?placeid=PLACEHOLDER");
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+function BusinessProfile({ businessId, initial }: {
+  businessId: string;
+  initial: { name: string; logo_url: string | null; google_review_url: string };
+}) {
+  const [name, setName] = useState(initial.name);
+  const [googleUrl, setGoogleUrl] = useState(initial.google_review_url);
+  const [logoPreview, setLogoPreview] = useState<string | null>(initial.logo_url);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const initials = name.trim()
     ? name.trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 3).toUpperCase()
     : "?";
 
+  const save = useCallback(async (fields: Record<string, string | null>) => {
+    setSaving(true);
+    await supabase.from("businesses").update(fields).eq("id", businessId);
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }, [businessId]);
+
+  async function handleLogoUpload(file: File) {
+    const ext = file.name.split(".").pop();
+    const path = `logos/${businessId}.${ext}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from("logos")
+      .upload(path, file, { upsert: true });
+
+    if (uploadErr) {
+      // If bucket doesn't exist yet, show the preview anyway
+      setLogoPreview(URL.createObjectURL(file));
+      return;
+    }
+
+    const { data } = supabase.storage.from("logos").getPublicUrl(path);
+    const url = data.publicUrl;
+    setLogoPreview(url);
+    save({ logo_url: url });
+  }
+
   return (
     <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
-      {/* Brand hero — the owner sees their identity */}
       <div className="relative overflow-hidden rounded-t-[16px] bg-gradient-to-br from-[#0070EB]/[0.04] via-[#F8F9FA] to-[#0070EB]/[0.02] px-6 pb-6 pt-8">
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) setLogoPreview(URL.createObjectURL(f));
+          if (f) handleLogoUpload(f);
         }} />
 
         <div className="flex flex-col items-center">
-          {/* Logo — large and tappable */}
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
@@ -78,7 +99,6 @@ function BusinessProfile() {
 
           <p className="text-[18px] font-bold tracking-tight text-[#18181B]">{name || "Your Business"}</p>
 
-          {/* Mini customer preview */}
           <div className="mt-3 flex items-center gap-2 rounded-full bg-white/80 px-3.5 py-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)] ring-1 ring-[rgba(228,228,231,0.5)]">
             <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0070EB]/10">
               <span className="text-[8px] font-bold text-[#0070EB]">{initials.slice(0, 2)}</span>
@@ -88,7 +108,6 @@ function BusinessProfile() {
         </div>
       </div>
 
-      {/* Fields */}
       <div className="flex flex-col gap-4 px-6 py-6">
         <div>
           <label className="mb-2 block text-[12px] font-medium text-[#71717A]">Business name</label>
@@ -96,6 +115,7 @@ function BusinessProfile() {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onBlur={() => { if (name !== initial.name) save({ name }); }}
             placeholder="Your business name"
             className="w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-[#FAFAFA] px-4 py-3 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] transition-all duration-300 focus:border-[#0070EB]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
           />
@@ -106,37 +126,47 @@ function BusinessProfile() {
             type="text"
             value={googleUrl}
             onChange={(e) => setGoogleUrl(e.target.value)}
+            onBlur={() => { if (googleUrl !== initial.google_review_url) save({ google_review_url: googleUrl }); }}
             placeholder="https://search.google.com/local/writereview?placeid=..."
             className="w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-[#FAFAFA] px-4 py-3 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] transition-all duration-300 focus:border-[#0070EB]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
           />
         </div>
+        {(saving || saved) && (
+          <p className="text-[12px] text-[#10B981]">{saving ? "Saving..." : "Saved"}</p>
+        )}
       </div>
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════
-   SERVICES — each one earns its space
+   SERVICES
    ═══════════════════════════════════════════════════ */
 
-function ServicesList() {
-  const [services, setServices] = useState(SEED_SERVICES);
+function ServicesList({ services: initial, businessId }: { services: ServiceRow[]; businessId: string }) {
+  const [services, setServices] = useState(initial);
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
 
-  function handleAdd() {
+  async function handleAdd() {
     const trimmed = draft.trim();
-    if (!trimmed || services.some((s) => s.toLowerCase() === trimmed.toLowerCase())) return;
-    setServices([...services, trimmed]);
+    if (!trimmed || services.some((s) => s.name.toLowerCase() === trimmed.toLowerCase())) return;
+    const { data, error } = await supabase
+      .from("services")
+      .insert({ business_id: businessId, name: trimmed })
+      .select("id, name")
+      .single();
+    if (data) setServices([...services, data]);
+    if (error) alert(`Failed to add service: ${error.message}`);
     setDraft("");
     setAdding(false);
   }
 
-  function handleRemove(idx: number) {
-    setServices(services.filter((_, i) => i !== idx));
+  async function handleRemove(id: string) {
+    await supabase.from("services").delete().eq("id", id);
+    setServices(services.filter((s) => s.id !== id));
   }
 
-  // Subtle accent colors per service for the leading dot
   const accents = ["#0070EB", "#10B981", "#F59E0B", "#E11D48", "#8B5CF6", "#06B6D4", "#F97316", "#6366F1"];
 
   return (
@@ -154,10 +184,9 @@ function ServicesList() {
       <div className="px-3">
         {services.map((service, i) => (
           <div
-            key={service}
+            key={service.id}
             className="group mx-0 flex items-center gap-3 rounded-[10px] px-3 py-3 transition-all duration-200 hover:bg-[#FAFAFA]"
           >
-            {/* Grip + accent dot */}
             <div className="flex items-center gap-2">
               <svg width="10" height="14" viewBox="0 0 10 14" fill="none" className="shrink-0 cursor-grab text-[#D4D4D8] opacity-0 transition-opacity duration-200 group-hover:opacity-100 active:cursor-grabbing">
                 <circle cx="3" cy="2" r="1.2" fill="currentColor" />
@@ -170,13 +199,13 @@ function ServicesList() {
               <div className="h-2 w-2 rounded-full" style={{ backgroundColor: accents[i % accents.length] }} />
             </div>
 
-            <span className="flex-1 text-[14px] font-medium text-[#18181B]">{service}</span>
+            <span className="flex-1 text-[14px] font-medium text-[#18181B]">{service.name}</span>
 
             <button
               type="button"
-              onClick={() => handleRemove(i)}
+              onClick={() => handleRemove(service.id)}
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-[#A1A1AA] transition-all duration-200 hover:bg-[#FEE2E2] hover:text-[#EF4444] active:scale-[0.92]"
-              aria-label={`Remove ${service}`}
+              aria-label={`Remove ${service.name}`}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
@@ -187,7 +216,6 @@ function ServicesList() {
         ))}
       </div>
 
-      {/* Add row */}
       {adding ? (
         <div className="border-t border-[rgba(228,228,231,0.3)] px-6 py-4">
           <div className="flex gap-2.5">
@@ -235,26 +263,31 @@ function ServicesList() {
 }
 
 /* ═══════════════════════════════════════════════════
-   TEAM — people with presence
+   TEAM
    ═══════════════════════════════════════════════════ */
 
-function TeamList() {
-  const [employees, setEmployees] = useState(SEED_EMPLOYEES);
+function TeamList({ employees: initial, businessId }: { employees: EmployeeRow[]; businessId: string }) {
+  const [employees, setEmployees] = useState(initial);
   const [draftName, setDraftName] = useState("");
-  const [draftRole, setDraftRole] = useState("");
   const [adding, setAdding] = useState(false);
 
-  function handleAdd() {
+  async function handleAdd() {
     const n = draftName.trim();
     if (!n || employees.some((e) => e.name.toLowerCase() === n.toLowerCase())) return;
-    setEmployees([...employees, { name: n, role: draftRole.trim() || "Team Member" }]);
+    const { data, error } = await supabase
+      .from("employees")
+      .insert({ business_id: businessId, name: n })
+      .select("id, name")
+      .single();
+    if (data) setEmployees([...employees, data]);
+    if (error) alert(`Failed to add employee: ${error.message}`);
     setDraftName("");
-    setDraftRole("");
     setAdding(false);
   }
 
-  function handleRemove(idx: number) {
-    setEmployees(employees.filter((_, i) => i !== idx));
+  async function handleRemove(id: string) {
+    await supabase.from("employees").delete().eq("id", id);
+    setEmployees(employees.filter((e) => e.id !== id));
   }
 
   const avatarColors = [
@@ -283,7 +316,7 @@ function TeamList() {
           const color = avatarColors[i % avatarColors.length];
           return (
             <div
-              key={emp.name}
+              key={emp.id}
               className="group flex items-center gap-3.5 rounded-[10px] px-3 py-3 transition-all duration-200 hover:bg-[#FAFAFA]"
             >
               <div
@@ -294,11 +327,10 @@ function TeamList() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[14px] font-medium text-[#18181B]">{emp.name}</p>
-                <p className="text-[12px] text-[#94A3B8]">{emp.role}</p>
               </div>
               <button
                 type="button"
-                onClick={() => handleRemove(i)}
+                onClick={() => handleRemove(emp.id)}
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-[#A1A1AA] transition-all duration-200 hover:bg-[#FEE2E2] hover:text-[#EF4444] active:scale-[0.92]"
                 aria-label={`Remove ${emp.name}`}
               >
@@ -312,48 +344,31 @@ function TeamList() {
         })}
       </div>
 
-      {/* Add member */}
       {adding ? (
         <div className="border-t border-[rgba(228,228,231,0.3)] px-6 py-4">
-          <div className="flex flex-col gap-2.5">
-            <div className="flex gap-2.5">
-              <input
-                type="text"
-                value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                placeholder="Name"
-                autoFocus
-                className="flex-1 rounded-[10px] border border-[#0070EB]/30 bg-white px-4 py-2.5 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
-              />
-              <input
-                type="text"
-                value={draftRole}
-                onChange={(e) => setDraftRole(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                placeholder="Role"
-                className="flex-1 rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-[#FAFAFA] px-4 py-2.5 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] transition-all duration-300 focus:border-[#0070EB]/30 focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => { setAdding(false); setDraftName(""); setDraftRole(""); }}
-                className="rounded-[8px] px-3.5 py-1.5 text-[13px] text-[#94A3B8] transition-all duration-200 hover:bg-[#F0F2F5] hover:text-[#71717A]"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleAdd}
-                disabled={!draftName.trim()}
-                className={`rounded-[8px] px-4 py-1.5 text-[13px] font-semibold text-white transition-all duration-200 ${
-                  draftName.trim() ? "bg-[#0070EB] shadow-[0_2px_8px_rgba(0,112,235,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#B0D4F8]"
-                }`}
-              >
-                Add
-              </button>
-            </div>
+          <div className="flex gap-2.5">
+            <input
+              type="text"
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAdd();
+                if (e.key === "Escape") { setAdding(false); setDraftName(""); }
+              }}
+              placeholder="Name"
+              autoFocus
+              className="flex-1 rounded-[10px] border border-[#0070EB]/30 bg-white px-4 py-2.5 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+            />
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={!draftName.trim()}
+              className={`shrink-0 rounded-[10px] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
+                draftName.trim() ? "bg-[#0070EB] shadow-[0_2px_8px_rgba(0,112,235,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#B0D4F8]"
+              }`}
+            >
+              Add
+            </button>
           </div>
         </div>
       ) : (
@@ -376,142 +391,174 @@ function TeamList() {
 }
 
 /* ═══════════════════════════════════════════════════
-   REVIEW TOPICS — visual tier separation
+   REVIEW TOPICS
    ═══════════════════════════════════════════════════ */
 
-function TopicSection() {
-  const [customTopics, setCustomTopics] = useState<string[]>([]);
-  const [draft, setDraft] = useState("");
-  const [adding, setAdding] = useState(false);
+const TIER_META: { key: string; label: string; color: string; chipBg: string; dotColor: string }[] = [
+  { key: "positive", label: "4-5 stars", color: "#059669", chipBg: "#ECFDF5", dotColor: "#10B981" },
+  { key: "neutral", label: "3 stars", color: "#D97706", chipBg: "#FFFBEB", dotColor: "#F59E0B" },
+  { key: "negative", label: "1-2 stars", color: "#DC2626", chipBg: "#FEF2F2", dotColor: "#EF4444" },
+];
 
-  function handleAdd() {
-    const trimmed = draft.trim();
-    if (!trimmed || customTopics.includes(trimmed)) return;
-    setCustomTopics([...customTopics, trimmed]);
-    setDraft("");
-    setAdding(false);
+function TopicSection({ topics: initial, businessId, isCustomized }: {
+  topics: TopicRow[];
+  businessId: string;
+  isCustomized: boolean;
+}) {
+  const [topics, setTopics] = useState(initial);
+  const [addingTier, setAddingTier] = useState<string | null>(null);
+  const [draftLabel, setDraftLabel] = useState("");
+  const [draftQuestion, setDraftQuestion] = useState("");
+  const [draftOptions, setDraftOptions] = useState("");
+
+  async function handleAdd(tier: string) {
+    const label = draftLabel.trim();
+    const question = draftQuestion.trim();
+    const options = draftOptions.split(",").map((o) => o.trim()).filter(Boolean);
+    if (!label || !question || options.length < 2) return;
+
+    const maxSort = topics.filter((t) => t.tier === tier).reduce((max, t) => Math.max(max, t.sort_order), 0);
+
+    const { data, error } = await supabase
+      .from("topics")
+      .insert({
+        business_id: businessId,
+        label,
+        tier,
+        follow_up_question: question,
+        follow_up_options: options,
+        sort_order: maxSort + 1,
+      })
+      .select()
+      .single();
+
+    if (data) setTopics([...topics, data]);
+    if (error) alert(`Failed to add topic: ${error.message}`);
+    setDraftLabel("");
+    setDraftQuestion("");
+    setDraftOptions("");
+    setAddingTier(null);
   }
 
-  const tiers: { key: keyof typeof TOPIC_TIERS; label: string; color: string; chipBg: string; dotColor: string }[] = [
-    { key: "shared", label: "All ratings", color: "#71717A", chipBg: "#F4F4F5", dotColor: "#94A3B8" },
-    { key: "positive", label: "4-5 stars", color: "#059669", chipBg: "#ECFDF5", dotColor: "#10B981" },
-    { key: "neutral", label: "3 stars", color: "#D97706", chipBg: "#FFFBEB", dotColor: "#F59E0B" },
-    { key: "negative", label: "1-2 stars", color: "#DC2626", chipBg: "#FEF2F2", dotColor: "#EF4444" },
-  ];
+  async function handleRemove(id: string) {
+    await supabase.from("topics").delete().eq("id", id);
+    setTopics(topics.filter((t) => t.id !== id));
+  }
 
   return (
     <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
       <div className="px-6 pt-5 pb-1">
         <h3 className="text-[15px] font-semibold tracking-tight text-[#18181B]">Review Topics</h3>
         <p className="mt-0.5 text-[11px] text-[#94A3B8]">What customers are asked about during the review</p>
-      </div>
-
-      {tiers.map((tier, ti) => (
-        <div key={tier.key} className={`px-6 py-4 ${ti < tiers.length - 1 ? "border-b border-[rgba(228,228,231,0.3)]" : ""}`}>
-          <div className="mb-3 flex items-center gap-2">
-            <div className="h-[6px] w-[6px] rounded-full" style={{ backgroundColor: tier.dotColor }} />
-            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: tier.color }}>{tier.label}</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {TOPIC_TIERS[tier.key].map((t) => (
-              <span
-                key={t}
-                className="rounded-[8px] px-3 py-1.5 text-[12px] font-medium"
-                style={{ backgroundColor: tier.chipBg, color: tier.color }}
-              >
-                {t}
-              </span>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {/* Custom topics */}
-      <div className="border-t border-[rgba(228,228,231,0.3)] px-6 py-4">
-        <div className="mb-3 flex items-center gap-2">
-          <div className="h-[6px] w-[6px] rounded-full bg-[#0070EB]" />
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#0070EB]">Custom</span>
-        </div>
-
-        {customTopics.length > 0 && (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {customTopics.map((t) => (
-              <span
-                key={t}
-                className="flex items-center gap-1.5 rounded-[8px] bg-[#EFF6FF] px-3 py-1.5 text-[12px] font-medium text-[#0070EB]"
-              >
-                {t}
-                <button
-                  type="button"
-                  onClick={() => setCustomTopics(customTopics.filter((c) => c !== t))}
-                  className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full transition-all duration-200 hover:bg-[#0070EB]/15 active:scale-[0.85]"
-                >
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-
-        {customTopics.length === 0 && !adding && (
-          <p className="mb-3 text-[12px] leading-relaxed text-[#94A3B8]">
-            Add topics specific to your business. AI generates the follow-up questions automatically.
+        {!isCustomized && (
+          <p className="mt-2 rounded-[8px] bg-[#F0F2F5] px-3 py-2 text-[12px] text-[#71717A]">
+            These are the defaults — customize them or leave as-is.
           </p>
         )}
-
-        {adding ? (
-          <div className="flex gap-2.5">
-            <input
-              type="text"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAdd();
-                if (e.key === "Escape") { setAdding(false); setDraft(""); }
-              }}
-              placeholder="e.g. Filter Condition"
-              autoFocus
-              className="flex-1 rounded-[10px] border border-[#0070EB]/30 bg-white px-4 py-2.5 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
-            />
-            <button
-              type="button"
-              onClick={handleAdd}
-              disabled={!draft.trim()}
-              className={`shrink-0 rounded-[10px] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
-                draft.trim() ? "bg-[#0070EB] shadow-[0_2px_8px_rgba(0,112,235,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#B0D4F8]"
-              }`}
-            >
-              Add
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="flex items-center gap-2 text-[13px] font-medium text-[#0070EB] transition-all duration-200 hover:text-[#0058BB] active:scale-[0.98]"
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-[6px] bg-[#0070EB]/[0.06]">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0070EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-            </div>
-            Add custom topic
-          </button>
-        )}
       </div>
+
+      {TIER_META.map((tier, ti) => {
+        const tierTopics = topics.filter((t) => t.tier === tier.key).sort((a, b) => a.sort_order - b.sort_order);
+        return (
+          <div key={tier.key} className={`px-6 py-4 ${ti < TIER_META.length - 1 ? "border-b border-[rgba(228,228,231,0.3)]" : ""}`}>
+            <div className="mb-3 flex items-center gap-2">
+              <div className="h-[6px] w-[6px] rounded-full" style={{ backgroundColor: tier.dotColor }} />
+              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: tier.color }}>{tier.label}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {tierTopics.map((t) => (
+                <span
+                  key={t.id}
+                  className="group/chip flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[12px] font-medium"
+                  style={{ backgroundColor: tier.chipBg, color: tier.color }}
+                >
+                  {t.label}
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(t.id)}
+                    className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full opacity-0 transition-all duration-200 hover:bg-black/10 group-hover/chip:opacity-100 active:scale-[0.85]"
+                  >
+                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </span>
+              ))}
+            </div>
+
+            {addingTier === tier.key ? (
+              <div className="mt-3 flex flex-col gap-2">
+                <input
+                  type="text"
+                  value={draftLabel}
+                  onChange={(e) => setDraftLabel(e.target.value)}
+                  placeholder="Topic label (e.g. Filter Condition)"
+                  autoFocus
+                  className="rounded-[8px] border border-[rgba(228,228,231,0.5)] px-3 py-2 text-[13px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] focus:border-[#0070EB]/40 focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+                />
+                <input
+                  type="text"
+                  value={draftQuestion}
+                  onChange={(e) => setDraftQuestion(e.target.value)}
+                  placeholder="Follow-up question (e.g. How was the filter?)"
+                  className="rounded-[8px] border border-[rgba(228,228,231,0.5)] px-3 py-2 text-[13px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] focus:border-[#0070EB]/40 focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+                />
+                <input
+                  type="text"
+                  value={draftOptions}
+                  onChange={(e) => setDraftOptions(e.target.value)}
+                  placeholder="Options, comma-separated (e.g. Great, Good, Fair, Poor)"
+                  className="rounded-[8px] border border-[rgba(228,228,231,0.5)] px-3 py-2 text-[13px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] focus:border-[#0070EB]/40 focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAdd(tier.key); }}
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setAddingTier(null); setDraftLabel(""); setDraftQuestion(""); setDraftOptions(""); }}
+                    className="rounded-[8px] px-3.5 py-1.5 text-[13px] text-[#94A3B8] transition-all duration-200 hover:bg-[#F0F2F5] hover:text-[#71717A]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAdd(tier.key)}
+                    disabled={!draftLabel.trim() || !draftQuestion.trim() || draftOptions.split(",").filter((o) => o.trim()).length < 2}
+                    className="rounded-[8px] bg-[#0070EB] px-4 py-1.5 text-[13px] font-semibold text-white transition-all duration-200 disabled:cursor-not-allowed disabled:bg-[#B0D4F8]"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingTier(tier.key)}
+                className="mt-3 flex items-center gap-1.5 text-[12px] font-medium transition-all duration-200 hover:opacity-70"
+                style={{ color: tier.color }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Add topic
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════
-   BILLING — premium feel
+   BILLING
    ═══════════════════════════════════════════════════ */
 
-function BillingSection() {
+function BillingSection({ subscriptionStatus }: { subscriptionStatus: string }) {
+  const planName = subscriptionStatus === "active" ? "small Talk Pro" : subscriptionStatus === "trialing" ? "Free Trial" : "No Plan";
+  const statusLabel = subscriptionStatus === "active" ? "Active" : subscriptionStatus === "trialing" ? "Trial" : "Inactive";
+
   return (
     <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
       <div className="px-6 pt-5 pb-1">
@@ -522,15 +569,11 @@ function BillingSection() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-wider text-white/60">Current plan</p>
-              <p className="mt-1 text-[18px] font-bold tracking-tight">small Talk Pro</p>
+              <p className="mt-1 text-[18px] font-bold tracking-tight">{planName}</p>
             </div>
             <span className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold text-white">
-              Active
+              {statusLabel}
             </span>
-          </div>
-          <div className="mt-4 flex items-baseline gap-0.5">
-            <span className="text-[28px] font-bold tracking-tight">$29</span>
-            <span className="text-[13px] text-white/60">/month</span>
           </div>
         </div>
         <button
@@ -568,23 +611,77 @@ function LogoutButton() {
 }
 
 export default function SettingsPage() {
+  const { business } = useAuth();
+  const [services, setServices] = useState<ServiceRow[]>([]);
+  const [employees, setEmployees] = useState<EmployeeRow[]>([]);
+  const [topics, setTopics] = useState<TopicRow[]>([]);
+  const [isCustomized, setIsCustomized] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!business) return;
+
+    async function fetchAll() {
+      const [svcRes, empRes, topicRes] = await Promise.all([
+        supabase.from("services").select("id, name").eq("business_id", business!.id).order("name"),
+        supabase.from("employees").select("id, name").eq("business_id", business!.id).order("name"),
+        supabase.from("topics").select("*").or(`business_id.eq.${business!.id},business_id.is.null`).order("sort_order"),
+      ]);
+
+      setServices(svcRes.data || []);
+      setEmployees(empRes.data || []);
+
+      const allTopics = (topicRes.data || []) as TopicRow[];
+
+      // If business has custom topics, show those. Otherwise show globals.
+      const customTopics = allTopics.filter((t) => t.business_id === business!.id);
+      if (customTopics.length > 0) {
+        setTopics(customTopics);
+        setIsCustomized(true);
+      } else {
+        setTopics(allTopics.filter((t) => t.business_id === null));
+        setIsCustomized(false);
+      }
+
+      setLoading(false);
+    }
+
+    fetchAll();
+  }, [business]);
+
+  if (!business) return null;
+
   return (
     <div className="min-h-dvh bg-[#F8F9FA] font-dashboard sm:pl-[200px]">
       <div className="mx-auto max-w-[600px] px-5 pb-28 pt-8 sm:pb-16">
 
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-[22px] font-bold tracking-tight text-[#18181B]">Settings</h1>
         </div>
 
-        <div className="flex flex-col gap-8">
-          <BusinessProfile />
-          <ServicesList />
-          <TeamList />
-          <TopicSection />
-          <BillingSection />
-          <LogoutButton />
-        </div>
+        {loading ? (
+          <div className="flex flex-col gap-8">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-[200px] animate-pulse rounded-[16px] bg-[#F4F4F5]" />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-8">
+            <BusinessProfile
+              businessId={business.id}
+              initial={{
+                name: business.name,
+                logo_url: business.logo_url,
+                google_review_url: business.google_review_url,
+              }}
+            />
+            <ServicesList services={services} businessId={business.id} />
+            <TeamList employees={employees} businessId={business.id} />
+            <TopicSection topics={topics} businessId={business.id} isCustomized={isCustomized} />
+            <BillingSection subscriptionStatus={business.subscription_status} />
+            <LogoutButton />
+          </div>
+        )}
       </div>
     </div>
   );
