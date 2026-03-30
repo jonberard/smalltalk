@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
 
 const TABS = [
   {
@@ -37,20 +39,68 @@ const TABS = [
   },
 ];
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function DashboardNav({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { business, signOut } = useAuth();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   function isActive(href: string) {
     if (href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(href);
   }
 
+  const initials = business?.name
+    ? business.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+    : "?";
+
   return (
     <>
+      {/* ─── Mobile Top Bar ─── */}
+      <div className="fixed left-0 right-0 top-0 z-40 flex items-center justify-between border-b border-[rgba(228,228,231,0.5)] bg-white/95 px-4 py-2.5 backdrop-blur-md font-dashboard sm:hidden">
+        <p className="text-[15px] font-bold tracking-tight text-[#18181B]">small Talk</p>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setProfileOpen(!profileOpen)}
+            className="flex items-center gap-2 rounded-full border border-[rgba(228,228,231,0.5)] bg-[#F4F4F5] px-3 py-1.5 transition-colors hover:bg-[#EBEBED]"
+          >
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0070EB] text-[9px] font-bold text-white">
+              {initials}
+            </div>
+            <span className="text-[12px] font-medium text-[#18181B]">{business?.name}</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#71717A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          {profileOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
+              <div className="absolute right-0 top-10 z-50 w-[200px] overflow-hidden rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
+                <div className="border-b border-[rgba(228,228,231,0.5)] px-4 py-3">
+                  <p className="text-[13px] font-semibold text-[#18181B]">{business?.name}</p>
+                  <p className="mt-0.5 text-[11px] text-[#A1A1AA]">{business?.subscription_status === "trial" ? "Free trial" : "Active"}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setProfileOpen(false);
+                    await signOut();
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-[#EF4444] transition-colors hover:bg-[#FEF2F2]"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  Sign out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
       {children}
 
       {/* ─── Bottom Tab Bar ─── */}
@@ -82,7 +132,7 @@ export default function DashboardLayout({
           <p className="text-[15px] font-bold tracking-tight text-[#18181B]">small Talk</p>
           <p className="text-[11px] text-[#A1A1AA]">Dashboard</p>
         </div>
-        <div className="flex flex-col gap-1 px-3">
+        <div className="flex flex-1 flex-col gap-1 px-3">
           {TABS.map((tab) => {
             const active = isActive(tab.href);
             return (
@@ -101,7 +151,39 @@ export default function DashboardLayout({
             );
           })}
         </div>
+
+        {/* Sidebar bottom — profile + sign out */}
+        <div className="border-t border-[rgba(228,228,231,0.5)] px-3 py-3">
+          <div className="flex items-center gap-2.5 rounded-[10px] px-3 py-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0070EB]/10 text-[11px] font-bold text-[#0070EB]">
+              {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[12px] font-medium text-[#18181B]">{business?.name}</p>
+              <p className="text-[10px] text-[#A1A1AA]">{business?.subscription_status === "trial" ? "Free trial" : "Active"}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={signOut}
+            className="mt-2 w-full rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] py-2.5 text-[13px] font-semibold text-[#EF4444] transition-all duration-200 hover:border-[#EF4444] hover:bg-[#EF4444] hover:text-white active:scale-[0.98]"
+          >
+            Sign out
+          </button>
+        </div>
       </nav>
     </>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AuthProvider>
+      <DashboardNav>{children}</DashboardNav>
+    </AuthProvider>
   );
 }

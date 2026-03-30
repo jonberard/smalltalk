@@ -1,73 +1,35 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 /* ═══════════════════════════════════════════════════
-   DATA
+   DATA TYPES
    ═══════════════════════════════════════════════════ */
 
-const TEST_DATA = {
-  businessName: "Crystal Clear Pools",
-  businessInitials: "CCP",
-  employeeName: "Marcus",
-  serviceType: "Weekly Pool Cleaning",
-  customerName: "Alex",
-  googleReviewUrl:
-    "https://search.google.com/local/writereview?placeid=PLACEHOLDER",
-  hardcodedReviews: {
-    positive: [
-      "Marcus was fantastic. He showed up right on time for our weekly pool cleaning and the pool looks crystal clear. Really impressed with the attention to detail — highly recommend Crystal Clear Pools.",
-      "Can't say enough good things about Crystal Clear Pools. Marcus was professional, thorough, and left everything spotless. The pool has never looked better. Will definitely keep using them.",
-      "Great experience with Crystal Clear Pools. Marcus arrived on schedule, was super friendly, and did an excellent job on the weekly cleaning. You can tell he takes pride in his work.",
-    ],
-    mixed: [
-      "Crystal Clear Pools does solid work — the pool always looks great after Marcus visits. Communication could be a little better though; I wasn't sure exactly when he'd arrive. Overall still a good experience and fair pricing.",
-      "The actual pool cleaning from Crystal Clear Pools is good — Marcus knows what he's doing. I'd just appreciate a heads up on arrival time. Service itself is reliable, just wish the communication matched.",
-      "Marcus does a nice job with the cleaning and the pool looks good after each visit. Scheduling has been a bit inconsistent though. The work quality keeps me coming back, but there's room to improve on the logistics side.",
-    ],
-    negative: [
-      "Had some issues with my recent service. The tech arrived later than expected and I had trouble getting updates on the schedule. The pool cleaning itself was fine but the overall experience was frustrating.",
-      "Disappointed with Crystal Clear Pools lately. Communication has been poor — missed the scheduled window and no heads up. The cleaning was okay but the lack of professionalism is concerning.",
-      "Not a great experience. Waited around for a while past the scheduled time with no update. When Marcus did arrive the work was adequate, but the service as a whole needs improvement.",
-    ],
-  },
+type ReviewData = {
+  businessName: string;
+  businessInitials: string;
+  employeeName: string | null;
+  serviceType: string;
+  customerName: string;
+  googleReviewUrl: string;
+  reviewLinkId: string;
+  businessId: string;
+  sessionId: string;
 };
 
 type TopicDef = {
+  id: string;
   label: string;
   followUp: string;
   options: string[];
 };
 
-const SHARED_TOPICS: TopicDef[] = [
-  { label: "Timeliness", followUp: "How was the timing?", options: ["Early", "Right on time", "A bit late", "Very late"] },
-  { label: "Work Quality", followUp: "How was the quality of work?", options: ["Exceptional", "Solid", "Acceptable", "Needs improvement"] },
-  { label: "Communication", followUp: "How was communication?", options: ["Excellent", "Good", "Could improve", "Poor"] },
-  { label: "Pricing", followUp: "How was the pricing?", options: ["Great value", "Fair", "A bit high", "Overpriced"] },
-  { label: "Professionalism", followUp: "How professional was the service?", options: ["Outstanding", "Professional", "Adequate", "Unprofessional"] },
-  { label: "Cleanliness", followUp: "How clean was the work area after?", options: ["Spotless", "Clean", "Mostly clean", "Left a mess"] },
-];
-
-const TIER_TOPICS: Record<string, TopicDef[]> = {
-  positive: [
-    ...SHARED_TOPICS,
-    { label: "Went Above & Beyond", followUp: "In what way did they go above and beyond?", options: ["Truly exceptional", "Went the extra mile", "A nice touch", "Not really"] },
-    { label: "Would Recommend", followUp: "Would you recommend them?", options: ["Absolutely", "Yes", "Maybe", "Probably not"] },
-  ],
-  neutral: [
-    ...SHARED_TOPICS,
-    { label: "What Went Well", followUp: "What went well?", options: ["Outstanding", "Good", "Decent", "Nothing stood out"] },
-    { label: "What Could Improve", followUp: "What could improve?", options: ["Minor things", "Several things", "Significant issues", "Major changes needed"] },
-  ],
-  negative: [
-    ...SHARED_TOPICS,
-    { label: "Responsiveness", followUp: "How responsive were they?", options: ["Very responsive", "Responsive", "Slow", "Unresponsive"] },
-    { label: "Follow-Through", followUp: "Did they follow through?", options: ["Completely", "Mostly", "Partially", "Not at all"] },
-    { label: "Didn't Fix the Problem", followUp: "Was the issue resolved?", options: ["Fully resolved", "Partially fixed", "Not fixed", "Made it worse"] },
-  ],
-};
-
 const OTHER_TOPIC: TopicDef = {
+  id: "other",
   label: "Other",
   followUp: "How was this aspect?",
   options: ["Great", "Good", "Fair", "Poor"],
@@ -79,14 +41,6 @@ function getTier(rating: number): "positive" | "neutral" | "negative" {
   return "negative";
 }
 
-function getSentiment(
-  rating: number,
-  answers: Record<string, { option: string }>
-): "positive" | "mixed" | "negative" {
-  if (rating >= 4) return "positive";
-  if (rating <= 2) return "negative";
-  return "mixed";
-}
 
 /* ═══════════════════════════════════════════════════
    FLOW STATE
@@ -109,11 +63,11 @@ type TopicAnswer = { option: string; detail: string };
    SHARED COMPONENTS
    ═══════════════════════════════════════════════════ */
 
-function Avatar() {
+function Avatar({ initials }: { initials: string }) {
   return (
     <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary">
       <span className="font-heading text-[20px] font-bold text-white">
-        {TEST_DATA.businessInitials}
+        {initials}
       </span>
     </div>
   );
@@ -259,7 +213,7 @@ function Star({
   );
 }
 
-function StarsScreen({ onRate }: { onRate: (r: number) => void }) {
+function StarsScreen({ onRate, data }: { onRate: (r: number) => void; data: ReviewData }) {
   const [hovered, setHovered] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [animatingIndex, setAnimatingIndex] = useState<number | null>(null);
@@ -283,14 +237,14 @@ function StarsScreen({ onRate }: { onRate: (r: number) => void }) {
 
   return (
     <div className="flex flex-col items-center text-center">
-      <Avatar />
+      <Avatar initials={data.businessInitials} />
       <h1 className="font-heading text-[24px] font-semibold leading-tight text-text sm:text-[28px]">
-        Hey {TEST_DATA.customerName}, how
+        Hey {data.customerName}, how
         <br />
         was your service?
       </h1>
       <p className="mt-3 text-[14px] text-muted">
-        {TEST_DATA.serviceType} with {TEST_DATA.employeeName}
+        {data.serviceType}{data.employeeName ? ` with ${data.employeeName}` : ""}
       </p>
       <div className="mt-8 flex gap-1" onMouseLeave={() => setHovered(null)}>
         {Array.from({ length: 5 }).map((_, i) => (
@@ -327,15 +281,17 @@ function LowRatingChoiceScreen({
   onPublic,
   onPrivate,
   onBack,
+  data,
 }: {
   onPublic: () => void;
   onPrivate: () => void;
   onBack: () => void;
+  data: ReviewData;
 }) {
   return (
     <div className="flex flex-col items-center text-center">
       <BackButton onClick={onBack} />
-      <Avatar />
+      <Avatar initials={data.businessInitials} />
       <ScreenHeading>We&rsquo;re sorry it wasn&rsquo;t great</ScreenHeading>
       <ScreenSub>
         Your feedback matters. How would you like to share it?
@@ -361,7 +317,7 @@ function LowRatingChoiceScreen({
           className="w-full rounded-card border border-accent bg-surface p-5 text-left transition-all duration-200 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           <p className="text-[15px] font-semibold text-text">
-            Send private feedback to {TEST_DATA.businessName}
+            Send private feedback to {data.businessName}
           </p>
           <p className="mt-1 text-[13px] text-muted">
             Give them a chance to make it right — just between you and them.
@@ -377,21 +333,25 @@ function LowRatingChoiceScreen({
    ═══════════════════════════════════════════════════ */
 
 function TopicsScreen({
+  tierTopics,
   tier,
   onContinue,
   onSkip,
   onBack,
+  data,
 }: {
+  tierTopics: TopicDef[];
   tier: "positive" | "neutral" | "negative";
   onContinue: (topics: string[], customTopic: string | null) => void;
   onSkip: () => void;
   onBack: () => void;
+  data: ReviewData;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showCustom, setShowCustom] = useState(false);
   const [customText, setCustomText] = useState("");
 
-  const topics = TIER_TOPICS[tier];
+  const topics = tierTopics;
 
   const toggle = useCallback((label: string) => {
     setSelected((prev) => {
@@ -423,7 +383,7 @@ function TopicsScreen({
   return (
     <div className="flex flex-col items-center">
       <BackButton onClick={onBack} />
-      <Avatar />
+      <Avatar initials={data.businessInitials} />
       <ScreenHeading>{heading}</ScreenHeading>
       <ScreenSub>Tap the topics that are relevant</ScreenSub>
 
@@ -494,12 +454,14 @@ function FollowUpScreen({
   totalTopics,
   onAnswer,
   onBack,
+  data,
 }: {
   topic: TopicDef;
   topicIndex: number;
   totalTopics: number;
   onAnswer: (option: string, detail: string) => void;
   onBack: () => void;
+  data: ReviewData;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState("");
@@ -532,7 +494,7 @@ function FollowUpScreen({
     <div className="flex flex-col items-center text-center">
       <BackButton onClick={onBack} />
       <ProgressDots total={totalTopics} current={topicIndex} />
-      <Avatar />
+      <Avatar initials={data.businessInitials} />
       <ScreenHeading>{topic.followUp}</ScreenHeading>
       <ScreenSub>{topic.label}</ScreenSub>
 
@@ -581,16 +543,20 @@ function FollowUpScreen({
 function DetailScreen({
   onContinue,
   onBack,
+  data,
 }: {
   onContinue: (detail: string) => void;
   onBack: () => void;
+  data: ReviewData;
 }) {
   const [text, setText] = useState("");
+
+  const placeholderName = data.employeeName || "They";
 
   return (
     <div className="flex flex-col items-center">
       <BackButton onClick={onBack} />
-      <Avatar />
+      <Avatar initials={data.businessInitials} />
       <ScreenHeading>Anything else?</ScreenHeading>
       <ScreenSub>
         Totally optional — but specifics make a review shine.
@@ -599,7 +565,7 @@ function DetailScreen({
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={`e.g. "${TEST_DATA.employeeName} noticed the filter was cracking and told me before it became a problem."`}
+        placeholder={`e.g. "${placeholderName} noticed the filter was cracking and told me before it became a problem."`}
         rows={4}
         className="mt-8 w-full resize-none rounded-card border border-accent bg-background p-4 text-[15px] text-text placeholder:text-muted/60 focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors duration-200"
       />
@@ -624,22 +590,125 @@ function DetailScreen({
    SCREEN: REVIEW DRAFT
    ═══════════════════════════════════════════════════ */
 
+function ReviewShimmer() {
+  return (
+    <div className="w-full rounded-card border border-accent/50 bg-background p-6">
+      <span className="absolute -top-3 left-5 font-heading text-[48px] leading-none text-primary/20">
+        &ldquo;
+      </span>
+      <div className="space-y-3">
+        {[100, 92, 85, 60].map((w, i) => (
+          <div
+            key={i}
+            className="h-[18px] rounded-full bg-accent/60"
+            style={{
+              width: `${w}%`,
+              animation: `shimmer 1.8s ease-in-out ${i * 0.15}s infinite`,
+            }}
+          />
+        ))}
+      </div>
+      <style jsx>{`
+        @keyframes shimmer {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 1; }
+        }
+      `}</style>
+      <p className="mt-5 text-center text-[13px] text-muted">Writing your review...</p>
+    </div>
+  );
+}
+
 function ReviewScreen({
-  sentiment,
+  rating,
+  topicAnswers,
+  selectedTopics,
+  optionalDetail,
   onPost,
   onBack,
+  data,
 }: {
-  sentiment: "positive" | "mixed" | "negative";
-  onPost: (finalReview: string) => void;
+  rating: number;
+  topicAnswers: Record<string, TopicAnswer>;
+  selectedTopics: TopicDef[];
+  optionalDetail: string;
+  onPost: (finalReview: string, voiceId: string) => void;
   onBack: () => void;
+  data: ReviewData;
 }) {
-  const variants = TEST_DATA.hardcodedReviews[sentiment];
-  const [variantIdx, setVariantIdx] = useState(0);
-  const [reviewText, setReviewText] = useState(variants[0]);
+  const [reviewText, setReviewText] = useState("");
+  const [voiceId, setVoiceId] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState("");
+  const [generating, setGenerating] = useState(true);
+  const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const hasGenerated = useRef(false);
+
+  const buildPayload = useCallback(
+    (excludeVoice?: string) => ({
+      star_rating: rating,
+      business_name: data.businessName,
+      service_type: data.serviceType,
+      employee_name: data.employeeName,
+      topics_selected: selectedTopics.map((t) => ({
+        label: t.label,
+        follow_up_answer: topicAnswers[t.label]?.option || "",
+        detail_text: topicAnswers[t.label]?.detail || undefined,
+      })),
+      optional_text: optionalDetail || undefined,
+      exclude_voice_id: excludeVoice,
+    }),
+    [rating, data, selectedTopics, topicAnswers, optionalDetail]
+  );
+
+  const callApi = useCallback(
+    async (excludeVoice?: string) => {
+      setGenerating(true);
+      setError("");
+      try {
+        const res = await fetch("/api/generate-review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildPayload(excludeVoice)),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to generate review");
+        }
+        const result = await res.json();
+        setReviewText(result.review_text);
+        setVoiceId(result.voice_id);
+        setDebugInfo(`Voice: ${result.voice_name} · ${result.model}`);
+
+        // Save to session
+        supabase
+          .from("review_sessions")
+          .update({
+            generated_review: result.review_text,
+            voice_id: result.voice_id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", data.sessionId)
+          .then();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Something went wrong";
+        setError(msg);
+      } finally {
+        setGenerating(false);
+      }
+    },
+    [buildPayload, data.sessionId]
+  );
+
+  // Generate on mount
+  useEffect(() => {
+    if (!hasGenerated.current) {
+      hasGenerated.current = true;
+      callApi();
+    }
+  }, [callApi]);
 
   const handleEdit = useCallback(() => {
     setIsEditing(true);
@@ -647,14 +716,8 @@ function ReviewScreen({
   }, []);
 
   const handleTryAnother = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => {
-      const nextIdx = (variantIdx + 1) % variants.length;
-      setVariantIdx(nextIdx);
-      setReviewText(variants[nextIdx]);
-      setRefreshing(false);
-    }, 500);
-  }, [sentiment, variantIdx, variants]);
+    callApi(voiceId || undefined);
+  }, [callApi, voiceId]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -668,18 +731,35 @@ function ReviewScreen({
       document.body.removeChild(ta);
     }
     setCopied(true);
-    setTimeout(() => onPost(reviewText), 800);
-  }, [reviewText, onPost]);
+    setTimeout(() => onPost(reviewText, voiceId || ""), 800);
+  }, [reviewText, voiceId, onPost]);
 
   return (
     <div className="flex flex-col items-center">
       <BackButton onClick={onBack} />
-      <Avatar />
-      <ScreenHeading>Your review is ready</ScreenHeading>
-      <ScreenSub>Edit anything, or post as-is.</ScreenSub>
+      <Avatar initials={data.businessInitials} />
+      <ScreenHeading>
+        {generating ? "Crafting your review" : "Your review is ready"}
+      </ScreenHeading>
+      {!generating && !error && (
+        <ScreenSub>Edit anything, or post as-is.</ScreenSub>
+      )}
 
       <div className="mt-8 w-full">
-        {isEditing ? (
+        {generating ? (
+          <ReviewShimmer />
+        ) : error ? (
+          <div className="w-full rounded-card border border-red-200 bg-red-50 p-6 text-center">
+            <p className="text-[14px] text-red-600">{error}</p>
+            <button
+              type="button"
+              onClick={() => callApi(voiceId || undefined)}
+              className="mt-4 rounded-pill bg-primary px-6 py-2.5 text-[14px] font-bold text-white transition-all duration-200 active:scale-[0.98]"
+            >
+              Try again
+            </button>
+          </div>
+        ) : isEditing ? (
           <>
             <textarea
               ref={textareaRef}
@@ -703,10 +783,7 @@ function ReviewScreen({
             onClick={handleEdit}
             className="group w-full cursor-text text-left focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-card"
           >
-            <div
-              className="relative rounded-card border border-accent/50 bg-background p-6 transition-all duration-300"
-              style={{ opacity: refreshing ? 0.3 : 1 }}
-            >
+            <div className="relative rounded-card border border-accent/50 bg-background p-6 transition-all duration-300">
               <span className="absolute -top-3 left-5 font-heading text-[48px] leading-none text-primary/20">
                 &ldquo;
               </span>
@@ -721,37 +798,40 @@ function ReviewScreen({
         )}
       </div>
 
-      <ButtonRow>
-        <button
-          type="button"
-          onClick={handleTryAnother}
-          disabled={refreshing}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-pill border border-accent px-6 py-2.5 text-[14px] font-bold text-muted transition-all duration-200 active:scale-[0.98] disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          aria-label="Generate another version"
-        >
-          <svg
-            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            className="transition-transform duration-500"
-            style={{ transform: refreshing ? "rotate(360deg)" : "rotate(0)" }}
+      {!generating && !error && debugInfo && (
+        <p className="mt-2 w-full text-center text-[11px] text-muted/50">{debugInfo}</p>
+      )}
+
+      {!generating && !error && (
+        <ButtonRow>
+          <button
+            type="button"
+            onClick={handleTryAnother}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-pill border border-accent px-6 py-2.5 text-[14px] font-bold text-muted transition-all duration-200 active:scale-[0.98] disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            aria-label="Generate another version"
           >
-            <polyline points="23 4 23 10 17 10" />
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-          </svg>
-          Try another
-        </button>
-        <PrimaryButton onClick={handleCopy} disabled={copied}>
-          {copied ? (
-            <>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-fade-in">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Copied!
-            </>
-          ) : (
-            "Copy & post"
-          )}
-        </PrimaryButton>
-      </ButtonRow>
+            <svg
+              width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            >
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+            Try another
+          </button>
+          <PrimaryButton onClick={handleCopy} disabled={copied}>
+            {copied ? (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-fade-in">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Copied!
+              </>
+            ) : (
+              "Copy & post"
+            )}
+          </PrimaryButton>
+        </ButtonRow>
+      )}
     </div>
   );
 }
@@ -796,7 +876,7 @@ function Confetti() {
   );
 }
 
-function SuccessScreen({ reviewText }: { reviewText: string }) {
+function SuccessScreen({ reviewText, data }: { reviewText: string; data: ReviewData }) {
   const [recopied, setRecopied] = useState(false);
 
   const handleRecopy = useCallback(async () => {
@@ -827,7 +907,7 @@ function SuccessScreen({ reviewText }: { reviewText: string }) {
         </div>
 
         <ScreenHeading>
-          You&rsquo;re the best, {TEST_DATA.customerName}
+          You&rsquo;re the best, {data.customerName}
         </ScreenHeading>
 
         <p className="mt-3 text-[15px] leading-relaxed text-muted">
@@ -874,7 +954,7 @@ function SuccessScreen({ reviewText }: { reviewText: string }) {
           <button
             type="button"
             onClick={() =>
-              window.open(TEST_DATA.googleReviewUrl, "_blank")
+              window.open(data.googleReviewUrl, "_blank")
             }
             className="flex flex-1 items-center justify-center rounded-pill bg-primary px-6 py-2.5 text-[14px] font-bold text-white transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
@@ -883,7 +963,7 @@ function SuccessScreen({ reviewText }: { reviewText: string }) {
         </ButtonRow>
 
         <p className="mt-6 text-[13px] text-muted">
-          Thank you for supporting {TEST_DATA.businessName}.
+          Thank you for supporting {data.businessName}.
         </p>
       </div>
     </>
@@ -898,10 +978,12 @@ function PrivateFeedbackScreen({
   topicAnswers,
   onSubmit,
   onBack,
+  data,
 }: {
   topicAnswers: Record<string, TopicAnswer>;
   onSubmit: (feedback: string) => void;
   onBack: () => void;
+  data: ReviewData;
 }) {
   const [text, setText] = useState("");
 
@@ -911,10 +993,10 @@ function PrivateFeedbackScreen({
   return (
     <div className="flex flex-col items-center">
       <BackButton onClick={onBack} />
-      <Avatar />
+      <Avatar initials={data.businessInitials} />
       <ScreenHeading>Send your feedback</ScreenHeading>
       <ScreenSub>
-        This goes directly to {TEST_DATA.businessName} — not posted publicly.
+        This goes directly to {data.businessName} — not posted publicly.
       </ScreenSub>
 
       {hasPriorAnswers && (
@@ -947,7 +1029,7 @@ function PrivateFeedbackScreen({
 
       <ButtonRow>
         <PrimaryButton
-          onClick={() => onSubmit(text)}
+          onClick={() => onSubmit(text || Object.entries(topicAnswers).map(([t, a]) => `${t}: ${a.option}`).join(", "))}
           disabled={text.trim().length === 0 && !hasPriorAnswers}
         >
           Send feedback
@@ -961,7 +1043,7 @@ function PrivateFeedbackScreen({
    SCREEN: PRIVATE SUCCESS
    ═══════════════════════════════════════════════════ */
 
-function PrivateSuccessScreen() {
+function PrivateSuccessScreen({ data }: { data: ReviewData }) {
   return (
     <div className="animate-fade-in flex flex-col items-center text-center">
       <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-accent">
@@ -973,7 +1055,7 @@ function PrivateSuccessScreen() {
       <ScreenHeading>Feedback sent</ScreenHeading>
 
       <p className="mt-3 text-[15px] leading-relaxed text-muted">
-        Your feedback has been sent to {TEST_DATA.businessName}.
+        Your feedback has been sent to {data.businessName}.
         <br />
         Thank you for giving them a chance to make it right.
       </p>
@@ -986,10 +1068,91 @@ function PrivateSuccessScreen() {
 }
 
 /* ═══════════════════════════════════════════════════
+   LOADING SKELETON
+   ═══════════════════════════════════════════════════ */
+
+function LoadingSkeleton() {
+  return (
+    <main className="flex min-h-dvh items-center justify-center px-4 py-8">
+      <div className="w-full max-w-[480px] rounded-card bg-surface px-6 py-10 shadow-card sm:px-10 sm:py-12">
+        <div className="flex flex-col items-center">
+          <div className="mb-5 h-14 w-14 animate-pulse rounded-full bg-accent" />
+          <div className="h-7 w-3/4 animate-pulse rounded-lg bg-accent" />
+          <div className="mt-3 h-4 w-1/2 animate-pulse rounded-lg bg-accent/60" />
+          <div className="mt-8 flex gap-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-11 w-11 animate-pulse rounded-lg bg-accent/40" />
+            ))}
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   NOT FOUND
+   ═══════════════════════════════════════════════════ */
+
+function NotFoundScreen() {
+  return (
+    <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-6">
+      {/* Giant background 404 */}
+      <div
+        className="pointer-events-none absolute select-none font-heading font-bold leading-none text-primary/[0.04]"
+        style={{ fontSize: "min(50vw, 400px)" }}
+        aria-hidden="true"
+      >
+        404
+      </div>
+
+      <div className="relative z-10 max-w-[440px] text-center">
+        {/* Disconnected chat bubbles */}
+        <div className="mb-10 flex items-end justify-center gap-3">
+          <div className="animate-[float_3s_ease-in-out_infinite] rounded-[20px] rounded-bl-[4px] bg-primary/10 px-5 py-3">
+            <div className="flex gap-[5px]">
+              <div className="h-[7px] w-[7px] animate-[blink_1.4s_ease-in-out_infinite] rounded-full bg-primary/40" />
+              <div className="h-[7px] w-[7px] animate-[blink_1.4s_ease-in-out_0.2s_infinite] rounded-full bg-primary/40" />
+              <div className="h-[7px] w-[7px] animate-[blink_1.4s_ease-in-out_0.4s_infinite] rounded-full bg-primary/40" />
+            </div>
+          </div>
+          <div className="animate-[float_3s_ease-in-out_0.5s_infinite] rounded-[20px] rounded-br-[4px] bg-accent px-5 py-3">
+            <div className="flex gap-[5px]">
+              <div className="h-[7px] w-[7px] animate-[blink_1.4s_ease-in-out_0.6s_infinite] rounded-full bg-muted/40" />
+              <div className="h-[7px] w-[7px] animate-[blink_1.4s_ease-in-out_0.8s_infinite] rounded-full bg-muted/40" />
+              <div className="h-[7px] w-[7px] animate-[blink_1.4s_ease-in-out_1s_infinite] rounded-full bg-muted/40" />
+            </div>
+          </div>
+        </div>
+
+        <h1 className="font-heading text-[36px] font-bold leading-[1.1] tracking-tight text-text sm:text-[44px]">
+          Lost the <em className="text-primary">conversation</em>
+        </h1>
+
+        <p className="mx-auto mt-5 max-w-[340px] text-[16px] leading-[1.7] text-muted">
+          This link wandered off. Ask the business to send you a fresh one — it takes two seconds.
+        </p>
+
+        <Link
+          href="/"
+          className="mt-10 inline-flex items-center gap-2 rounded-pill border border-accent bg-surface px-7 py-3 text-[14px] font-semibold text-text shadow-sm transition-all duration-300 hover:border-primary hover:text-primary active:scale-[0.98]"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+          Back to small Talk
+        </Link>
+      </div>
+    </main>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
    MAIN FLOW
    ═══════════════════════════════════════════════════ */
 
-export default function ReviewFlow() {
+function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Record<string, TopicDef[]> }) {
   const [step, setStep] = useState<Step>("stars");
   const [rating, setRating] = useState(0);
   const [path, setPath] = useState<"public" | "private" | null>(null);
@@ -1006,7 +1169,7 @@ export default function ReviewFlow() {
   // Resolve which topics the user selected into TopicDef objects
   const resolveTopics = useCallback(
     (labels: string[], customTopic: string | null) => {
-      const tierTopics = TIER_TOPICS[tier];
+      const tierTopics = allTopics[tier] || [];
       const resolved: TopicDef[] = [];
       for (const label of labels) {
         const found = tierTopics.find((t) => t.label === label);
@@ -1020,18 +1183,24 @@ export default function ReviewFlow() {
       }
       return resolved;
     },
-    [tier]
+    [tier, allTopics]
   );
 
   // Star rating handler
   const handleRate = useCallback((r: number) => {
     setRating(r);
+    // Update session with rating
+    supabase
+      .from("review_sessions")
+      .update({ star_rating: r, status: "in_progress", updated_at: new Date().toISOString() })
+      .eq("id", data.sessionId)
+      .then();
     if (r <= 2) {
       setStep("low-rating-choice");
     } else {
       setStep("topics");
     }
-  }, []);
+  }, [data.sessionId]);
 
   // Low rating choice
   const handlePublic = useCallback(() => {
@@ -1041,8 +1210,13 @@ export default function ReviewFlow() {
 
   const handlePrivate = useCallback(() => {
     setPath("private");
+    supabase
+      .from("review_sessions")
+      .update({ feedback_type: "private", updated_at: new Date().toISOString() })
+      .eq("id", data.sessionId)
+      .then();
     setStep("topics");
-  }, []);
+  }, [data.sessionId]);
 
   // Topic selection
   const handleTopics = useCallback(
@@ -1068,46 +1242,75 @@ export default function ReviewFlow() {
   const handleFollowUpAnswer = useCallback(
     (option: string, detail: string) => {
       const topic = selectedTopics[currentTopicIdx];
-      setTopicAnswers((prev) => ({
-        ...prev,
+      const newAnswers = {
+        ...topicAnswers,
         [topic.label]: { option, detail },
+      };
+      setTopicAnswers(newAnswers);
+
+      // Save topics to session
+      const topicsSelected = Object.entries(newAnswers).map(([label, ans]) => ({
+        topic_id: selectedTopics.find((t) => t.label === label)?.id || "custom",
+        label,
+        follow_up_answer: ans.option,
       }));
+      supabase
+        .from("review_sessions")
+        .update({ topics_selected: topicsSelected, updated_at: new Date().toISOString() })
+        .eq("id", data.sessionId)
+        .then();
 
       const nextIdx = currentTopicIdx + 1;
       if (nextIdx < selectedTopics.length) {
         setCurrentTopicIdx(nextIdx);
-        // Force re-render by updating step key
         setStep("followup");
       } else {
         setStep("detail");
       }
     },
-    [selectedTopics, currentTopicIdx]
+    [selectedTopics, currentTopicIdx, topicAnswers, data.sessionId]
   );
 
   // Detail
   const handleDetail = useCallback(
     (text: string) => {
       setOptionalDetail(text);
+      if (text) {
+        supabase
+          .from("review_sessions")
+          .update({ optional_text: text, updated_at: new Date().toISOString() })
+          .eq("id", data.sessionId)
+          .then();
+      }
       if (path === "private") {
         setStep("private-feedback");
       } else {
         setStep("review");
       }
     },
-    [path]
+    [path, data.sessionId]
   );
 
   // Review
-  const handlePost = useCallback((text: string) => {
+  const handlePost = useCallback((text: string, voiceId: string) => {
     setFinalReview(text);
+    supabase
+      .from("review_sessions")
+      .update({ generated_review: text, status: "copied", updated_at: new Date().toISOString() })
+      .eq("id", data.sessionId)
+      .then();
     setStep("success");
-  }, []);
+  }, [data.sessionId]);
 
   // Private feedback
-  const handlePrivateSubmit = useCallback(() => {
+  const handlePrivateSubmit = useCallback((feedback: string) => {
+    supabase
+      .from("review_sessions")
+      .update({ optional_text: feedback, status: "drafted", updated_at: new Date().toISOString() })
+      .eq("id", data.sessionId)
+      .then();
     setStep("private-success");
-  }, []);
+  }, [data.sessionId]);
 
   // Back handlers
   const handleBackToStars = useCallback(() => {
@@ -1149,28 +1352,29 @@ export default function ReviewFlow() {
     setStep("detail");
   }, []);
 
-  const sentiment = getSentiment(rating, topicAnswers);
-
   return (
     <main className="flex min-h-dvh items-center justify-center px-4 py-8">
       <div className="w-full max-w-[480px] rounded-card bg-surface px-6 py-10 shadow-card transition-all duration-300 sm:px-10 sm:py-12">
         <div key={`${step}-${currentTopicIdx}`} className="animate-fade-in">
-          {step === "stars" && <StarsScreen onRate={handleRate} />}
+          {step === "stars" && <StarsScreen onRate={handleRate} data={data} />}
 
           {step === "low-rating-choice" && (
             <LowRatingChoiceScreen
               onPublic={handlePublic}
               onPrivate={handlePrivate}
               onBack={handleBackToStars}
+              data={data}
             />
           )}
 
           {step === "topics" && (
             <TopicsScreen
+              tierTopics={allTopics[tier] || []}
               tier={tier}
               onContinue={handleTopics}
               onSkip={handleSkipTopics}
               onBack={handleBackFromTopics}
+              data={data}
             />
           )}
 
@@ -1182,6 +1386,7 @@ export default function ReviewFlow() {
               totalTopics={selectedTopics.length}
               onAnswer={handleFollowUpAnswer}
               onBack={handleBackFromFollowup}
+              data={data}
             />
           )}
 
@@ -1189,30 +1394,160 @@ export default function ReviewFlow() {
             <DetailScreen
               onContinue={handleDetail}
               onBack={handleBackFromDetail}
+              data={data}
             />
           )}
 
           {step === "review" && (
             <ReviewScreen
-              sentiment={sentiment}
+              rating={rating}
+              topicAnswers={topicAnswers}
+              selectedTopics={selectedTopics}
+              optionalDetail={optionalDetail}
               onPost={handlePost}
               onBack={handleBackFromReview}
+              data={data}
             />
           )}
 
-          {step === "success" && <SuccessScreen reviewText={finalReview} />}
+          {step === "success" && <SuccessScreen reviewText={finalReview} data={data} />}
 
           {step === "private-feedback" && (
             <PrivateFeedbackScreen
               topicAnswers={topicAnswers}
               onSubmit={handlePrivateSubmit}
               onBack={handleBackFromPrivateFeedback}
+              data={data}
             />
           )}
 
-          {step === "private-success" && <PrivateSuccessScreen />}
+          {step === "private-success" && <PrivateSuccessScreen data={data} />}
         </div>
       </div>
     </main>
   );
+}
+
+/* ═══════════════════════════════════════════════════
+   PAGE — data fetching wrapper
+   ═══════════════════════════════════════════════════ */
+
+export default function ReviewFlow() {
+  const params = useParams();
+  const code = params.code as string;
+
+  const [data, setData] = useState<ReviewData | null>(null);
+  const [allTopics, setAllTopics] = useState<Record<string, TopicDef[]>>({});
+  const [notFound, setNotFound] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      // 1. Look up the review link by unique_code
+      const { data: link, error: linkError } = await supabase
+        .from("review_links")
+        .select("id, business_id, service_id, employee_id, customer_name")
+        .eq("unique_code", code)
+        .single();
+
+      if (linkError || !link) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Fetch business, service, and optionally employee
+      const [bizRes, svcRes, empRes] = await Promise.all([
+        supabase.from("businesses").select("name, logo_url, google_review_url").eq("id", link.business_id).single(),
+        supabase.from("services").select("name").eq("id", link.service_id).single(),
+        link.employee_id
+          ? supabase.from("employees").select("name").eq("id", link.employee_id).single()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+
+      if (bizRes.error || !bizRes.data || svcRes.error || !svcRes.data) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      const businessName = bizRes.data.name;
+      const employeeName = empRes.data?.name || null;
+      const initials = businessName
+        .split(/\s+/)
+        .map((w: string) => w[0])
+        .join("")
+        .slice(0, 3)
+        .toUpperCase();
+
+      // 3. Fetch topics for this business (or global defaults)
+      const { data: bizTopics } = await supabase
+        .from("topics")
+        .select("id, label, tier, follow_up_question, follow_up_options, sort_order")
+        .eq("business_id", link.business_id)
+        .order("sort_order");
+
+      let topicRows = bizTopics;
+      if (!topicRows || topicRows.length === 0) {
+        // Fall back to global defaults
+        const { data: globalTopics } = await supabase
+          .from("topics")
+          .select("id, label, tier, follow_up_question, follow_up_options, sort_order")
+          .is("business_id", null)
+          .order("sort_order");
+        topicRows = globalTopics;
+      }
+
+      // Group topics by tier
+      const grouped: Record<string, TopicDef[]> = { positive: [], neutral: [], negative: [] };
+      if (topicRows) {
+        for (const t of topicRows) {
+          const def: TopicDef = {
+            id: t.id,
+            label: t.label,
+            followUp: t.follow_up_question,
+            options: t.follow_up_options,
+          };
+          if (grouped[t.tier]) {
+            grouped[t.tier].push(def);
+          }
+        }
+      }
+
+      // 4. Create a review_session
+      const { data: session, error: sessionError } = await supabase
+        .from("review_sessions")
+        .insert({ review_link_id: link.id })
+        .select("id")
+        .single();
+
+      if (sessionError || !session) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      const reviewData: ReviewData = {
+        businessName,
+        businessInitials: initials,
+        employeeName,
+        serviceType: svcRes.data.name,
+        customerName: link.customer_name,
+        googleReviewUrl: bizRes.data.google_review_url,
+        reviewLinkId: link.id,
+        businessId: link.business_id,
+        sessionId: session.id,
+      };
+
+      setData(reviewData);
+      setAllTopics(grouped);
+      setLoading(false);
+    }
+
+    load();
+  }, [code]);
+
+  if (loading) return <LoadingSkeleton />;
+  if (notFound || !data) return <NotFoundScreen />;
+  return <ReviewFlowInner data={data} allTopics={allTopics} />;
 }

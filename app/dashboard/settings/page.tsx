@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useAuth } from "@/lib/auth-context";
 
 /* ═══════════════════════════════════════════════════
    SEED DATA
@@ -547,6 +548,25 @@ function BillingSection() {
    PAGE
    ═══════════════════════════════════════════════════ */
 
+function LogoutButton() {
+  const { signOut } = useAuth();
+  const [loading, setLoading] = useState(false);
+
+  return (
+    <button
+      type="button"
+      disabled={loading}
+      onClick={async () => {
+        setLoading(true);
+        await signOut();
+      }}
+      className="w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-white py-3 text-[13px] font-semibold text-[#EF4444] transition-all duration-200 hover:bg-[#FEF2F2] hover:border-[#FECACA] active:scale-[0.98] disabled:opacity-60"
+    >
+      {loading ? "Signing out..." : "Sign out"}
+    </button>
+  );
+}
+
 export default function SettingsPage() {
   return (
     <div className="min-h-dvh bg-[#F8F9FA] font-dashboard sm:pl-[200px]">
@@ -563,6 +583,7 @@ export default function SettingsPage() {
           <TeamList />
           <TopicSection />
           <BillingSection />
+          <LogoutButton />
         </div>
       </div>
     </div>
