@@ -24,16 +24,37 @@ type TopicRow = {
    BUSINESS PROFILE
    ═══════════════════════════════════════════════════ */
 
+type PlaceResult = {
+  place_id: string;
+  name: string;
+  address: string;
+  rating: number | null;
+  user_ratings_total: number;
+};
+
 function BusinessProfile({ businessId, initial }: {
   businessId: string;
-  initial: { name: string; logo_url: string | null; google_review_url: string };
+  initial: { name: string; logo_url: string | null; google_review_url: string; google_place_id: string | null };
 }) {
   const [name, setName] = useState(initial.name);
   const [googleUrl, setGoogleUrl] = useState(initial.google_review_url);
+  const [placeId, setPlaceId] = useState<string | null>(initial.google_place_id);
   const [logoPreview, setLogoPreview] = useState<string | null>(initial.logo_url);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Google Places search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<PlaceResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showManual, setShowManual] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<PlaceResult | null>(
+    initial.google_place_id
+      ? { place_id: initial.google_place_id, name: "", address: "", rating: null, user_ratings_total: 0 }
+      : null
+  );
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const initials = name.trim()
     ? name.trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 3).toUpperCase()
@@ -46,6 +67,55 @@ function BusinessProfile({ businessId, initial }: {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }, [businessId]);
+
+  async function handlePlaceSearch(query: string) {
+    setSearchQuery(query);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (query.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    searchTimeout.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/places-search?q=${encodeURIComponent(query.trim())}`);
+        const data = await res.json();
+        setSearchResults(data.results || []);
+      } catch {
+        setSearchResults([]);
+      }
+      setSearching(false);
+    }, 400);
+  }
+
+  async function handlePlaceSelect(place: PlaceResult) {
+    const url = `https://search.google.com/local/writereview?placeid=${place.place_id}`;
+    setSelectedPlace(place);
+    setPlaceId(place.place_id);
+    setGoogleUrl(url);
+    setSearchQuery("");
+    setSearchResults([]);
+
+    // Extract city from address (typically "City, State ZIP, Country" format)
+    const city = extractCity(place.address);
+    save({ google_review_url: url, google_place_id: place.place_id, business_city: city });
+  }
+
+  function extractCity(address: string): string | null {
+    // Google formatted_address: "123 Main St, Austin, TX 78701, USA"
+    const parts = address.split(",").map((p) => p.trim());
+    // City is usually the second-to-last US part (before "State ZIP" and "USA/Country")
+    if (parts.length >= 3) return parts[parts.length - 3];
+    if (parts.length === 2) return parts[0];
+    return null;
+  }
+
+  function handleClearPlace() {
+    setSelectedPlace(null);
+    setPlaceId(null);
+    setGoogleUrl("");
+    save({ google_review_url: "", google_place_id: null });
+  }
 
   async function handleLogoUpload(file: File) {
     const ext = file.name.split(".").pop();
@@ -121,15 +191,119 @@ function BusinessProfile({ businessId, initial }: {
           />
         </div>
         <div>
-          <label className="mb-2 block text-[12px] font-medium text-[#71717A]">Google Business Profile URL</label>
-          <input
-            type="text"
-            value={googleUrl}
-            onChange={(e) => setGoogleUrl(e.target.value)}
-            onBlur={() => { if (googleUrl !== initial.google_review_url) save({ google_review_url: googleUrl }); }}
-            placeholder="https://search.google.com/local/writereview?placeid=..."
-            className="w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-[#FAFAFA] px-4 py-3 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] transition-all duration-300 focus:border-[#0070EB]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
-          />
+          <label className="mb-2 block text-[12px] font-medium text-[#71717A]">Google Business Profile</label>
+
+          {/* Selected place card */}
+          {selectedPlace && placeId ? (
+            <div className="flex items-start gap-3 rounded-[10px] border border-[#10B981]/30 bg-[#ECFDF5] px-4 py-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-[#10B981]">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <polyline points="22 4 12 14.01 9 11.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-[13px] font-medium text-[#18181B]">
+                    {selectedPlace.name || "Connected"}
+                  </span>
+                </div>
+                {selectedPlace.address && (
+                  <p className="mt-1 text-[12px] text-[#71717A] pl-[24px]">{selectedPlace.address}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleClearPlace}
+                className="shrink-0 rounded-[6px] px-2.5 py-1 text-[11px] font-medium text-[#71717A] transition-all duration-200 hover:bg-white hover:text-[#EF4444]"
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Search field */}
+              <div className="relative">
+                <div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#A1A1AA]">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handlePlaceSearch(e.target.value)}
+                  placeholder="Search for your business on Google"
+                  className="w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-[#FAFAFA] py-3 pl-10 pr-4 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] transition-all duration-300 focus:border-[#0070EB]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+                />
+                {searching && (
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#D4D4D8] border-t-[#0070EB]" />
+                  </div>
+                )}
+              </div>
+
+              {/* Search results */}
+              {searchResults.length > 0 && (
+                <div className="mt-2 overflow-hidden rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_4px_12px_rgba(0,0,0,0.06)]">
+                  {searchResults.map((place, i) => (
+                    <button
+                      key={place.place_id}
+                      type="button"
+                      onClick={() => handlePlaceSelect(place)}
+                      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-all duration-200 hover:bg-[#F8F9FA] active:bg-[#F0F2F5] ${
+                        i < searchResults.length - 1 ? "border-b border-[rgba(228,228,231,0.3)]" : ""
+                      }`}
+                    >
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#0070EB]/[0.06]">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0070EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                          <circle cx="12" cy="10" r="3" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-medium text-[#18181B]">{place.name}</p>
+                        <p className="mt-0.5 text-[12px] text-[#71717A] truncate">{place.address}</p>
+                        {place.rating && (
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <div className="flex items-center gap-0.5">
+                              {Array.from({ length: 5 }).map((_, s) => (
+                                <svg key={s} width="10" height="10" viewBox="0 0 24 24" fill={s < Math.round(place.rating!) ? "#F59E0B" : "#E5E7EB"}>
+                                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                                </svg>
+                              ))}
+                            </div>
+                            <span className="text-[11px] text-[#A1A1AA]">{place.rating} ({place.user_ratings_total})</span>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Manual fallback */}
+              {!showManual ? (
+                <button
+                  type="button"
+                  onClick={() => setShowManual(true)}
+                  className="mt-2.5 text-[12px] text-[#A1A1AA] transition-all duration-200 hover:text-[#71717A]"
+                >
+                  Can&apos;t find your business? Paste your Google review link directly
+                </button>
+              ) : (
+                <div className="mt-2.5">
+                  <input
+                    type="text"
+                    value={googleUrl}
+                    onChange={(e) => setGoogleUrl(e.target.value)}
+                    onBlur={() => { if (googleUrl !== initial.google_review_url) save({ google_review_url: googleUrl }); }}
+                    placeholder="https://search.google.com/local/writereview?placeid=..."
+                    className="w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-[#FAFAFA] px-4 py-3 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] transition-all duration-300 focus:border-[#0070EB]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+                  />
+                </div>
+              )}
+            </>
+          )}
         </div>
         {(saving || saved) && (
           <p className="text-[12px] text-[#10B981]">{saving ? "Saving..." : "Saved"}</p>
@@ -256,6 +430,127 @@ function ServicesList({ services: initial, businessId }: { services: ServiceRow[
             </svg>
           </div>
           Add a service
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   NEIGHBORHOODS
+   ═══════════════════════════════════════════════════ */
+
+function NeighborhoodsList({ neighborhoods: initial, businessId }: { neighborhoods: string[]; businessId: string }) {
+  const [items, setItems] = useState(initial);
+  const [draft, setDraft] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function persist(updated: string[]) {
+    setSaving(true);
+    await supabase.from("businesses").update({ neighborhoods: updated }).eq("id", businessId);
+    setSaving(false);
+  }
+
+  async function handleAdd() {
+    const trimmed = draft.trim();
+    if (!trimmed || items.some((n) => n.toLowerCase() === trimmed.toLowerCase())) return;
+    const updated = [...items, trimmed];
+    setItems(updated);
+    setDraft("");
+    setAdding(false);
+    persist(updated);
+  }
+
+  function handleRemove(index: number) {
+    const updated = items.filter((_, i) => i !== index);
+    setItems(updated);
+    persist(updated);
+  }
+
+  const areaColors = ["#06B6D4", "#8B5CF6", "#F97316", "#10B981", "#E11D48", "#0070EB", "#F59E0B", "#6366F1"];
+
+  return (
+    <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
+      <div className="px-6 pt-5 pb-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-[15px] font-semibold tracking-tight text-[#18181B]">Service Areas</h3>
+            <p className="mt-0.5 text-[11px] text-[#94A3B8]">Neighborhoods you serve — boosts local SEO in reviews</p>
+          </div>
+          {saving && <span className="text-[11px] text-[#10B981]">Saving...</span>}
+          {!saving && items.length > 0 && (
+            <span className="rounded-full bg-[#F0F2F5] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[#71717A]">{items.length}</span>
+          )}
+        </div>
+      </div>
+
+      {items.length > 0 && (
+        <div className="px-6 pb-1">
+          <div className="flex flex-wrap gap-2">
+            {items.map((name, i) => (
+              <span
+                key={`${name}-${i}`}
+                className="group/chip flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[12px] font-medium text-white"
+                style={{ backgroundColor: areaColors[i % areaColors.length] }}
+              >
+                {name}
+                <button
+                  type="button"
+                  onClick={() => handleRemove(i)}
+                  className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full opacity-0 transition-all duration-200 hover:bg-white/30 group-hover/chip:opacity-100 active:scale-[0.85]"
+                >
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {adding ? (
+        <div className="border-t border-[rgba(228,228,231,0.3)] px-6 py-4">
+          <div className="flex gap-2.5">
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAdd();
+                if (e.key === "Escape") { setAdding(false); setDraft(""); }
+              }}
+              placeholder="e.g. Zilker, Westlake, North Loop"
+              autoFocus
+              className="flex-1 rounded-[10px] border border-[#0070EB]/30 bg-white px-4 py-2.5 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+            />
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={!draft.trim()}
+              className={`shrink-0 rounded-[10px] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
+                draft.trim() ? "bg-[#0070EB] shadow-[0_2px_8px_rgba(0,112,235,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#B0D4F8]"
+              }`}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="flex w-full items-center gap-2.5 border-t border-[rgba(228,228,231,0.3)] px-6 py-4 text-[13px] font-medium text-[#0070EB] transition-all duration-200 hover:bg-[#0070EB]/[0.03] active:scale-[0.99]"
+        >
+          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#0070EB]/[0.06]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0070EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </div>
+          Add a neighborhood
         </button>
       )}
     </div>
@@ -555,9 +850,112 @@ function TopicSection({ topics: initial, businessId, isCustomized }: {
    BILLING
    ═══════════════════════════════════════════════════ */
 
-function BillingSection({ subscriptionStatus }: { subscriptionStatus: string }) {
-  const planName = subscriptionStatus === "active" ? "small Talk Pro" : subscriptionStatus === "trialing" ? "Free Trial" : "No Plan";
-  const statusLabel = subscriptionStatus === "active" ? "Active" : subscriptionStatus === "trialing" ? "Trial" : "Inactive";
+function BillingSection({ business }: {
+  business: {
+    id: string;
+    subscription_status: string;
+    trial_requests_remaining: number;
+    trial_ends_at: string | null;
+    stripe_customer_id: string | null;
+  };
+}) {
+  const [redirecting, setRedirecting] = useState(false);
+
+  const status = business.subscription_status;
+  const trialExpired =
+    status === "trial" &&
+    ((business.trial_ends_at && new Date(business.trial_ends_at) < new Date()) ||
+      business.trial_requests_remaining <= 0);
+
+  const daysLeft = business.trial_ends_at
+    ? Math.max(0, Math.ceil((new Date(business.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  async function handleCheckout() {
+    setRedirecting(true);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          price_id: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || "price_placeholder",
+          user_id: business.id,
+        }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else setRedirecting(false);
+    } catch {
+      setRedirecting(false);
+    }
+  }
+
+  async function handlePortal() {
+    if (!business.stripe_customer_id) return;
+    setRedirecting(true);
+    try {
+      const res = await fetch("/api/billing-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stripe_customer_id: business.stripe_customer_id }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else setRedirecting(false);
+    } catch {
+      setRedirecting(false);
+    }
+  }
+
+  // Determine card content
+  let planName: string;
+  let badge: { label: string; color: string };
+  let details: React.ReactNode;
+  let action: { label: string; onClick: () => void };
+
+  if (status === "active") {
+    planName = "small Talk Pro";
+    badge = { label: "Active", color: "bg-[#10B981]/20 text-[#10B981]" };
+    details = (
+      <p className="mt-3 text-[13px] text-white/70">
+        Your subscription is active. Manage your billing, update payment method, or cancel anytime.
+      </p>
+    );
+    action = { label: "Manage Billing", onClick: handlePortal };
+  } else if (status === "trial" && !trialExpired) {
+    planName = "Free Trial";
+    badge = { label: "Trial", color: "bg-white/20 text-white" };
+    details = (
+      <div className="mt-3 flex flex-col gap-1.5">
+        <p className="text-[13px] text-white/70">
+          <span className="font-semibold text-white">{business.trial_requests_remaining}</span> request{business.trial_requests_remaining !== 1 ? "s" : ""} remaining
+        </p>
+        <p className="text-[13px] text-white/70">
+          <span className="font-semibold text-white">{daysLeft}</span> day{daysLeft !== 1 ? "s" : ""} left
+        </p>
+      </div>
+    );
+    action = { label: "Upgrade Now", onClick: handleCheckout };
+  } else if (status === "trial" && trialExpired) {
+    planName = "Free Trial";
+    badge = { label: "Ended", color: "bg-[#EF4444]/20 text-[#FCA5A5]" };
+    details = (
+      <p className="mt-3 text-[13px] text-white/70">
+        Your trial has ended. Subscribe to continue sending review links and unlock all features.
+      </p>
+    );
+    action = { label: "Subscribe to Continue", onClick: handleCheckout };
+  } else {
+    // canceled
+    planName = "No Active Plan";
+    badge = { label: "Canceled", color: "bg-[#EF4444]/20 text-[#FCA5A5]" };
+    details = (
+      <p className="mt-3 text-[13px] text-white/70">
+        Your subscription has ended. Resubscribe to start sending review links again.
+      </p>
+    );
+    action = { label: "Resubscribe", onClick: handleCheckout };
+  }
 
   return (
     <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
@@ -571,16 +969,19 @@ function BillingSection({ subscriptionStatus }: { subscriptionStatus: string }) 
               <p className="text-[11px] font-medium uppercase tracking-wider text-white/60">Current plan</p>
               <p className="mt-1 text-[18px] font-bold tracking-tight">{planName}</p>
             </div>
-            <span className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold text-white">
-              {statusLabel}
+            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${badge.color}`}>
+              {badge.label}
             </span>
           </div>
+          {details}
         </div>
         <button
           type="button"
-          className="mt-3 w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-[#FAFAFA] py-3 text-[13px] font-semibold text-[#71717A] transition-all duration-200 hover:bg-white hover:text-[#18181B] hover:shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)] active:scale-[0.98]"
+          onClick={action.onClick}
+          disabled={redirecting}
+          className="mt-3 w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-[#FAFAFA] py-3 text-[13px] font-semibold text-[#71717A] transition-all duration-200 hover:bg-white hover:text-[#18181B] hover:shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)] active:scale-[0.98] disabled:opacity-60"
         >
-          Manage Billing
+          {redirecting ? "Redirecting..." : action.label}
         </button>
       </div>
     </div>
@@ -673,12 +1074,14 @@ export default function SettingsPage() {
                 name: business.name,
                 logo_url: business.logo_url,
                 google_review_url: business.google_review_url,
+                google_place_id: business.google_place_id,
               }}
             />
             <ServicesList services={services} businessId={business.id} />
+            <NeighborhoodsList neighborhoods={business.neighborhoods || []} businessId={business.id} />
             <TeamList employees={employees} businessId={business.id} />
             <TopicSection topics={topics} businessId={business.id} isCustomized={isCustomized} />
-            <BillingSection subscriptionStatus={business.subscription_status} />
+            <BillingSection business={business} />
             <LogoutButton />
           </div>
         )}

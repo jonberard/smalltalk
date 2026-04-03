@@ -39,11 +39,13 @@ export default function SignupPage() {
         return;
       }
 
-      // 2. Insert business row with auth user's UUID
+      // 2. Insert business row with auth user's UUID + 7-day trial
+      const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       const { error: bizError } = await supabase.from("businesses").insert({
         id: userId,
         name: businessName,
         google_review_url: googleUrl,
+        trial_ends_at: trialEndsAt,
       });
 
       if (bizError) {

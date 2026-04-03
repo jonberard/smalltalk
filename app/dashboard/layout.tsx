@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
@@ -38,6 +38,48 @@ const TABS = [
     ),
   },
 ];
+
+function TrialBanner({ remaining, userId }: { remaining: number; userId: string }) {
+  const [redirecting, setRedirecting] = useState(false);
+
+  const handleSubscribe = useCallback(async () => {
+    setRedirecting(true);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          price_id: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || "price_placeholder",
+          user_id: userId,
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setRedirecting(false);
+      }
+    } catch {
+      setRedirecting(false);
+    }
+  }, [userId]);
+
+  return (
+    <div className="border-b border-[#E0E7FF] bg-[#EFF6FF] px-4 py-2.5 text-center sm:pl-[200px]">
+      <p className="text-[13px] text-[#1E40AF]">
+        <span className="font-semibold">{remaining}</span> review request{remaining !== 1 ? "s" : ""} left in your free trial.{" "}
+        <button
+          type="button"
+          onClick={handleSubscribe}
+          disabled={redirecting}
+          className="font-semibold underline underline-offset-2 hover:no-underline disabled:opacity-60"
+        >
+          {redirecting ? "Redirecting..." : "Subscribe now"}
+        </button>
+      </p>
+    </div>
+  );
+}
 
 function DashboardNav({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -100,6 +142,17 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
           )}
         </div>
       </div>
+
+      {/* ─── Trial Banner (only when running low) ─── */}
+      {business &&
+        business.subscription_status === "trial" &&
+        business.trial_requests_remaining > 0 &&
+        business.trial_requests_remaining <= 3 &&
+        (!business.trial_ends_at || new Date(business.trial_ends_at) > new Date()) && (
+          <div className="pt-[52px] sm:pt-0">
+            <TrialBanner remaining={business.trial_requests_remaining} userId={business.id} />
+          </div>
+        )}
 
       {children}
 

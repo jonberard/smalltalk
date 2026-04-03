@@ -16,6 +16,8 @@ export type GenerateReviewInput = {
   business_name: string;
   service_type: string;
   employee_name: string | null;
+  business_city?: string | null;
+  neighborhood?: string | null;
   topics_selected: TopicInput[];
   optional_text?: string;
   provider?: "anthropic" | "openai" | "gemini";
@@ -86,10 +88,15 @@ function getEmployeeRule(rating: number, employeeName: string | null): string {
 function buildSystemPrompt(
   voice: ReviewVoice,
   rating: number,
-  employeeName: string | null
+  employeeName: string | null,
+  neighborhood?: string | null
 ): string {
   const tone = getToneLayer(rating);
   const empRule = getEmployeeRule(rating, employeeName);
+
+  const neighborhoodRule = neighborhood
+    ? `- Naturally mention the neighborhood "${neighborhood}" once in the review — e.g., "here in ${neighborhood}" or "over in ${neighborhood}." It must feel conversational, not forced.`
+    : "";
 
   return `You are a review ghostwriter. You transform structured keyword inputs into a natural Google review.
 
@@ -101,13 +108,17 @@ ${voice.prompt}
 The star rating is truth. The writing style is style. The style NEVER overrides the rating's emotional register.
 
 RULES — always apply:
+- HIGHEST PRIORITY: If the customer provided specific detail text for any topic, that detail MUST appear in the review nearly verbatim. Specific details like "he wore booties to protect my carpet" or "she texted 10 minutes before arriving" are proof of authenticity — they are more important than any keyword or voice instruction. Build the review around these details.
 - Target 30-80 words. Minimum 15 words (short_direct voice only). Maximum 100 words (thorough voice only). No voice ever exceeds 100 words.
 - ${empRule}
 - Never mention AI, Small Talk, or that this review was generated.
 - Never start with "I" — vary your opening.
 - No hashtags, no emojis.
 - No "highly recommend" on anything below 4 stars.
-- The review must read like a real Google review written by a real person.
+- Naturally weave in the business name, service type, and city/area (if provided) at least once each in the review. These are SEO keywords that help the business rank on Google Maps. They must feel natural — never stuffed or forced. Example: "Crystal Clear Pools did a great job on our weekly pool cleaning here in Austin" not "Best pool cleaning service Crystal Clear Pools Austin TX highly recommended."
+- Avoid generic praise. Never write "They were professional" or "Great service" or "Highly recommend" without grounding it in a specific input the customer provided. Instead of "They were professional," use details from their actual answers — "showed up right at the scheduled time" or "explained everything before starting." Every positive claim must trace back to something the customer actually said.
+- Only use sensory or descriptive words (clean, quiet, fast, thorough, careful) if they directly relate to the customer's specific topic answers. If the customer didn't mention cleanliness, don't say "clean." If they didn't mention speed, don't say "fast." Never invent details the customer didn't provide.
+${neighborhoodRule ? neighborhoodRule + "\n" : ""}- The review must read like a real Google review written by a real person.
 - Output ONLY the review text. No quotation marks, no labels, no preamble.`;
 }
 
@@ -117,6 +128,14 @@ function buildUserPrompt(input: GenerateReviewInput): string {
     `Business: ${input.business_name}`,
     `Service: ${input.service_type}`,
   ];
+
+  if (input.business_city) {
+    lines.push(`City/Area: ${input.business_city}`);
+  }
+
+  if (input.neighborhood) {
+    lines.push(`Neighborhood: ${input.neighborhood}`);
+  }
 
   if (input.employee_name) {
     lines.push(`Employee: ${input.employee_name}`);
@@ -139,24 +158,42 @@ function buildUserPrompt(input: GenerateReviewInput): string {
 }
 
 /* ═══════════════════════════════════════════════════
+   SMART MODEL ROUTING
+   ═══════════════════════════════════════════════════ */
+
+function getAnthropicModel(rating: number): string {
+  // Manual override — if ANTHROPIC_MODEL is set, use it for everything
+  if (process.env.ANTHROPIC_MODEL) {
+    return process.env.ANTHROPIC_MODEL;
+  }
+  // Smart routing: Sonnet for nuanced 1-3 star reviews, Haiku for straightforward 4-5 star
+  if (rating <= 3) {
+    return "claude-sonnet-4-20250514";
+  }
+  return "claude-haiku-4-5-20251001";
+}
+
+/* ═══════════════════════════════════════════════════
    PROVIDER FUNCTIONS
    ═══════════════════════════════════════════════════ */
 
 type ProviderFn = (
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  model: string
 ) => Promise<string>;
 
 async function callAnthropic(
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  model: string
 ): Promise<string> {
   const client = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
   });
 
   const response = await client.messages.create({
-    model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+    model,
     max_tokens: 256,
     temperature: 0.9,
     system: systemPrompt,
@@ -170,11 +207,19 @@ async function callAnthropic(
   return block.text.trim();
 }
 
-async function callOpenAI(): Promise<string> {
+async function callOpenAI(
+  _systemPrompt: string,
+  _userPrompt: string,
+  _model: string
+): Promise<string> {
   throw new Error("Provider not implemented yet");
 }
 
-async function callGemini(): Promise<string> {
+async function callGemini(
+  _systemPrompt: string,
+  _userPrompt: string,
+  _model: string
+): Promise<string> {
   throw new Error("Provider not implemented yet");
 }
 
@@ -194,12 +239,14 @@ export async function generateReview(
   input: GenerateReviewInput
 ): Promise<GenerateReviewResult> {
   const primary = input.provider ?? process.env.REVIEW_PROVIDER ?? "anthropic";
+  const anthropicModel = getAnthropicModel(input.star_rating);
 
   const voice = pickVoice(input.exclude_voice_id);
   const systemPrompt = buildSystemPrompt(
     voice,
     input.star_rating,
-    input.employee_name
+    input.employee_name,
+    input.neighborhood
   );
   const userPrompt = buildUserPrompt(input);
 
@@ -215,12 +262,10 @@ export async function generateReview(
     const providerFn = providers[providerName];
     if (!providerFn) continue;
 
+    const model = providerName === "anthropic" ? anthropicModel : providerName;
+
     try {
-      const review_text = await providerFn(systemPrompt, userPrompt);
-      const model =
-        providerName === "anthropic"
-          ? process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514"
-          : providerName;
+      const review_text = await providerFn(systemPrompt, userPrompt, model);
       return {
         review_text,
         voice_id: voice.id,

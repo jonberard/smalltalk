@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import GoogleReviewMockup from "@/components/google-review-mockup";
 
 /* ═══════════════════════════════════════════════════
    DATA TYPES
@@ -16,6 +17,9 @@ type ReviewData = {
   serviceType: string;
   customerName: string;
   googleReviewUrl: string;
+  googlePlaceId: string | null;
+  businessCity: string | null;
+  neighborhoods: string[];
   reviewLinkId: string;
   businessId: string;
   sessionId: string;
@@ -53,6 +57,7 @@ type Step =
   | "followup"
   | "detail"
   | "review"
+  | "interstitial"
   | "success"
   | "private-feedback"
   | "private-success";
@@ -652,6 +657,10 @@ function ReviewScreen({
       business_name: data.businessName,
       service_type: data.serviceType,
       employee_name: data.employeeName,
+      business_city: data.businessCity,
+      neighborhood: data.neighborhoods.length > 0
+        ? data.neighborhoods[Math.floor(Math.random() * data.neighborhoods.length)]
+        : null,
       topics_selected: selectedTopics.map((t) => ({
         label: t.label,
         follow_up_answer: topicAnswers[t.label]?.option || "",
@@ -837,6 +846,74 @@ function ReviewScreen({
 }
 
 /* ═══════════════════════════════════════════════════
+   SCREEN: INTERSTITIAL HANDOFF
+   ═══════════════════════════════════════════════════ */
+
+function InterstitialScreen({
+  reviewText,
+  data,
+  onContinue,
+}: {
+  reviewText: string;
+  data: ReviewData;
+  onContinue: () => void;
+}) {
+  const isMobile = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  }, []);
+
+  function handleOpenGoogle() {
+    const base = isMobile
+      ? "https://search.google.com/local/writereview/mobile"
+      : "https://search.google.com/local/writereview";
+    const url = `${base}?placeid=${data.googlePlaceId}`;
+    window.open(url, "_blank");
+    onContinue();
+  }
+
+  return (
+    <div className="animate-fade-in flex flex-col items-center text-center">
+      <h2 className="font-heading text-[26px] font-bold leading-tight text-text sm:text-[30px]">
+        You&rsquo;re almost there.
+      </h2>
+
+      <div className="mt-8 w-full overflow-hidden rounded-card bg-white shadow-card">
+        <GoogleReviewMockup
+          businessName={data.businessName}
+          reviewText={reviewText}
+        />
+      </div>
+
+      <div className="mt-6 w-full rounded-[14px] border border-[#F5D799] bg-[#FEF9EE] px-5 py-4">
+        <div className="flex items-start gap-3 text-left">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="mt-0.5 shrink-0 text-[#D4960A]">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor" />
+          </svg>
+          <p className="text-[14px] leading-relaxed text-[#92700C]">
+            One thing — Google needs you to tap your stars before it&rsquo;ll let you post. Quick tap, then you&rsquo;re done.
+          </p>
+        </div>
+      </div>
+
+      <p className="mt-3 text-[13px] text-muted">
+        Signed into Google? You&rsquo;re good to go.
+      </p>
+
+      <div className="mt-8 w-full">
+        <button
+          type="button"
+          onClick={handleOpenGoogle}
+          className="w-full rounded-pill bg-primary py-3.5 text-[15px] font-bold text-white transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          Take me to Google →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
    SCREEN: SUCCESS
    ═══════════════════════════════════════════════════ */
 
@@ -876,7 +953,7 @@ function Confetti() {
   );
 }
 
-function SuccessScreen({ reviewText, data }: { reviewText: string; data: ReviewData }) {
+function SuccessScreen({ reviewText, data, cameFromInterstitial }: { reviewText: string; data: ReviewData; cameFromInterstitial: boolean }) {
   const [recopied, setRecopied] = useState(false);
 
   const handleRecopy = useCallback(async () => {
@@ -910,19 +987,34 @@ function SuccessScreen({ reviewText, data }: { reviewText: string; data: ReviewD
           You&rsquo;re the best, {data.customerName}
         </ScreenHeading>
 
-        <p className="mt-3 text-[15px] leading-relaxed text-muted">
-          Your review is copied and ready to paste.
-          <br />
-          Just switch to the Google tab and hit paste.
-        </p>
+        {cameFromInterstitial ? (
+          <p className="mt-3 text-[15px] leading-relaxed text-muted">
+            Your review is copied and ready to paste.
+            <br />
+            Just switch to the Google tab and hit paste.
+          </p>
+        ) : (
+          <p className="mt-3 text-[15px] leading-relaxed text-muted">
+            Your review is copied! Search for{" "}
+            <span className="font-semibold text-text">{data.businessName}</span>{" "}
+            on Google Maps to post it.
+          </p>
+        )}
 
         <div className="mt-8 w-full rounded-card bg-background p-5">
           <div className="flex flex-col gap-4 text-left">
-            {[
-              "Switch to the Google Reviews tab",
-              "Tap the review box and paste",
-              "Hit submit — that's it!",
-            ].map((text, i) => (
+            {(cameFromInterstitial
+              ? [
+                  "Switch to the Google Reviews tab",
+                  "Tap the review box and paste",
+                  "Hit submit — that\u2019s it!",
+                ]
+              : [
+                  "Open Google Maps and find " + data.businessName,
+                  "Tap \"Write a review\" and paste",
+                  "Hit submit — that\u2019s it!",
+                ]
+            ).map((text, i) => (
               <div key={i} className="flex items-start gap-3">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[12px] font-bold text-white">
                   {i + 1}
@@ -951,16 +1043,40 @@ function SuccessScreen({ reviewText, data }: { reviewText: string; data: ReviewD
               "Copy again"
             )}
           </button>
-          <button
-            type="button"
-            onClick={() =>
-              window.open(data.googleReviewUrl, "_blank")
-            }
-            className="flex flex-1 items-center justify-center rounded-pill bg-primary px-6 py-2.5 text-[14px] font-bold text-white transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          >
-            Open Google
-          </button>
+          {data.googleReviewUrl ? (
+            <button
+              type="button"
+              onClick={() => window.open(data.googleReviewUrl, "_blank")}
+              className="flex flex-1 items-center justify-center rounded-pill bg-primary px-6 py-2.5 text-[14px] font-bold text-white transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            >
+              Open Google
+            </button>
+          ) : (
+            <a
+              href="https://www.google.com/maps"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-1 items-center justify-center rounded-pill bg-primary px-6 py-2.5 text-[14px] font-bold text-white transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            >
+              Open Google Maps
+            </a>
+          )}
         </ButtonRow>
+
+        {cameFromInterstitial && (
+          <p className="mt-6 rounded-[12px] bg-background px-4 py-3 text-[13px] leading-relaxed text-muted">
+            Google didn&rsquo;t open? No worries — search for{" "}
+            <a
+              href="https://www.google.com/maps"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary underline underline-offset-2"
+            >
+              {data.businessName} on Google Maps
+            </a>{" "}
+            and paste your review there.
+          </p>
+        )}
 
         <p className="mt-6 text-[13px] text-muted">
           Thank you for supporting {data.businessName}.
@@ -1291,16 +1407,36 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
     [path, data.sessionId]
   );
 
-  // Review
-  const handlePost = useCallback((text: string, voiceId: string) => {
+  // Review — copy to clipboard, then route to interstitial or success
+  const handlePost = useCallback(async (text: string, voiceId: string) => {
     setFinalReview(text);
     supabase
       .from("review_sessions")
       .update({ generated_review: text, status: "copied", updated_at: new Date().toISOString() })
       .eq("id", data.sessionId)
       .then();
-    setStep("success");
-  }, [data.sessionId]);
+
+    // Notify business owner for low-rating public reviews
+    if (rating <= 2 && path === "public") {
+      fetch("/api/notify-owner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: data.sessionId,
+          review_link_id: data.reviewLinkId,
+          customer_name: data.customerName,
+          star_rating: rating,
+          review_text: text,
+        }),
+      }).catch(() => {}); // fire-and-forget — don't block the customer
+    }
+
+    if (data.googlePlaceId) {
+      setStep("interstitial");
+    } else {
+      setStep("success");
+    }
+  }, [data.sessionId, data.reviewLinkId, data.customerName, data.googlePlaceId, rating, path]);
 
   // Private feedback
   const handlePrivateSubmit = useCallback((feedback: string) => {
@@ -1410,7 +1546,15 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
             />
           )}
 
-          {step === "success" && <SuccessScreen reviewText={finalReview} data={data} />}
+          {step === "interstitial" && (
+            <InterstitialScreen
+              reviewText={finalReview}
+              data={data}
+              onContinue={() => setStep("success")}
+            />
+          )}
+
+          {step === "success" && <SuccessScreen reviewText={finalReview} data={data} cameFromInterstitial={!!data.googlePlaceId} />}
 
           {step === "private-feedback" && (
             <PrivateFeedbackScreen
@@ -1458,7 +1602,7 @@ export default function ReviewFlow() {
 
       // 2. Fetch business, service, and optionally employee
       const [bizRes, svcRes, empRes] = await Promise.all([
-        supabase.from("businesses").select("name, logo_url, google_review_url").eq("id", link.business_id).single(),
+        supabase.from("businesses").select("name, logo_url, google_review_url, google_place_id, business_city, neighborhoods").eq("id", link.business_id).single(),
         supabase.from("services").select("name").eq("id", link.service_id).single(),
         link.employee_id
           ? supabase.from("employees").select("name").eq("id", link.employee_id).single()
@@ -1534,6 +1678,9 @@ export default function ReviewFlow() {
         serviceType: svcRes.data.name,
         customerName: link.customer_name,
         googleReviewUrl: bizRes.data.google_review_url,
+        googlePlaceId: bizRes.data.google_place_id || null,
+        businessCity: bizRes.data.business_city || null,
+        neighborhoods: bizRes.data.neighborhoods || [],
         reviewLinkId: link.id,
         businessId: link.business_id,
         sessionId: session.id,

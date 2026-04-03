@@ -38,11 +38,23 @@ Screen: Review draft (editable)
   ↓
 "Copy & Post to Google"
   → clipboard copy
-  → open Google review URL (deep link on mobile)
   → status: "copied"
   → if 1-2 stars: trigger /api/notify-owner
   ↓
+Has google_place_id?
+  ↓ YES                        ↓ NO
+  Interstitial screen:         Skip to success
+  GoogleReviewMockup           "Search for [Business]
+  animation + star tip         on Google Maps"
+  "Take me to Google →"
+  → builds URL from place_id
+    (mobile: /mobile path)
+    (desktop: standard path)
+  → window.open() new tab
+  ↓
 Screen: Success + paste coaching
+  → re-copy button
+  → fallback: "Google didn't open?" link to Google Maps
 
 BACK ON THE DASHBOARD:
 Owner opens dashboard → queries review_sessions

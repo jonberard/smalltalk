@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import Link from "next/link";
 
 /* ═══════════════════════════════════════════════════
    SCROLL FADE-UP — IntersectionObserver, no library
@@ -55,10 +57,10 @@ function Heading({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CTAButton({ children, large }: { children: React.ReactNode; large?: boolean }) {
+function CTAButton({ children, large, href }: { children: React.ReactNode; large?: boolean; href: string }) {
   return (
-    <a
-      href="#get-started"
+    <Link
+      href={href}
       className={`inline-flex items-center justify-center rounded-pill bg-primary font-medium text-white transition-all duration-300 hover:opacity-90 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
         large
           ? "px-8 py-4 text-[16px]"
@@ -66,7 +68,7 @@ function CTAButton({ children, large }: { children: React.ReactNode; large?: boo
       }`}
     >
       {children}
-    </a>
+    </Link>
   );
 }
 
@@ -167,6 +169,15 @@ function HeroPhone() {
 
 export default function LandingPage() {
   const wrapRef = useFadeUp();
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setLoggedIn(!!session);
+    });
+  }, []);
+
+  const ctaHref = loggedIn ? "/dashboard" : "/signup";
 
   return (
     <div ref={wrapRef} className="min-h-dvh bg-background font-body text-text">
@@ -174,12 +185,22 @@ export default function LandingPage() {
       {/* ─── Nav ─── */}
       <nav className="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5 lg:px-12">
         <span className="font-heading text-[20px] font-semibold text-text">small Talk</span>
-        <a
-          href="#get-started"
-          className="rounded-[8px] border border-accent px-6 py-2.5 text-[14px] font-semibold text-text transition-colors duration-300 hover:border-primary hover:text-primary"
-        >
-          Get Started
-        </a>
+        <div className="flex items-center gap-4">
+          {!loggedIn && (
+            <Link
+              href="/login"
+              className="text-[14px] font-medium text-muted transition-colors duration-300 hover:text-text"
+            >
+              Log in
+            </Link>
+          )}
+          <Link
+            href={ctaHref}
+            className="rounded-[8px] border border-accent px-6 py-2.5 text-[14px] font-semibold text-text transition-colors duration-300 hover:border-primary hover:text-primary"
+          >
+            {loggedIn ? "Dashboard" : "Get Started"}
+          </Link>
+        </div>
       </nav>
 
       {/* ════════════════════════════════════════════
@@ -199,13 +220,13 @@ export default function LandingPage() {
               paralysis.
             </p>
             <div className="mt-8 flex flex-col items-center gap-5 pt-2 sm:flex-row lg:justify-start">
-              <a
-                href="#get-started"
+              <Link
+                href={ctaHref}
                 className="flex w-full items-center justify-center gap-2 rounded-[8px] bg-primary px-8 py-4 text-[17px] font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#c84a2f] active:scale-[0.98] sm:w-auto"
               >
-                Start Free Trial
+                {loggedIn ? "Go to Dashboard" : "Start Free Trial"}
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-              </a>
+              </Link>
               <p className="flex items-center gap-2 text-[14px] text-muted">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 No credit card required
@@ -283,7 +304,7 @@ export default function LandingPage() {
               <div className="absolute inset-x-0 top-[4px] z-20 flex justify-center">
                 <div className="h-[11px] w-[40px] rounded-full bg-black" />
               </div>
-              <div className="relative flex h-full flex-col overflow-hidden rounded-[37px] bg-background">
+              <div className="relative flex h-full flex-col overflow-hidden rounded-[37px] bg-white">
                 {/* iMessage nav */}
                 <div className="flex items-center justify-between px-3 pb-1.5 pt-7">
                   <svg width="7" height="11" viewBox="0 0 8 12" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 1L2 6l5 5"/></svg>
@@ -330,7 +351,7 @@ export default function LandingPage() {
               <div className="absolute inset-x-0 top-[4px] z-20 flex justify-center">
                 <div className="h-[11px] w-[40px] rounded-full bg-black" />
               </div>
-              <div className="relative flex h-full flex-col overflow-hidden rounded-[37px] bg-background">
+              <div className="relative flex h-full flex-col overflow-hidden rounded-[37px] bg-white">
                 <div className="flex flex-1 flex-col items-center justify-center px-5">
                   <p className="font-heading text-[14px] font-semibold text-text">What stood out?</p>
                   <p className="mt-1 text-[10px] text-muted">Tap the topics that matter</p>
@@ -382,7 +403,7 @@ export default function LandingPage() {
               <div className="absolute inset-x-0 top-[4px] z-20 flex justify-center">
                 <div className="h-[11px] w-[40px] rounded-full bg-black" />
               </div>
-              <div className="relative flex h-full flex-col overflow-hidden rounded-[37px] bg-background">
+              <div className="relative flex h-full flex-col overflow-hidden rounded-[37px] bg-white">
                 <div className="flex flex-1 flex-col justify-center px-5">
                   <div className="mb-4 text-center">
                     <p className="font-heading text-[14px] font-semibold text-text">Your review is ready</p>
@@ -576,8 +597,10 @@ export default function LandingPage() {
               <span className="font-heading text-[44px] font-bold tracking-tight text-text">$29</span>
               <span className="text-[15px] text-muted">/mo</span>
             </div>
+            <p className="mb-4 text-[13px] text-muted">7-day free trial · 10 free review requests</p>
             <ul className="mb-10 flex flex-1 flex-col gap-4">
               {[
+                "Unlimited review requests",
                 "Unlimited review links",
                 "AI review generation",
                 "Real-time analytics",
@@ -591,12 +614,12 @@ export default function LandingPage() {
                 </li>
               ))}
             </ul>
-            <a
-              href="#get-started"
+            <Link
+              href={ctaHref}
               className={`block w-full rounded-pill ${BORDER} bg-surface py-3.5 text-center text-[14px] font-semibold text-text transition-all duration-300 hover:bg-accent/30 active:scale-[0.98]`}
             >
-              Start free trial
-            </a>
+              {loggedIn ? "Go to Dashboard" : "Start free trial"}
+            </Link>
           </div>
 
           {/* Multi-Crew */}
@@ -616,8 +639,11 @@ export default function LandingPage() {
               <span className="font-heading text-[44px] font-bold tracking-tight text-text">$49</span>
               <span className="text-[15px] text-muted">/mo</span>
             </div>
+            <p className="mb-4 text-[13px] text-muted">7-day free trial · 10 free review requests</p>
             <ul className="mb-10 flex flex-1 flex-col gap-4">
               {[
+                "Bulk CSV sends",
+                "Unlimited review requests",
                 "Everything in Single",
                 "Up to 5 locations",
                 "Priority support",
@@ -630,12 +656,12 @@ export default function LandingPage() {
                 </li>
               ))}
             </ul>
-            <a
-              href="#get-started"
+            <Link
+              href={ctaHref}
               className="block w-full rounded-pill bg-primary py-3.5 text-center text-[14px] font-semibold text-white transition-all duration-300 hover:opacity-90 active:scale-[0.98]"
             >
-              Start free trial
-            </a>
+              {loggedIn ? "Go to Dashboard" : "Start free trial"}
+            </Link>
           </div>
         </div>
       </section>
@@ -714,12 +740,12 @@ export default function LandingPage() {
             Set up your account, send one link, and see the difference a guided review makes.
           </p>
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <a
-              href="#"
+            <Link
+              href={ctaHref}
               className="rounded-pill bg-primary px-8 py-4 text-[16px] font-medium text-white shadow-sm transition-all duration-300 hover:bg-[#c84a2f] active:scale-[0.98]"
             >
-              Start Free Trial
-            </a>
+              {loggedIn ? "Go to Dashboard" : "Start Free Trial"}
+            </Link>
             <span className="text-[12px] italic uppercase tracking-widest text-muted">
               No credit card required
             </span>

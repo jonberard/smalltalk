@@ -42,9 +42,13 @@ The business owner's account. The row's `id` IS the Supabase auth user's UUID �
 | name | text | Business display name |
 | logo_url | text, nullable | Logo for branding in the consumer flow |
 | google_review_url | text | Google Business review link customers post to |
+| google_place_id | text, nullable | Google Places ID — used to construct review URLs with mobile deep linking |
+| business_city | text, nullable | City/area extracted from Google Places — used for SEO in generated reviews |
+| neighborhoods | text[], nullable | Service area neighborhoods — one randomly picked per review for hyper-local SEO |
 | stripe_customer_id | text, nullable | Stripe customer ID for billing |
 | subscription_status | text, default `'trial'` | `trial`, `active`, `canceled`, etc. |
 | trial_requests_remaining | integer, default `10` | Free review links before requiring payment |
+| trial_ends_at | timestamptz, nullable | When the free trial expires (7 days from signup) |
 | created_at | timestamptz | |
 
 **RLS:** Users can select, insert, and update only their own row (`auth.uid() = id`).

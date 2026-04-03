@@ -22,6 +22,58 @@ function generateCode(): string {
     .slice(0, 8);
 }
 
+type SubTier = "active" | "trial" | "expired";
+
+function getSubTier(business: {
+  subscription_status: string;
+  trial_ends_at: string | null;
+  trial_requests_remaining: number;
+}): SubTier {
+  if (business.subscription_status === "active") return "active";
+  if (business.subscription_status === "trial") {
+    const expired =
+      (business.trial_ends_at && new Date(business.trial_ends_at) < new Date()) ||
+      business.trial_requests_remaining <= 0;
+    return expired ? "expired" : "trial";
+  }
+  return "expired"; // canceled, inactive, etc.
+}
+
+function isPhone(contact: string): boolean {
+  return !contact.includes("@") && /\d{7,}/.test(contact.replace(/\D/g, ""));
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendSms(
+  customerName: string,
+  customerContact: string,
+  reviewLinkUrl: string,
+  businessName: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch("/api/send-sms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer_name: customerName,
+        customer_contact: customerContact,
+        review_link_url: reviewLinkUrl,
+        business_name: businessName,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { ok: false, error: data.error || `SMS failed (${res.status})` };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Network error sending SMS" };
+  }
+}
+
 /* ═══════════════════════════════════════════════════
    TOAST
    ═══════════════════════════════════════════════════ */
@@ -159,6 +211,7 @@ function SingleForm({
   services,
   employees,
   businessId,
+  businessName,
   onSend,
   onServiceCreated,
   onEmployeeCreated,
@@ -166,7 +219,8 @@ function SingleForm({
   services: ServiceRow[];
   employees: EmployeeRow[];
   businessId: string;
-  onSend: (name: string, code: string) => void;
+  businessName: string;
+  onSend: (name: string, code: string, smsStatus?: string) => void;
   onServiceCreated: (s: ServiceRow) => void;
   onEmployeeCreated: (e: EmployeeRow) => void;
 }) {
@@ -233,7 +287,20 @@ function SingleForm({
       return;
     }
 
-    onSend(firstName.trim(), code);
+    const linkUrl = `https://usesmalltalk.com/r/${code}`;
+    let smsStatus: string | undefined;
+
+    if (isPhone(contact.trim())) {
+      const smsResult = await sendSms(
+        firstName.trim(),
+        contact.trim(),
+        linkUrl,
+        businessName,
+      );
+      smsStatus = smsResult.ok ? "sent" : smsResult.error;
+    }
+
+    onSend(firstName.trim(), code, smsStatus);
     setFirstName("");
     setContact("");
     setServiceText("");
@@ -374,32 +441,299 @@ function SingleForm({
             : "cursor-not-allowed bg-[#B0D4F8]"
         }`}
       >
-        {sending ? "Creating..." : "Send Review Link"}
+        {sending ? "Sending..." : "Send Review Link"}
       </button>
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════
+   CSV PARSER
+   ═══════════════════════════════════════════════════ */
+
+type CsvRow = { customer_name: string; customer_contact: string; service: string; employee: string };
+
+function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
+  const lines = text.trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return { rows: [], error: "CSV must have a header row and at least one data row" };
+
+  const header = lines[0].toLowerCase().split(",").map((h) => h.trim());
+  const nameIdx = header.findIndex((h) => h === "customer_name" || h === "name" || h === "first_name");
+  const contactIdx = header.findIndex((h) => h === "customer_contact" || h === "contact" || h === "phone" || h === "email");
+  const serviceIdx = header.findIndex((h) => h === "service" || h === "service_type");
+  const employeeIdx = header.findIndex((h) => h === "employee" || h === "employee_name" || h === "tech");
+
+  if (nameIdx === -1 || contactIdx === -1 || serviceIdx === -1) {
+    return { rows: [], error: "CSV must include columns: customer_name, customer_contact, service" };
+  }
+
+  const rows: CsvRow[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(",").map((c) => c.trim());
+    const name = cols[nameIdx] || "";
+    const contact = cols[contactIdx] || "";
+    const service = cols[serviceIdx] || "";
+    const employee = employeeIdx !== -1 ? cols[employeeIdx] || "" : "";
+    if (name && contact && service) {
+      rows.push({ customer_name: name, customer_contact: contact, service, employee });
+    }
+  }
+
+  if (rows.length === 0) return { rows: [], error: "No valid rows found in CSV" };
+  return { rows };
+}
+
+/* ═══════════════════════════════════════════════════
    BULK UPLOAD
    ═══════════════════════════════════════════════════ */
 
-function BulkUpload() {
-  return (
-    <div className="flex flex-col items-center gap-3 py-6 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-[#F0F2F5]">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="17 8 12 3 7 8" />
-          <line x1="12" y1="3" x2="12" y2="15" />
-        </svg>
-      </div>
-      <div>
-        <p className="text-[14px] font-semibold text-[#18181B]">Bulk CSV upload</p>
-        <p className="mt-1 text-[13px] text-[#A1A1AA]">
-          Send review links to multiple customers at once. This feature is coming soon.
+function BulkUpload({
+  services,
+  employees,
+  businessId,
+  businessName,
+  onComplete,
+}: {
+  services: ServiceRow[];
+  employees: EmployeeRow[];
+  businessId: string;
+  businessName: string;
+  onComplete: (sent: number, total: number, failed: number) => void;
+}) {
+  const [csvRows, setCsvRows] = useState<CsvRow[] | null>(null);
+  const [parseError, setParseError] = useState("");
+  const [sending, setSending] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0, failed: 0 });
+  const fileRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef(false);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setParseError("");
+    setCsvRows(null);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const { rows, error } = parseCsv(reader.result as string);
+      if (error) {
+        setParseError(error);
+      } else {
+        setCsvRows(rows);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleSend() {
+    if (!csvRows || csvRows.length === 0) return;
+    setSending(true);
+    abortRef.current = false;
+
+    const serviceMap = new Map(services.map((s) => [s.name.toLowerCase(), s.id]));
+    const employeeMap = new Map(employees.map((e) => [e.name.toLowerCase(), e.id]));
+    let failed = 0;
+
+    for (let i = 0; i < csvRows.length; i++) {
+      if (abortRef.current) break;
+
+      setProgress({ current: i + 1, total: csvRows.length, failed });
+      const row = csvRows[i];
+
+      // Resolve service — use existing or skip if not found
+      let serviceId = serviceMap.get(row.service.toLowerCase());
+      if (!serviceId) {
+        const { data } = await supabase
+          .from("services")
+          .insert({ business_id: businessId, name: row.service })
+          .select("id, name")
+          .single();
+        if (data) {
+          serviceId = data.id;
+          serviceMap.set(data.name.toLowerCase(), data.id);
+        } else {
+          failed++;
+          continue;
+        }
+      }
+
+      // Resolve employee (optional)
+      let employeeId: string | null = null;
+      if (row.employee) {
+        employeeId = employeeMap.get(row.employee.toLowerCase()) || null;
+        if (!employeeId) {
+          const { data } = await supabase
+            .from("employees")
+            .insert({ business_id: businessId, name: row.employee })
+            .select("id, name")
+            .single();
+          if (data) {
+            employeeId = data.id;
+            employeeMap.set(data.name.toLowerCase(), data.id);
+          }
+        }
+      }
+
+      // Create review link
+      const code = generateCode();
+      const { error: linkErr } = await supabase.from("review_links").insert({
+        business_id: businessId,
+        service_id: serviceId,
+        employee_id: employeeId,
+        customer_name: row.customer_name,
+        customer_contact: row.customer_contact,
+        unique_code: code,
+      });
+
+      if (linkErr) {
+        failed++;
+        continue;
+      }
+
+      // Send SMS if phone
+      if (isPhone(row.customer_contact)) {
+        const linkUrl = `https://usesmalltalk.com/r/${code}`;
+        const result = await sendSms(row.customer_name, row.customer_contact, linkUrl, businessName);
+        if (!result.ok) failed++;
+      }
+
+      // 500ms delay between sends to avoid rate limiting
+      if (i < csvRows.length - 1) {
+        await delay(500);
+      }
+    }
+
+    onComplete(csvRows.length - failed, csvRows.length, failed);
+    setCsvRows(null);
+    setSending(false);
+    setProgress({ current: 0, total: 0, failed: 0 });
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  if (sending) {
+    const pct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
+    return (
+      <div className="flex flex-col items-center gap-4 py-8">
+        <div className="relative h-10 w-10">
+          <svg className="h-10 w-10 -rotate-90" viewBox="0 0 40 40">
+            <circle cx="20" cy="20" r="17" fill="none" stroke="#E4E4E7" strokeWidth="3" />
+            <circle
+              cx="20" cy="20" r="17" fill="none" stroke="#0070EB" strokeWidth="3"
+              strokeDasharray={`${pct * 1.068} 106.8`}
+              strokeLinecap="round"
+              className="transition-all duration-300"
+            />
+          </svg>
+        </div>
+        <p className="text-[15px] font-semibold text-[#18181B]">
+          Sending {progress.current} of {progress.total}...
         </p>
+        {progress.failed > 0 && (
+          <p className="text-[13px] text-red-500">{progress.failed} failed</p>
+        )}
+        <button
+          type="button"
+          onClick={() => { abortRef.current = true; }}
+          className="mt-1 text-[13px] font-medium text-[#A1A1AA] hover:text-[#71717A]"
+        >
+          Cancel
+        </button>
       </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {parseError && (
+        <div className="rounded-[8px] border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-600">
+          {parseError}
+        </div>
+      )}
+
+      {!csvRows ? (
+        <div className="flex flex-col items-center gap-3 py-6 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-[#F0F2F5]">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-[14px] font-semibold text-[#18181B]">Upload a CSV file</p>
+            <p className="mt-1 text-[13px] text-[#A1A1AA]">
+              Columns: <span className="font-medium text-[#71717A]">customer_name</span>,{" "}
+              <span className="font-medium text-[#71717A]">customer_contact</span>,{" "}
+              <span className="font-medium text-[#71717A]">service</span>,{" "}
+              <span className="text-[#A1A1AA]">employee (optional)</span>
+            </p>
+          </div>
+          <label className="mt-2 cursor-pointer rounded-[10px] bg-[#0070EB] px-5 py-2.5 text-[14px] font-semibold text-white shadow-[0_2px_12px_rgba(0,112,235,0.3)] transition-all active:scale-[0.98]">
+            Choose File
+            <input ref={fileRef} type="file" accept=".csv" onChange={handleFile} className="hidden" />
+          </label>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="rounded-[10px] bg-[#F0F2F5] px-4 py-3">
+            <p className="text-[14px] font-semibold text-[#18181B]">
+              {csvRows.length} customer{csvRows.length !== 1 ? "s" : ""} ready to send
+            </p>
+            <p className="mt-0.5 text-[12px] text-[#A1A1AA]">
+              {csvRows.filter((r) => isPhone(r.customer_contact)).length} via SMS
+              {" · "}
+              {csvRows.filter((r) => !isPhone(r.customer_contact)).length} link only (email delivery coming soon)
+            </p>
+          </div>
+
+          {/* Preview first 5 rows */}
+          <div className="overflow-hidden rounded-[10px] border border-[rgba(228,228,231,0.5)]">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="bg-[#FAFAFA] text-left text-[#A1A1AA]">
+                  <th className="px-3 py-2 font-medium">Name</th>
+                  <th className="px-3 py-2 font-medium">Contact</th>
+                  <th className="px-3 py-2 font-medium">Service</th>
+                </tr>
+              </thead>
+              <tbody>
+                {csvRows.slice(0, 5).map((row, i) => (
+                  <tr key={i} className="border-t border-[rgba(228,228,231,0.3)]">
+                    <td className="px-3 py-2 text-[#18181B]">{row.customer_name}</td>
+                    <td className="px-3 py-2 text-[#71717A]">{row.customer_contact}</td>
+                    <td className="px-3 py-2 text-[#71717A]">{row.service}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {csvRows.length > 5 && (
+              <div className="border-t border-[rgba(228,228,231,0.3)] bg-[#FAFAFA] px-3 py-2 text-center text-[11px] text-[#A1A1AA]">
+                +{csvRows.length - 5} more
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setCsvRows(null);
+                if (fileRef.current) fileRef.current.value = "";
+              }}
+              className="flex-1 rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-white py-3 text-[14px] font-semibold text-[#71717A] transition-all active:scale-[0.98]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSend}
+              className="flex-1 rounded-[10px] bg-[#0070EB] py-3 text-[14px] font-semibold text-white shadow-[0_2px_12px_rgba(0,112,235,0.3)] transition-all active:scale-[0.98]"
+            >
+              Send All
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -491,6 +825,119 @@ function QRBlock({ businessName }: { businessName: string }) {
 }
 
 /* ═══════════════════════════════════════════════════
+   PAYWALL — expired trial or canceled
+   ═══════════════════════════════════════════════════ */
+
+function Paywall({ userId }: { userId: string }) {
+  const [redirecting, setRedirecting] = useState(false);
+
+  async function handleSubscribe() {
+    setRedirecting(true);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          price_id: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || "price_placeholder",
+          user_id: userId,
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setRedirecting(false);
+      }
+    } catch {
+      setRedirecting(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-4 py-10 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#0070EB]/10">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0070EB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 2L11 13" />
+          <path d="M22 2L15 22l-4-9-9-4 20-7z" />
+        </svg>
+      </div>
+      <div>
+        <h3 className="text-[18px] font-bold text-[#18181B]">
+          You&rsquo;ve used your free trial &mdash; ready to keep going?
+        </h3>
+        <p className="mx-auto mt-2 max-w-[360px] text-[14px] leading-relaxed text-[#71717A]">
+          Subscribe to send unlimited review links, unlock bulk CSV sends, and keep growing your reviews.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={handleSubscribe}
+        disabled={redirecting}
+        className="mt-2 rounded-[10px] bg-[#0070EB] px-8 py-3 text-[15px] font-semibold text-white shadow-[0_2px_12px_rgba(0,112,235,0.3)] transition-all active:scale-[0.98] disabled:opacity-60"
+      >
+        {redirecting ? "Redirecting..." : "Subscribe Now"}
+      </button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   BULK UPGRADE PROMPT — shown for trial users on CSV tab
+   ═══════════════════════════════════════════════════ */
+
+function BulkUpgradePrompt({ userId }: { userId: string }) {
+  const [redirecting, setRedirecting] = useState(false);
+
+  async function handleSubscribe() {
+    setRedirecting(true);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          price_id: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || "price_placeholder",
+          user_id: userId,
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setRedirecting(false);
+      }
+    } catch {
+      setRedirecting(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-3 py-8 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-[#F0F2F5]">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+      </div>
+      <div>
+        <p className="text-[14px] font-semibold text-[#18181B]">Upgrade to unlock bulk sends</p>
+        <p className="mt-1 text-[13px] text-[#A1A1AA]">
+          Send review links to hundreds of customers at once with CSV upload. Available on paid plans.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={handleSubscribe}
+        disabled={redirecting}
+        className="mt-1 rounded-[10px] bg-[#0070EB] px-6 py-2.5 text-[14px] font-semibold text-white shadow-[0_2px_12px_rgba(0,112,235,0.3)] transition-all active:scale-[0.98] disabled:opacity-60"
+      >
+        {redirecting ? "Redirecting..." : "Subscribe"}
+      </button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
    MAIN PAGE
    ═══════════════════════════════════════════════════ */
 
@@ -500,10 +947,14 @@ export default function SendPage() {
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trialRemaining, setTrialRemaining] = useState<number>(10);
   const { business } = useAuth();
+
+  const tier: SubTier = business ? getSubTier(business) : "trial";
 
   useEffect(() => {
     if (!business) return;
+    setTrialRemaining(business.trial_requests_remaining);
 
     async function fetchData() {
       const [svcRes, empRes] = await Promise.all([
@@ -518,13 +969,54 @@ export default function SendPage() {
     fetchData();
   }, [business]);
 
-  function showToast(name: string, code: string) {
-    setToast({
-      message: `Link sent to ${name}! usesmalltalk.com/r/${code}`,
-      visible: true,
-    });
+  function showToast(name: string, code: string, smsStatus?: string) {
+    const link = `usesmalltalk.com/r/${code}`;
+    let msg: string;
+    if (smsStatus === "sent") {
+      msg = `SMS sent to ${name}! ${link}`;
+    } else if (smsStatus) {
+      msg = `Link created for ${name} (SMS failed: ${smsStatus}) — ${link}`;
+    } else {
+      msg = `Link created for ${name}! ${link}`;
+    }
+    setToast({ message: msg, visible: true });
     setTimeout(() => setToast((t) => ({ ...t, visible: false })), 6000);
   }
+
+  // Wraps showToast for single sends — decrements trial counter when on trial
+  function handleSingleSend(name: string, code: string, smsStatus?: string) {
+    if (tier === "trial" && business) {
+      const newRemaining = Math.max(0, trialRemaining - 1);
+      setTrialRemaining(newRemaining);
+      supabase
+        .from("businesses")
+        .update({ trial_requests_remaining: newRemaining })
+        .eq("id", business.id)
+        .then();
+    }
+    showToast(name, code, smsStatus);
+  }
+
+  function showBulkToast(sent: number, total: number, failed: number) {
+    const msg = failed > 0
+      ? `Sent ${sent} of ${total} links (${failed} failed)`
+      : `All ${total} links sent successfully!`;
+    setToast({ message: msg, visible: true });
+    setTimeout(() => setToast((t) => ({ ...t, visible: false })), 6000);
+  }
+
+  // Re-check tier with live trialRemaining (business object may be stale)
+  const effectiveTier: SubTier = (() => {
+    if (!business) return "trial";
+    if (business.subscription_status === "active") return "active";
+    if (business.subscription_status === "trial") {
+      const expired =
+        (business.trial_ends_at && new Date(business.trial_ends_at) < new Date()) ||
+        trialRemaining <= 0;
+      return expired ? "expired" : "trial";
+    }
+    return "expired";
+  })();
 
   return (
     <div className="min-h-dvh bg-[#F8F9FA] font-dashboard sm:pl-[200px]">
@@ -535,6 +1027,19 @@ export default function SendPage() {
           <h1 className="text-[20px] font-bold text-[#18181B]">Send Review Link</h1>
           <p className="mt-1 text-[13px] text-[#A1A1AA]">Send a review link to a customer via SMS or email</p>
         </div>
+
+        {/* Trial remaining badge */}
+        {effectiveTier === "trial" && (
+          <div className="mb-4 flex items-center gap-2 rounded-[10px] bg-[#EFF6FF] px-4 py-2.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0070EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <p className="text-[13px] text-[#0070EB]">
+              <span className="font-semibold">{trialRemaining}</span> review request{trialRemaining !== 1 ? "s" : ""} left in your free trial
+            </p>
+          </div>
+        )}
 
         {/* Mode toggle */}
         <div className="mb-5 flex gap-1 rounded-[10px] bg-[#EEEFF1] p-1">
@@ -558,10 +1063,7 @@ export default function SendPage() {
                 : "text-[#A1A1AA]"
             }`}
           >
-            <span className="flex items-center justify-center gap-1.5">
-              Bulk CSV
-              <span className="rounded-full bg-[#E4E4E7] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#71717A]">Soon</span>
-            </span>
+            Bulk CSV
           </button>
         </div>
 
@@ -576,17 +1078,28 @@ export default function SendPage() {
                 </div>
               ))}
             </div>
+          ) : effectiveTier === "expired" ? (
+            <Paywall userId={business!.id} />
           ) : mode === "single" ? (
             <SingleForm
               services={services}
               employees={employees}
               businessId={business!.id}
-              onSend={showToast}
+              businessName={business!.name}
+              onSend={handleSingleSend}
               onServiceCreated={(s) => setServices((prev) => [...prev, s])}
               onEmployeeCreated={(e) => setEmployees((prev) => [...prev, e])}
             />
+          ) : effectiveTier === "trial" ? (
+            <BulkUpgradePrompt userId={business!.id} />
           ) : (
-            <BulkUpload />
+            <BulkUpload
+              services={services}
+              employees={employees}
+              businessId={business!.id}
+              businessName={business!.name}
+              onComplete={showBulkToast}
+            />
           )}
         </div>
 

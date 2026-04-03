@@ -7,9 +7,13 @@ export type Business = {
   name: string;
   logo_url: string | null;
   google_review_url: string;
+  google_place_id: string | null;
+  business_city: string | null;
+  neighborhoods: string[] | null;
   stripe_customer_id: string | null;
   subscription_status: string;
   trial_requests_remaining: number;
+  trial_ends_at: string | null;
   created_at: string;
 };
 
@@ -18,9 +22,13 @@ export type BusinessInsert = {
   name: string;
   logo_url?: string | null;
   google_review_url: string;
+  google_place_id?: string | null;
+  business_city?: string | null;
+  neighborhoods?: string[] | null;
   stripe_customer_id?: string | null;
   subscription_status?: string;
   trial_requests_remaining?: number;
+  trial_ends_at?: string | null;
   created_at?: string;
 };
 
