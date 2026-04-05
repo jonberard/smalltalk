@@ -73,6 +73,7 @@ We are not a review management platform. We are not an SEO suite. We are a **rev
 - [ ] Debug label removed from review draft screen (voice_id + model)
 - [ ] Business intake workflow after signup (business name, Google Place ID, services, employees, topics, logo — populates dashboard)
 - [x] Add SEO keyword injection to AI review generation — business name, service type, and city woven naturally into every generated review
+- [ ] Account deletion flow (UI placeholder built — needs backend implementation: delete business, cascade services/employees/topics/review_links, revoke Stripe subscription, delete Supabase auth user)
 - [ ] Voice-to-text input as alternative to topic chips on the consumer flow. Add a microphone icon option on the topic selection screen: "Or just tell us what happened." Customer taps the mic, speaks for 10-15 seconds, Web Speech API transcribes it, AI cleans it into a polished review — removes ums, ahs, and rambling while keeping their genuine sentiment and specific details. This gives the customer TWO paths: tap through chips (structured, fast) or talk (natural, richer input). Both feed into the same 15-voice AI generation system.
 
 ### Landing Page Updates
