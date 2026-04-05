@@ -17,7 +17,7 @@ html {
 
 /* Dashboard-specific focus for blue accent */
 .font-dashboard :focus-visible {
-  outline-color: #0070EB;
+  outline-color: var(--dash-primary);
 }
 
 @theme {
@@ -43,6 +43,20 @@ html {
 
   /* Animations */
   --animate-fade-in: fade-in 400ms ease-out;
+
+  /* Dashboard Design System */
+  --dash-primary: #E05A3D;
+  --dash-bg: #FAFAF8;
+  --dash-surface: #FFFFFF;
+  --dash-text: #1A1D20;
+  --dash-muted: #6B7280;
+  --dash-border: #E8E5E0;
+  --dash-success: #059669;
+  --dash-warning: #D97706;
+  --dash-error: #DC2626;
+  --dash-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+  --dash-radius: 12px;
+  --dash-radius-sm: 8px;
 }
 
 @keyframes fade-in {
@@ -106,4 +120,19 @@ details[open] summary ~ * {
     transform: translateY(calc(100vh + 20px)) rotate(720deg);
     opacity: 0;
   }
+}
+
+@keyframes dash-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dash-page-enter {
+  animation: dash-page-enter 200ms ease-out;
 }
