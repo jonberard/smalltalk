@@ -590,7 +590,7 @@ function Paywall() {
    ═══════════════════════════════════════════════════ */
 
 export default function SendPage() {
-  const { addToast } = useToast();
+  const { toast: addToast } = useToast();
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [loading, setLoading] = useState(true);
