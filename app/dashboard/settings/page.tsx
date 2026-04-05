@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase, fetchWithAuth } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -138,8 +138,8 @@ function BusinessProfile({ businessId, initial }: {
   }
 
   return (
-    <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
-      <div className="relative overflow-hidden rounded-t-[16px] bg-gradient-to-br from-[#0070EB]/[0.04] via-[#F8F9FA] to-[#0070EB]/[0.02] px-6 pb-6 pt-8">
+    <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
+      <div className="relative overflow-hidden rounded-t-[16px] bg-gradient-to-br from-[#E05A3D]/[0.04] via-[#F8F9FA] to-[#E05A3D]/[0.02] px-6 pb-6 pt-8">
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
           const f = e.target.files?.[0];
           if (f) handleLogoUpload(f);
@@ -149,12 +149,12 @@ function BusinessProfile({ businessId, initial }: {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="group relative mb-4 flex h-24 w-24 items-center justify-center overflow-hidden rounded-[20px] bg-white shadow-[0_4px_24px_rgba(0,112,235,0.12)] ring-1 ring-[rgba(228,228,231,0.5)] transition-all duration-300 hover:shadow-[0_8px_32px_rgba(0,112,235,0.18)] active:scale-[0.97]"
+            className="group relative mb-4 flex h-24 w-24 items-center justify-center overflow-hidden rounded-[20px] bg-white shadow-[0_4px_24px_rgba(224,90,61,0.12)] ring-1 ring-[rgba(228,228,231,0.5)] transition-all duration-300 hover:shadow-[0_8px_32px_rgba(224,90,61,0.18)] active:scale-[0.97]"
           >
             {logoPreview ? (
               <img src={logoPreview} alt="Logo" className="h-full w-full object-cover" />
             ) : (
-              <span className="text-[24px] font-bold tracking-tight text-[#0070EB]">{initials}</span>
+              <span className="text-[24px] font-bold tracking-tight text-[#E05A3D]">{initials}</span>
             )}
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-[20px] bg-[#18181B]/0 transition-all duration-300 group-hover:bg-[#18181B]/50">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="translate-y-1 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
@@ -167,53 +167,53 @@ function BusinessProfile({ businessId, initial }: {
             </div>
           </button>
 
-          <p className="text-[18px] font-bold tracking-tight text-[#18181B]">{name || "Your Business"}</p>
+          <p className="text-[18px] font-bold tracking-tight text-[var(--dash-text)]">{name || "Your Business"}</p>
 
-          <div className="mt-3 flex items-center gap-2 rounded-full bg-white/80 px-3.5 py-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)] ring-1 ring-[rgba(228,228,231,0.5)]">
-            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0070EB]/10">
-              <span className="text-[8px] font-bold text-[#0070EB]">{initials.slice(0, 2)}</span>
+          <div className="mt-3 flex items-center gap-2 rounded-full bg-white/80 px-3.5 py-1.5 shadow-[var(--dash-shadow)] ring-1 ring-[rgba(228,228,231,0.5)]">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#E05A3D]/10">
+              <span className="text-[8px] font-bold text-[#E05A3D]">{initials.slice(0, 2)}</span>
             </div>
-            <span className="text-[11px] text-[#71717A]">How customers see you</span>
+            <span className="text-[11px] text-[var(--dash-muted)]">How customers see you</span>
           </div>
         </div>
       </div>
 
       <div className="flex flex-col gap-4 px-6 py-6">
         <div>
-          <label className="mb-2 block text-[12px] font-medium text-[#71717A]">Business name</label>
+          <label className="mb-2 block text-[12px] font-medium text-[var(--dash-muted)]">Business name</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onBlur={() => { if (name !== initial.name) save({ name }); }}
             placeholder="Your business name"
-            className="w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-[#FAFAFA] px-4 py-3 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] transition-all duration-300 focus:border-[#0070EB]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+            className="w-full rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-4 py-3 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-all duration-300 focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
           />
         </div>
         <div>
-          <label className="mb-2 block text-[12px] font-medium text-[#71717A]">Google Business Profile</label>
+          <label className="mb-2 block text-[12px] font-medium text-[var(--dash-muted)]">Google Business Profile</label>
 
           {/* Selected place card */}
           {selectedPlace && placeId ? (
-            <div className="flex items-start gap-3 rounded-[10px] border border-[#10B981]/30 bg-[#ECFDF5] px-4 py-3">
+            <div className="flex items-start gap-3 rounded-[var(--dash-radius-sm)] border border-[#10B981]/30 bg-[#ECFDF5] px-4 py-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-[#10B981]">
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     <polyline points="22 4 12 14.01 9 11.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <span className="text-[13px] font-medium text-[#18181B]">
+                  <span className="text-[13px] font-medium text-[var(--dash-text)]">
                     {selectedPlace.name || "Connected"}
                   </span>
                 </div>
                 {selectedPlace.address && (
-                  <p className="mt-1 text-[12px] text-[#71717A] pl-[24px]">{selectedPlace.address}</p>
+                  <p className="mt-1 text-[12px] text-[var(--dash-muted)] pl-[24px]">{selectedPlace.address}</p>
                 )}
               </div>
               <button
                 type="button"
                 onClick={handleClearPlace}
-                className="shrink-0 rounded-[6px] px-2.5 py-1 text-[11px] font-medium text-[#71717A] transition-all duration-200 hover:bg-white hover:text-[#EF4444]"
+                className="shrink-0 rounded-[6px] px-2.5 py-1 text-[11px] font-medium text-[var(--dash-muted)] transition-all duration-200 hover:bg-white hover:text-[#EF4444]"
               >
                 Change
               </button>
@@ -222,7 +222,7 @@ function BusinessProfile({ businessId, initial }: {
             <>
               {/* Search field */}
               <div className="relative">
-                <div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#A1A1AA]">
+                <div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--dash-muted)]">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="11" cy="11" r="8" />
                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -233,36 +233,36 @@ function BusinessProfile({ businessId, initial }: {
                   value={searchQuery}
                   onChange={(e) => handlePlaceSearch(e.target.value)}
                   placeholder="Search for your business on Google"
-                  className="w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-[#FAFAFA] py-3 pl-10 pr-4 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] transition-all duration-300 focus:border-[#0070EB]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+                  className="w-full rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] py-3 pl-10 pr-4 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-all duration-300 focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
                 />
                 {searching && (
                   <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#D4D4D8] border-t-[#0070EB]" />
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#D4D4D8] border-t-[#E05A3D]" />
                   </div>
                 )}
               </div>
 
               {/* Search results */}
               {searchResults.length > 0 && (
-                <div className="mt-2 overflow-hidden rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_4px_12px_rgba(0,0,0,0.06)]">
+                <div className="mt-2 overflow-hidden rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-white shadow-[0_4px_12px_rgba(0,0,0,0.06)]">
                   {searchResults.map((place, i) => (
                     <button
                       key={place.place_id}
                       type="button"
                       onClick={() => handlePlaceSelect(place)}
-                      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-all duration-200 hover:bg-[#F8F9FA] active:bg-[#F0F2F5] ${
-                        i < searchResults.length - 1 ? "border-b border-[rgba(228,228,231,0.3)]" : ""
+                      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-all duration-200 hover:bg-[var(--dash-bg)] active:bg-[var(--dash-bg)] ${
+                        i < searchResults.length - 1 ? "border-b border-[var(--dash-border)]" : ""
                       }`}
                     >
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#0070EB]/[0.06]">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0070EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#E05A3D]/[0.06]">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                           <circle cx="12" cy="10" r="3" />
                         </svg>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium text-[#18181B]">{place.name}</p>
-                        <p className="mt-0.5 text-[12px] text-[#71717A] truncate">{place.address}</p>
+                        <p className="text-[13px] font-medium text-[var(--dash-text)]">{place.name}</p>
+                        <p className="mt-0.5 text-[12px] text-[var(--dash-muted)] truncate">{place.address}</p>
                         {place.rating && (
                           <div className="mt-1 flex items-center gap-1.5">
                             <div className="flex items-center gap-0.5">
@@ -272,7 +272,7 @@ function BusinessProfile({ businessId, initial }: {
                                 </svg>
                               ))}
                             </div>
-                            <span className="text-[11px] text-[#A1A1AA]">{place.rating} ({place.user_ratings_total})</span>
+                            <span className="text-[11px] text-[var(--dash-muted)]">{place.rating} ({place.user_ratings_total})</span>
                           </div>
                         )}
                       </div>
@@ -286,7 +286,7 @@ function BusinessProfile({ businessId, initial }: {
                 <button
                   type="button"
                   onClick={() => setShowManual(true)}
-                  className="mt-2.5 text-[12px] text-[#A1A1AA] transition-all duration-200 hover:text-[#71717A]"
+                  className="mt-2.5 text-[12px] text-[var(--dash-muted)] transition-all duration-200 hover:text-[var(--dash-muted)]"
                 >
                   Can&apos;t find your business? Paste your Google review link directly
                 </button>
@@ -298,7 +298,7 @@ function BusinessProfile({ businessId, initial }: {
                     onChange={(e) => setGoogleUrl(e.target.value)}
                     onBlur={() => { if (googleUrl !== initial.google_review_url) save({ google_review_url: googleUrl }); }}
                     placeholder="https://search.google.com/local/writereview?placeid=..."
-                    className="w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-[#FAFAFA] px-4 py-3 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] transition-all duration-300 focus:border-[#0070EB]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+                    className="w-full rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-4 py-3 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-all duration-300 focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
                   />
                 </div>
               )}
@@ -341,17 +341,17 @@ function ServicesList({ services: initial, businessId }: { services: ServiceRow[
     setServices(services.filter((s) => s.id !== id));
   }
 
-  const accents = ["#0070EB", "#10B981", "#F59E0B", "#E11D48", "#8B5CF6", "#06B6D4", "#F97316", "#6366F1"];
+  const accents = ["#E05A3D", "#10B981", "#F59E0B", "#E11D48", "#8B5CF6", "#06B6D4", "#F97316", "#6366F1"];
 
   return (
-    <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
+    <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
       <div className="px-6 pt-5 pb-2">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-[15px] font-semibold tracking-tight text-[#18181B]">Services</h3>
+            <h3 className="text-[15px] font-semibold tracking-tight text-[var(--dash-text)]">Services</h3>
             <p className="mt-0.5 text-[11px] text-[#94A3B8]">What you offer — shows in the Send form</p>
           </div>
-          <span className="rounded-full bg-[#F0F2F5] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[#71717A]">{services.length}</span>
+          <span className="rounded-full bg-[var(--dash-bg)] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[var(--dash-muted)]">{services.length}</span>
         </div>
       </div>
 
@@ -359,7 +359,7 @@ function ServicesList({ services: initial, businessId }: { services: ServiceRow[
         {services.map((service, i) => (
           <div
             key={service.id}
-            className="group mx-0 flex items-center gap-3 rounded-[10px] px-3 py-3 transition-all duration-200 hover:bg-[#FAFAFA]"
+            className="group mx-0 flex items-center gap-3 rounded-[var(--dash-radius-sm)] px-3 py-3 transition-all duration-200 hover:bg-[var(--dash-bg)]"
           >
             <div className="flex items-center gap-2">
               <svg width="10" height="14" viewBox="0 0 10 14" fill="none" className="shrink-0 cursor-grab text-[#D4D4D8] opacity-0 transition-opacity duration-200 group-hover:opacity-100 active:cursor-grabbing">
@@ -373,12 +373,12 @@ function ServicesList({ services: initial, businessId }: { services: ServiceRow[
               <div className="h-2 w-2 rounded-full" style={{ backgroundColor: accents[i % accents.length] }} />
             </div>
 
-            <span className="flex-1 text-[14px] font-medium text-[#18181B]">{service.name}</span>
+            <span className="flex-1 text-[14px] font-medium text-[var(--dash-text)]">{service.name}</span>
 
             <button
               type="button"
               onClick={() => handleRemove(service.id)}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-[#A1A1AA] transition-all duration-200 hover:bg-[#FEE2E2] hover:text-[#EF4444] active:scale-[0.92]"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-[var(--dash-muted)] transition-all duration-200 hover:bg-[#FEE2E2] hover:text-[#EF4444] active:scale-[0.92]"
               aria-label={`Remove ${service.name}`}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -391,7 +391,7 @@ function ServicesList({ services: initial, businessId }: { services: ServiceRow[
       </div>
 
       {adding ? (
-        <div className="border-t border-[rgba(228,228,231,0.3)] px-6 py-4">
+        <div className="border-t border-[var(--dash-border)] px-6 py-4">
           <div className="flex gap-2.5">
             <input
               type="text"
@@ -403,14 +403,14 @@ function ServicesList({ services: initial, businessId }: { services: ServiceRow[
               }}
               placeholder="What service do you offer?"
               autoFocus
-              className="flex-1 rounded-[10px] border border-[#0070EB]/30 bg-white px-4 py-2.5 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+              className="flex-1 rounded-[var(--dash-radius-sm)] border border-[#E05A3D]/30 bg-white px-4 py-2.5 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
             />
             <button
               type="button"
               onClick={handleAdd}
               disabled={!draft.trim()}
-              className={`shrink-0 rounded-[10px] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
-                draft.trim() ? "bg-[#0070EB] shadow-[0_2px_8px_rgba(0,112,235,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#B0D4F8]"
+              className={`shrink-0 rounded-[var(--dash-radius-sm)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
+                draft.trim() ? "bg-[#E05A3D] shadow-[0_2px_8px_rgba(224,90,61,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#F0ADA0]"
               }`}
             >
               Add
@@ -421,10 +421,10 @@ function ServicesList({ services: initial, businessId }: { services: ServiceRow[
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="flex w-full items-center gap-2.5 border-t border-[rgba(228,228,231,0.3)] px-6 py-4 text-[13px] font-medium text-[#0070EB] transition-all duration-200 hover:bg-[#0070EB]/[0.03] active:scale-[0.99]"
+          className="flex w-full items-center gap-2.5 border-t border-[var(--dash-border)] px-6 py-4 text-[13px] font-medium text-[#E05A3D] transition-all duration-200 hover:bg-[#E05A3D]/[0.03] active:scale-[0.99]"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#0070EB]/[0.06]">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0070EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#E05A3D]/[0.06]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -468,19 +468,19 @@ function NeighborhoodsList({ neighborhoods: initial, businessId }: { neighborhoo
     persist(updated);
   }
 
-  const areaColors = ["#06B6D4", "#8B5CF6", "#F97316", "#10B981", "#E11D48", "#0070EB", "#F59E0B", "#6366F1"];
+  const areaColors = ["#06B6D4", "#8B5CF6", "#F97316", "#10B981", "#E11D48", "#E05A3D", "#F59E0B", "#6366F1"];
 
   return (
-    <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
+    <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
       <div className="px-6 pt-5 pb-2">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-[15px] font-semibold tracking-tight text-[#18181B]">Service Areas</h3>
+            <h3 className="text-[15px] font-semibold tracking-tight text-[var(--dash-text)]">Service Areas</h3>
             <p className="mt-0.5 text-[11px] text-[#94A3B8]">Neighborhoods you serve — boosts local SEO in reviews</p>
           </div>
           {saving && <span className="text-[11px] text-[#10B981]">Saving...</span>}
           {!saving && items.length > 0 && (
-            <span className="rounded-full bg-[#F0F2F5] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[#71717A]">{items.length}</span>
+            <span className="rounded-full bg-[var(--dash-bg)] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[var(--dash-muted)]">{items.length}</span>
           )}
         </div>
       </div>
@@ -512,7 +512,7 @@ function NeighborhoodsList({ neighborhoods: initial, businessId }: { neighborhoo
       )}
 
       {adding ? (
-        <div className="border-t border-[rgba(228,228,231,0.3)] px-6 py-4">
+        <div className="border-t border-[var(--dash-border)] px-6 py-4">
           <div className="flex gap-2.5">
             <input
               type="text"
@@ -524,14 +524,14 @@ function NeighborhoodsList({ neighborhoods: initial, businessId }: { neighborhoo
               }}
               placeholder="e.g. Zilker, Westlake, North Loop"
               autoFocus
-              className="flex-1 rounded-[10px] border border-[#0070EB]/30 bg-white px-4 py-2.5 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+              className="flex-1 rounded-[var(--dash-radius-sm)] border border-[#E05A3D]/30 bg-white px-4 py-2.5 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
             />
             <button
               type="button"
               onClick={handleAdd}
               disabled={!draft.trim()}
-              className={`shrink-0 rounded-[10px] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
-                draft.trim() ? "bg-[#0070EB] shadow-[0_2px_8px_rgba(0,112,235,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#B0D4F8]"
+              className={`shrink-0 rounded-[var(--dash-radius-sm)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
+                draft.trim() ? "bg-[#E05A3D] shadow-[0_2px_8px_rgba(224,90,61,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#F0ADA0]"
               }`}
             >
               Add
@@ -542,10 +542,10 @@ function NeighborhoodsList({ neighborhoods: initial, businessId }: { neighborhoo
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="flex w-full items-center gap-2.5 border-t border-[rgba(228,228,231,0.3)] px-6 py-4 text-[13px] font-medium text-[#0070EB] transition-all duration-200 hover:bg-[#0070EB]/[0.03] active:scale-[0.99]"
+          className="flex w-full items-center gap-2.5 border-t border-[var(--dash-border)] px-6 py-4 text-[13px] font-medium text-[#E05A3D] transition-all duration-200 hover:bg-[#E05A3D]/[0.03] active:scale-[0.99]"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#0070EB]/[0.06]">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0070EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#E05A3D]/[0.06]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -586,7 +586,7 @@ function TeamList({ employees: initial, businessId }: { employees: EmployeeRow[]
   }
 
   const avatarColors = [
-    { bg: "#0070EB", text: "#FFFFFF" },
+    { bg: "#E05A3D", text: "#FFFFFF" },
     { bg: "#10B981", text: "#FFFFFF" },
     { bg: "#F59E0B", text: "#FFFFFF" },
     { bg: "#8B5CF6", text: "#FFFFFF" },
@@ -595,14 +595,14 @@ function TeamList({ employees: initial, businessId }: { employees: EmployeeRow[]
   ];
 
   return (
-    <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
+    <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
       <div className="px-6 pt-5 pb-2">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-[15px] font-semibold tracking-tight text-[#18181B]">Team</h3>
+            <h3 className="text-[15px] font-semibold tracking-tight text-[var(--dash-text)]">Team</h3>
             <p className="mt-0.5 text-[11px] text-[#94A3B8]">People who perform your services</p>
           </div>
-          <span className="rounded-full bg-[#F0F2F5] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[#71717A]">{employees.length}</span>
+          <span className="rounded-full bg-[var(--dash-bg)] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[var(--dash-muted)]">{employees.length}</span>
         </div>
       </div>
 
@@ -612,7 +612,7 @@ function TeamList({ employees: initial, businessId }: { employees: EmployeeRow[]
           return (
             <div
               key={emp.id}
-              className="group flex items-center gap-3.5 rounded-[10px] px-3 py-3 transition-all duration-200 hover:bg-[#FAFAFA]"
+              className="group flex items-center gap-3.5 rounded-[var(--dash-radius-sm)] px-3 py-3 transition-all duration-200 hover:bg-[var(--dash-bg)]"
             >
               <div
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] text-[13px] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
@@ -621,12 +621,12 @@ function TeamList({ employees: initial, businessId }: { employees: EmployeeRow[]
                 {emp.name[0]}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-medium text-[#18181B]">{emp.name}</p>
+                <p className="text-[14px] font-medium text-[var(--dash-text)]">{emp.name}</p>
               </div>
               <button
                 type="button"
                 onClick={() => handleRemove(emp.id)}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-[#A1A1AA] transition-all duration-200 hover:bg-[#FEE2E2] hover:text-[#EF4444] active:scale-[0.92]"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-[var(--dash-muted)] transition-all duration-200 hover:bg-[#FEE2E2] hover:text-[#EF4444] active:scale-[0.92]"
                 aria-label={`Remove ${emp.name}`}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -640,7 +640,7 @@ function TeamList({ employees: initial, businessId }: { employees: EmployeeRow[]
       </div>
 
       {adding ? (
-        <div className="border-t border-[rgba(228,228,231,0.3)] px-6 py-4">
+        <div className="border-t border-[var(--dash-border)] px-6 py-4">
           <div className="flex gap-2.5">
             <input
               type="text"
@@ -652,14 +652,14 @@ function TeamList({ employees: initial, businessId }: { employees: EmployeeRow[]
               }}
               placeholder="Name"
               autoFocus
-              className="flex-1 rounded-[10px] border border-[#0070EB]/30 bg-white px-4 py-2.5 text-[14px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+              className="flex-1 rounded-[var(--dash-radius-sm)] border border-[#E05A3D]/30 bg-white px-4 py-2.5 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
             />
             <button
               type="button"
               onClick={handleAdd}
               disabled={!draftName.trim()}
-              className={`shrink-0 rounded-[10px] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
-                draftName.trim() ? "bg-[#0070EB] shadow-[0_2px_8px_rgba(0,112,235,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#B0D4F8]"
+              className={`shrink-0 rounded-[var(--dash-radius-sm)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
+                draftName.trim() ? "bg-[#E05A3D] shadow-[0_2px_8px_rgba(224,90,61,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#F0ADA0]"
               }`}
             >
               Add
@@ -670,10 +670,10 @@ function TeamList({ employees: initial, businessId }: { employees: EmployeeRow[]
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="flex w-full items-center gap-2.5 border-t border-[rgba(228,228,231,0.3)] px-6 py-4 text-[13px] font-medium text-[#0070EB] transition-all duration-200 hover:bg-[#0070EB]/[0.03] active:scale-[0.99]"
+          className="flex w-full items-center gap-2.5 border-t border-[var(--dash-border)] px-6 py-4 text-[13px] font-medium text-[#E05A3D] transition-all duration-200 hover:bg-[#E05A3D]/[0.03] active:scale-[0.99]"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#0070EB]/[0.06]">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0070EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#E05A3D]/[0.06]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -741,12 +741,12 @@ function TopicSection({ topics: initial, businessId, isCustomized }: {
   }
 
   return (
-    <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
+    <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
       <div className="px-6 pt-5 pb-1">
-        <h3 className="text-[15px] font-semibold tracking-tight text-[#18181B]">Review Topics</h3>
+        <h3 className="text-[15px] font-semibold tracking-tight text-[var(--dash-text)]">Review Topics</h3>
         <p className="mt-0.5 text-[11px] text-[#94A3B8]">What customers are asked about during the review</p>
         {!isCustomized && (
-          <p className="mt-2 rounded-[8px] bg-[#F0F2F5] px-3 py-2 text-[12px] text-[#71717A]">
+          <p className="mt-2 rounded-[8px] bg-[var(--dash-bg)] px-3 py-2 text-[12px] text-[var(--dash-muted)]">
             These are the defaults — customize them or leave as-is.
           </p>
         )}
@@ -755,7 +755,7 @@ function TopicSection({ topics: initial, businessId, isCustomized }: {
       {TIER_META.map((tier, ti) => {
         const tierTopics = topics.filter((t) => t.tier === tier.key).sort((a, b) => a.sort_order - b.sort_order);
         return (
-          <div key={tier.key} className={`px-6 py-4 ${ti < TIER_META.length - 1 ? "border-b border-[rgba(228,228,231,0.3)]" : ""}`}>
+          <div key={tier.key} className={`px-6 py-4 ${ti < TIER_META.length - 1 ? "border-b border-[var(--dash-border)]" : ""}`}>
             <div className="mb-3 flex items-center gap-2">
               <div className="h-[6px] w-[6px] rounded-full" style={{ backgroundColor: tier.dotColor }} />
               <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: tier.color }}>{tier.label}</span>
@@ -790,28 +790,28 @@ function TopicSection({ topics: initial, businessId, isCustomized }: {
                   onChange={(e) => setDraftLabel(e.target.value)}
                   placeholder="Topic label (e.g. Filter Condition)"
                   autoFocus
-                  className="rounded-[8px] border border-[rgba(228,228,231,0.5)] px-3 py-2 text-[13px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] focus:border-[#0070EB]/40 focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+                  className="rounded-[8px] border border-[var(--dash-border)] px-3 py-2 text-[13px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] focus:border-[#E05A3D]/40 focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
                 />
                 <input
                   type="text"
                   value={draftQuestion}
                   onChange={(e) => setDraftQuestion(e.target.value)}
                   placeholder="Follow-up question (e.g. How was the filter?)"
-                  className="rounded-[8px] border border-[rgba(228,228,231,0.5)] px-3 py-2 text-[13px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] focus:border-[#0070EB]/40 focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+                  className="rounded-[8px] border border-[var(--dash-border)] px-3 py-2 text-[13px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] focus:border-[#E05A3D]/40 focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
                 />
                 <input
                   type="text"
                   value={draftOptions}
                   onChange={(e) => setDraftOptions(e.target.value)}
                   placeholder="Options, comma-separated (e.g. Great, Good, Fair, Poor)"
-                  className="rounded-[8px] border border-[rgba(228,228,231,0.5)] px-3 py-2 text-[13px] text-[#18181B] outline-none placeholder:text-[#A1A1AA] focus:border-[#0070EB]/40 focus:shadow-[0_0_0_3px_rgba(0,112,235,0.08)]"
+                  className="rounded-[8px] border border-[var(--dash-border)] px-3 py-2 text-[13px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] focus:border-[#E05A3D]/40 focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
                   onKeyDown={(e) => { if (e.key === "Enter") handleAdd(tier.key); }}
                 />
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => { setAddingTier(null); setDraftLabel(""); setDraftQuestion(""); setDraftOptions(""); }}
-                    className="rounded-[8px] px-3.5 py-1.5 text-[13px] text-[#94A3B8] transition-all duration-200 hover:bg-[#F0F2F5] hover:text-[#71717A]"
+                    className="rounded-[8px] px-3.5 py-1.5 text-[13px] text-[#94A3B8] transition-all duration-200 hover:bg-[var(--dash-bg)] hover:text-[var(--dash-muted)]"
                   >
                     Cancel
                   </button>
@@ -819,7 +819,7 @@ function TopicSection({ topics: initial, businessId, isCustomized }: {
                     type="button"
                     onClick={() => handleAdd(tier.key)}
                     disabled={!draftLabel.trim() || !draftQuestion.trim() || draftOptions.split(",").filter((o) => o.trim()).length < 2}
-                    className="rounded-[8px] bg-[#0070EB] px-4 py-1.5 text-[13px] font-semibold text-white transition-all duration-200 disabled:cursor-not-allowed disabled:bg-[#B0D4F8]"
+                    className="rounded-[8px] bg-[#E05A3D] px-4 py-1.5 text-[13px] font-semibold text-white transition-all duration-200 disabled:cursor-not-allowed disabled:bg-[#F0ADA0]"
                   >
                     Add
                   </button>
@@ -847,182 +847,17 @@ function TopicSection({ topics: initial, businessId, isCustomized }: {
 }
 
 /* ═══════════════════════════════════════════════════
-   BILLING
-   ═══════════════════════════════════════════════════ */
-
-function BillingSection({ business }: {
-  business: {
-    id: string;
-    subscription_status: string;
-    trial_requests_remaining: number;
-    trial_ends_at: string | null;
-    stripe_customer_id: string | null;
-  };
-}) {
-  const [redirecting, setRedirecting] = useState(false);
-
-  const status = business.subscription_status;
-
-  const trialEndsFormatted = business.trial_ends_at
-    ? new Date(business.trial_ends_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
-    : null;
-
-  async function handleCheckout() {
-    setRedirecting(true);
-    try {
-      const res = await fetchWithAuth("/api/checkout", { method: "POST" });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-      else setRedirecting(false);
-    } catch {
-      setRedirecting(false);
-    }
-  }
-
-  async function handlePortal() {
-    if (!business.stripe_customer_id) return;
-    setRedirecting(true);
-    try {
-      const res = await fetch("/api/customer-portal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stripe_customer_id: business.stripe_customer_id }),
-      });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-      else setRedirecting(false);
-    } catch {
-      setRedirecting(false);
-    }
-  }
-
-  // Determine card content
-  let planName: string;
-  let badge: { label: string; color: string };
-  let details: React.ReactNode;
-  let action: { label: string; onClick: () => void };
-
-  if (status === "active") {
-    planName = "Small Talk — $79/mo";
-    badge = { label: "Active", color: "bg-[#10B981]/20 text-[#10B981]" };
-    details = (
-      <p className="mt-3 text-[13px] text-white/70">
-        Your subscription is active. Manage your billing, update payment method, or cancel anytime.
-      </p>
-    );
-    action = { label: "Manage Billing", onClick: handlePortal };
-  } else if (status === "trialing") {
-    planName = "Small Talk — Trial";
-    badge = { label: "Trialing", color: "bg-white/20 text-white" };
-    details = (
-      <p className="mt-3 text-[13px] text-white/70">
-        {trialEndsFormatted
-          ? <>Your trial ends on <span className="font-semibold text-white">{trialEndsFormatted}</span></>
-          : "Your free trial is active"
-        }
-      </p>
-    );
-    action = { label: "Manage Billing", onClick: handlePortal };
-  } else if (status === "past_due") {
-    planName = "Small Talk — $79/mo";
-    badge = { label: "Past Due", color: "bg-[#F59E0B]/20 text-[#F59E0B]" };
-    details = (
-      <p className="mt-3 text-[13px] text-white/70">
-        Payment failed — please update your card to keep your account active.
-      </p>
-    );
-    action = { label: "Manage Billing", onClick: handlePortal };
-  } else if (status === "canceled") {
-    planName = "No Active Plan";
-    badge = { label: "Canceled", color: "bg-[#EF4444]/20 text-[#FCA5A5]" };
-    details = (
-      <p className="mt-3 text-[13px] text-white/70">
-        Your subscription has ended. Start a new trial to begin sending review links again.
-      </p>
-    );
-    action = { label: "Start Free Trial", onClick: handleCheckout };
-  } else if (status === "paused") {
-    planName = "Small Talk — Paused";
-    badge = { label: "Paused", color: "bg-[#F59E0B]/20 text-[#F59E0B]" };
-    details = (
-      <p className="mt-3 text-[13px] text-white/70">
-        Your subscription is paused. Resume to start sending review links again.
-      </p>
-    );
-    action = { label: "Manage Billing", onClick: handlePortal };
-  } else {
-    // none, incomplete, or anything else
-    planName = "No Plan";
-    badge = { label: "No Plan", color: "bg-white/20 text-white/60" };
-    details = (
-      <p className="mt-3 text-[13px] text-white/70">
-        Start your free 7-day trial to send review requests and grow your Google reviews.
-      </p>
-    );
-    action = { label: "Start Free Trial", onClick: handleCheckout };
-  }
-
-  return (
-    <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
-      <div className="px-6 pt-5 pb-1">
-        <h3 className="text-[15px] font-semibold tracking-tight text-[#18181B]">Billing</h3>
-      </div>
-      <div className="px-6 py-5">
-        <div className="overflow-hidden rounded-[14px] bg-gradient-to-br from-[#0070EB] to-[#0058BB] p-5 text-white">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-white/60">Current plan</p>
-              <p className="mt-1 text-[18px] font-bold tracking-tight">{planName}</p>
-            </div>
-            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${badge.color}`}>
-              {badge.label}
-            </span>
-          </div>
-          {details}
-        </div>
-        <button
-          type="button"
-          onClick={action.onClick}
-          disabled={redirecting}
-          className="mt-3 w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-[#FAFAFA] py-3 text-[13px] font-semibold text-[#71717A] transition-all duration-200 hover:bg-white hover:text-[#18181B] hover:shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)] active:scale-[0.98] disabled:opacity-60"
-        >
-          {redirecting ? "Redirecting..." : action.label}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════
    PAGE
    ═══════════════════════════════════════════════════ */
 
-function LogoutButton() {
-  const { signOut } = useAuth();
-  const [loading, setLoading] = useState(false);
-
-  return (
-    <button
-      type="button"
-      disabled={loading}
-      onClick={async () => {
-        setLoading(true);
-        await signOut();
-      }}
-      className="w-full rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-white py-3 text-[13px] font-semibold text-[#EF4444] transition-all duration-200 hover:bg-[#FEF2F2] hover:border-[#FECACA] active:scale-[0.98] disabled:opacity-60"
-    >
-      {loading ? "Signing out..." : "Sign out"}
-    </button>
-  );
-}
-
 export default function SettingsPage() {
-  const { business } = useAuth();
+  const { business, session, signOut } = useAuth();
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [topics, setTopics] = useState<TopicRow[]>([]);
   const [isCustomized, setIsCustomized] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (!business) return;
@@ -1058,17 +893,15 @@ export default function SettingsPage() {
   if (!business) return null;
 
   return (
-    <div className="min-h-dvh bg-[#F8F9FA] font-dashboard sm:pl-[200px]">
-      <div className="mx-auto max-w-[600px] px-5 pb-28 pt-8 sm:pb-16">
-
-        <div className="mb-8">
-          <h1 className="text-[22px] font-bold tracking-tight text-[#18181B]">Settings</h1>
-        </div>
+    <div className="min-h-dvh bg-[var(--dash-bg)] font-dashboard sm:pl-[220px]">
+      <div className="dash-page-enter mx-auto max-w-[960px] px-5 pb-32 pt-8 sm:pb-16">
+        <h1 className="font-heading text-[24px] font-semibold text-[var(--dash-text)]">Settings</h1>
+        <p className="mt-1 mb-6 text-[13px] text-[var(--dash-muted)]">Manage your business profile and preferences</p>
 
         {loading ? (
           <div className="flex flex-col gap-8">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-[200px] animate-pulse rounded-[16px] bg-[#F4F4F5]" />
+              <div key={i} className="h-[200px] animate-pulse rounded-[var(--dash-radius)] bg-[var(--dash-border)]" />
             ))}
           </div>
         ) : (
@@ -1086,8 +919,77 @@ export default function SettingsPage() {
             <NeighborhoodsList neighborhoods={business.neighborhoods || []} businessId={business.id} />
             <TeamList employees={employees} businessId={business.id} />
             <TopicSection topics={topics} businessId={business.id} isCustomized={isCustomized} />
-            <BillingSection business={business} />
-            <LogoutButton />
+
+            {/* Account */}
+            <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">
+              <h2 className="mb-4 text-[16px] font-semibold text-[var(--dash-text)]">Account</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium text-[var(--dash-muted)]">Email</label>
+                  <p className="text-[14px] text-[var(--dash-text)]">{session?.user?.email ?? "\u2014"}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const email = session?.user?.email;
+                    if (email) {
+                      await supabase.auth.resetPasswordForEmail(email);
+                      alert("Password reset email sent to " + email);
+                    }
+                  }}
+                  className="text-[13px] font-medium text-[var(--dash-primary)] underline underline-offset-2 hover:no-underline"
+                >
+                  Change password
+                </button>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="block text-[13px] font-medium text-[var(--dash-muted)] underline underline-offset-2 hover:no-underline"
+                >
+                  Sign out
+                </button>
+                <div className="border-t border-[var(--dash-border)] pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-[12px] font-medium text-[#DC2626] underline underline-offset-2 hover:no-underline"
+                  >
+                    Delete account
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Delete confirmation dialog */}
+            {showDeleteConfirm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 font-dashboard">
+                <div className="mx-4 w-full max-w-[400px] rounded-[var(--dash-radius)] bg-white p-6 shadow-lg">
+                  <h3 className="text-[16px] font-bold text-[var(--dash-text)]">Delete your account?</h3>
+                  <p className="mt-2 text-[13px] text-[var(--dash-muted)]">
+                    This will permanently delete your business, all review links, and cancel your subscription. This action cannot be undone.
+                  </p>
+                  <div className="mt-5 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="flex-1 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] py-2.5 text-[13px] font-semibold text-[var(--dash-muted)] transition-all hover:bg-[var(--dash-bg)]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        console.log("Account deletion requested");
+                        setShowDeleteConfirm(false);
+                      }}
+                      className="flex-1 rounded-[var(--dash-radius-sm)] bg-[#DC2626] py-2.5 text-[13px] font-semibold text-white transition-all hover:brightness-95 active:scale-[0.98]"
+                    >
+                      Delete Account
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
