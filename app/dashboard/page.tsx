@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { supabase } from "@/lib/supabase";
+import { supabase, fetchWithAuth } from "@/lib/supabase";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -327,6 +328,30 @@ export default function Dashboard() {
   const [recentReviews, setRecentReviews] = useState<{ name: string; stars: number; snippet: string; time: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const { business } = useAuth();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Safety net: verify subscription with Stripe after checkout redirect
+  useEffect(() => {
+    if (searchParams.get("checkout") !== "success") return;
+    if (!business) return;
+
+    // Remove ?checkout=success from URL so it doesn't re-fire
+    router.replace("/dashboard", { scroll: false });
+
+    fetchWithAuth("/api/verify-subscription", { method: "POST" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.updated) {
+          console.log("[dashboard] Subscription verified via Stripe:", data.subscription_status);
+          // Reload to pick up the updated business record
+          window.location.href = "/dashboard";
+        }
+      })
+      .catch((err) => {
+        console.error("[dashboard] Failed to verify subscription:", err);
+      });
+  }, [searchParams, business, router]);
 
   useEffect(() => {
     if (!business) return;

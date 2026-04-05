@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase } from "@/lib/supabase";
+import { supabase, fetchWithAuth } from "@/lib/supabase";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -862,26 +862,15 @@ function BillingSection({ business }: {
   const [redirecting, setRedirecting] = useState(false);
 
   const status = business.subscription_status;
-  const trialExpired =
-    status === "trial" &&
-    ((business.trial_ends_at && new Date(business.trial_ends_at) < new Date()) ||
-      business.trial_requests_remaining <= 0);
 
-  const daysLeft = business.trial_ends_at
-    ? Math.max(0, Math.ceil((new Date(business.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : 0;
+  const trialEndsFormatted = business.trial_ends_at
+    ? new Date(business.trial_ends_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : null;
 
   async function handleCheckout() {
     setRedirecting(true);
     try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          price_id: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || "price_placeholder",
-          user_id: business.id,
-        }),
-      });
+      const res = await fetchWithAuth("/api/checkout", { method: "POST" });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
       else setRedirecting(false);
@@ -894,7 +883,7 @@ function BillingSection({ business }: {
     if (!business.stripe_customer_id) return;
     setRedirecting(true);
     try {
-      const res = await fetch("/api/billing-portal", {
+      const res = await fetch("/api/customer-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stripe_customer_id: business.stripe_customer_id }),
@@ -914,7 +903,7 @@ function BillingSection({ business }: {
   let action: { label: string; onClick: () => void };
 
   if (status === "active") {
-    planName = "small Talk Pro";
+    planName = "Small Talk — $79/mo";
     badge = { label: "Active", color: "bg-[#10B981]/20 text-[#10B981]" };
     details = (
       <p className="mt-3 text-[13px] text-white/70">
@@ -922,39 +911,55 @@ function BillingSection({ business }: {
       </p>
     );
     action = { label: "Manage Billing", onClick: handlePortal };
-  } else if (status === "trial" && !trialExpired) {
-    planName = "Free Trial";
-    badge = { label: "Trial", color: "bg-white/20 text-white" };
-    details = (
-      <div className="mt-3 flex flex-col gap-1.5">
-        <p className="text-[13px] text-white/70">
-          <span className="font-semibold text-white">{business.trial_requests_remaining}</span> request{business.trial_requests_remaining !== 1 ? "s" : ""} remaining
-        </p>
-        <p className="text-[13px] text-white/70">
-          <span className="font-semibold text-white">{daysLeft}</span> day{daysLeft !== 1 ? "s" : ""} left
-        </p>
-      </div>
-    );
-    action = { label: "Upgrade Now", onClick: handleCheckout };
-  } else if (status === "trial" && trialExpired) {
-    planName = "Free Trial";
-    badge = { label: "Ended", color: "bg-[#EF4444]/20 text-[#FCA5A5]" };
+  } else if (status === "trialing") {
+    planName = "Small Talk — Trial";
+    badge = { label: "Trialing", color: "bg-white/20 text-white" };
     details = (
       <p className="mt-3 text-[13px] text-white/70">
-        Your trial has ended. Subscribe to continue sending review links and unlock all features.
+        {trialEndsFormatted
+          ? <>Your trial ends on <span className="font-semibold text-white">{trialEndsFormatted}</span></>
+          : "Your free trial is active"
+        }
       </p>
     );
-    action = { label: "Subscribe to Continue", onClick: handleCheckout };
-  } else {
-    // canceled
+    action = { label: "Manage Billing", onClick: handlePortal };
+  } else if (status === "past_due") {
+    planName = "Small Talk — $79/mo";
+    badge = { label: "Past Due", color: "bg-[#F59E0B]/20 text-[#F59E0B]" };
+    details = (
+      <p className="mt-3 text-[13px] text-white/70">
+        Payment failed — please update your card to keep your account active.
+      </p>
+    );
+    action = { label: "Manage Billing", onClick: handlePortal };
+  } else if (status === "canceled") {
     planName = "No Active Plan";
     badge = { label: "Canceled", color: "bg-[#EF4444]/20 text-[#FCA5A5]" };
     details = (
       <p className="mt-3 text-[13px] text-white/70">
-        Your subscription has ended. Resubscribe to start sending review links again.
+        Your subscription has ended. Start a new trial to begin sending review links again.
       </p>
     );
-    action = { label: "Resubscribe", onClick: handleCheckout };
+    action = { label: "Start Free Trial", onClick: handleCheckout };
+  } else if (status === "paused") {
+    planName = "Small Talk — Paused";
+    badge = { label: "Paused", color: "bg-[#F59E0B]/20 text-[#F59E0B]" };
+    details = (
+      <p className="mt-3 text-[13px] text-white/70">
+        Your subscription is paused. Resume to start sending review links again.
+      </p>
+    );
+    action = { label: "Manage Billing", onClick: handlePortal };
+  } else {
+    // none, incomplete, or anything else
+    planName = "No Plan";
+    badge = { label: "No Plan", color: "bg-white/20 text-white/60" };
+    details = (
+      <p className="mt-3 text-[13px] text-white/70">
+        Start your free 7-day trial to send review requests and grow your Google reviews.
+      </p>
+    );
+    action = { label: "Start Free Trial", onClick: handleCheckout };
   }
 
   return (

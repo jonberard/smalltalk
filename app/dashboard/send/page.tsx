@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase } from "@/lib/supabase";
+import { supabase, fetchWithAuth } from "@/lib/supabase";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -29,14 +29,15 @@ function getSubTier(business: {
   trial_ends_at: string | null;
   trial_requests_remaining: number;
 }): SubTier {
-  if (business.subscription_status === "active") return "active";
-  if (business.subscription_status === "trial") {
+  const status = business.subscription_status;
+  if (status === "active" || status === "trialing") return "active";
+  if (status === "trial") {
     const expired =
       (business.trial_ends_at && new Date(business.trial_ends_at) < new Date()) ||
       business.trial_requests_remaining <= 0;
     return expired ? "expired" : "trial";
   }
-  return "expired"; // canceled, inactive, etc.
+  return "expired"; // none, canceled, paused, past_due, etc.
 }
 
 function isPhone(contact: string): boolean {
@@ -828,20 +829,13 @@ function QRBlock({ businessName }: { businessName: string }) {
    PAYWALL — expired trial or canceled
    ═══════════════════════════════════════════════════ */
 
-function Paywall({ userId }: { userId: string }) {
+function Paywall() {
   const [redirecting, setRedirecting] = useState(false);
 
   async function handleSubscribe() {
     setRedirecting(true);
     try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          price_id: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || "price_placeholder",
-          user_id: userId,
-        }),
-      });
+      const res = await fetchWithAuth("/api/checkout", { method: "POST" });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
@@ -863,10 +857,10 @@ function Paywall({ userId }: { userId: string }) {
       </div>
       <div>
         <h3 className="text-[18px] font-bold text-[#18181B]">
-          You&rsquo;ve used your free trial &mdash; ready to keep going?
+          Start your free trial to send review requests
         </h3>
         <p className="mx-auto mt-2 max-w-[360px] text-[14px] leading-relaxed text-[#71717A]">
-          Subscribe to send unlimited review links, unlock bulk CSV sends, and keep growing your reviews.
+          7-day free trial. Unlimited review links, bulk CSV sends, and everything you need to grow your reviews.
         </p>
       </div>
       <button
@@ -885,20 +879,13 @@ function Paywall({ userId }: { userId: string }) {
    BULK UPGRADE PROMPT — shown for trial users on CSV tab
    ═══════════════════════════════════════════════════ */
 
-function BulkUpgradePrompt({ userId }: { userId: string }) {
+function BulkUpgradePrompt() {
   const [redirecting, setRedirecting] = useState(false);
 
   async function handleSubscribe() {
     setRedirecting(true);
     try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          price_id: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || "price_placeholder",
-          user_id: userId,
-        }),
-      });
+      const res = await fetchWithAuth("/api/checkout", { method: "POST" });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
@@ -1007,15 +994,16 @@ export default function SendPage() {
 
   // Re-check tier with live trialRemaining (business object may be stale)
   const effectiveTier: SubTier = (() => {
-    if (!business) return "trial";
-    if (business.subscription_status === "active") return "active";
-    if (business.subscription_status === "trial") {
+    if (!business) return "expired";
+    const status = business.subscription_status;
+    if (status === "active" || status === "trialing") return "active";
+    if (status === "trial") {
       const expired =
         (business.trial_ends_at && new Date(business.trial_ends_at) < new Date()) ||
         trialRemaining <= 0;
       return expired ? "expired" : "trial";
     }
-    return "expired";
+    return "expired"; // none, canceled, paused, past_due
   })();
 
   return (
@@ -1079,7 +1067,7 @@ export default function SendPage() {
               ))}
             </div>
           ) : effectiveTier === "expired" ? (
-            <Paywall userId={business!.id} />
+            <Paywall />
           ) : mode === "single" ? (
             <SingleForm
               services={services}
@@ -1091,7 +1079,7 @@ export default function SendPage() {
               onEmployeeCreated={(e) => setEmployees((prev) => [...prev, e])}
             />
           ) : effectiveTier === "trial" ? (
-            <BulkUpgradePrompt userId={business!.id} />
+            <BulkUpgradePrompt />
           ) : (
             <BulkUpload
               services={services}

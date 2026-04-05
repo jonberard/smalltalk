@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, fetchWithAuth } from "@/lib/supabase";
 import Link from "next/link";
 
 /* ═══════════════════════════════════════════════════
@@ -170,14 +170,30 @@ function HeroPhone() {
 export default function LandingPage() {
   const wrapRef = useFadeUp();
   const [loggedIn, setLoggedIn] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setLoggedIn(!!session);
+      setUserId(session?.user?.id ?? null);
     });
   }, []);
 
   const ctaHref = loggedIn ? "/dashboard" : "/signup";
+
+  async function handlePricingCta() {
+    if (!loggedIn || !userId) {
+      window.location.href = "/signup";
+      return;
+    }
+    try {
+      const res = await fetchWithAuth("/api/checkout", { method: "POST" });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch {
+      window.location.href = "/dashboard";
+    }
+  }
 
   return (
     <div ref={wrapRef} className="min-h-dvh bg-background font-body text-text">
@@ -614,12 +630,13 @@ export default function LandingPage() {
                 </li>
               ))}
             </ul>
-            <Link
-              href={ctaHref}
+            <button
+              type="button"
+              onClick={handlePricingCta}
               className={`block w-full rounded-pill ${BORDER} bg-surface py-3.5 text-center text-[14px] font-semibold text-text transition-all duration-300 hover:bg-accent/30 active:scale-[0.98]`}
             >
-              {loggedIn ? "Go to Dashboard" : "Start free trial"}
-            </Link>
+              {loggedIn ? "Start Free Trial" : "Start free trial"}
+            </button>
           </div>
 
           {/* Multi-Crew */}
@@ -656,12 +673,13 @@ export default function LandingPage() {
                 </li>
               ))}
             </ul>
-            <Link
-              href={ctaHref}
+            <button
+              type="button"
+              onClick={handlePricingCta}
               className="block w-full rounded-pill bg-primary py-3.5 text-center text-[14px] font-semibold text-white transition-all duration-300 hover:opacity-90 active:scale-[0.98]"
             >
-              {loggedIn ? "Go to Dashboard" : "Start free trial"}
-            </Link>
+              {loggedIn ? "Start Free Trial" : "Start free trial"}
+            </button>
           </div>
         </div>
       </section>

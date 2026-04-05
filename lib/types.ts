@@ -11,6 +11,7 @@ export type Business = {
   business_city: string | null;
   neighborhoods: string[] | null;
   stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
   subscription_status: string;
   trial_requests_remaining: number;
   trial_ends_at: string | null;
@@ -26,6 +27,7 @@ export type BusinessInsert = {
   business_city?: string | null;
   neighborhoods?: string[] | null;
   stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
   subscription_status?: string;
   trial_requests_remaining?: number;
   trial_ends_at?: string | null;

@@ -46,7 +46,8 @@ The business owner's account. The row's `id` IS the Supabase auth user's UUID �
 | business_city | text, nullable | City/area extracted from Google Places — used for SEO in generated reviews |
 | neighborhoods | text[], nullable | Service area neighborhoods — one randomly picked per review for hyper-local SEO |
 | stripe_customer_id | text, nullable | Stripe customer ID for billing |
-| subscription_status | text, default `'trial'` | `trial`, `active`, `canceled`, etc. |
+| stripe_subscription_id | text, nullable | Stripe subscription ID for lifecycle tracking |
+| subscription_status | text, default `'none'` | `none`, `trialing`, `active`, `past_due`, `canceled`, `paused` |
 | trial_requests_remaining | integer, default `10` | Free review links before requiring payment |
 | trial_ends_at | timestamptz, nullable | When the free trial expires (7 days from signup) |
 | created_at | timestamptz | |

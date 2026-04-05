@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { fetchWithAuth } from "@/lib/supabase";
 
 const TABS = [
   {
@@ -45,14 +46,7 @@ function TrialBanner({ remaining, userId }: { remaining: number; userId: string 
   const handleSubscribe = useCallback(async () => {
     setRedirecting(true);
     try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          price_id: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || "price_placeholder",
-          user_id: userId,
-        }),
-      });
+      const res = await fetchWithAuth("/api/checkout", { method: "POST" });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
@@ -120,7 +114,7 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
               <div className="absolute right-0 top-10 z-50 w-[200px] overflow-hidden rounded-[10px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
                 <div className="border-b border-[rgba(228,228,231,0.5)] px-4 py-3">
                   <p className="text-[13px] font-semibold text-[#18181B]">{business?.name}</p>
-                  <p className="mt-0.5 text-[11px] text-[#A1A1AA]">{business?.subscription_status === "trial" ? "Free trial" : "Active"}</p>
+                  <p className="mt-0.5 text-[11px] text-[#A1A1AA]">{business?.subscription_status === "trialing" ? "Free trial" : business?.subscription_status === "active" ? "Active" : business?.subscription_status ?? ""}</p>
                 </div>
                 <button
                   type="button"
@@ -213,7 +207,7 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-medium text-[#18181B]">{business?.name}</p>
-              <p className="text-[10px] text-[#A1A1AA]">{business?.subscription_status === "trial" ? "Free trial" : "Active"}</p>
+              <p className="text-[10px] text-[#A1A1AA]">{business?.subscription_status === "trialing" ? "Free trial" : business?.subscription_status === "active" ? "Active" : business?.subscription_status ?? ""}</p>
             </div>
           </div>
           <button
