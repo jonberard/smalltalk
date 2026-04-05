@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
+import { StatCard } from "@/components/dashboard/stat-card";
+import { StatusPill } from "@/components/dashboard/status-pill";
+import { EmptyState } from "@/components/dashboard/empty-state";
+import { SkeletonCard, SkeletonRow } from "@/components/dashboard/skeleton";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -96,28 +99,49 @@ function statusToAttentionDetail(status: string, updatedAt: string): string {
   }
 }
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 /* ═══════════════════════════════════════════════════
-   SHARED COMPONENTS
+   INLINE SVG ICONS
    ═══════════════════════════════════════════════════ */
 
-/* ─── Google Logo ─── */
-function GoogleLogo({ size = 14 }: { size?: number }) {
+function CalendarIcon() {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
     </svg>
   );
 }
 
-/* ─── Stars ─── */
-function Stars({ count, size = 14 }: { count: number; size?: number }) {
+function StarIcon() {
+  return (
+    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+    </svg>
+  );
+}
+
+function ChartIcon() {
+  return (
+    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  );
+}
+
+function MiniStars({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
       {[1, 2, 3, 4, 5].map((i) => (
-        <svg key={i} width={size} height={size} viewBox="0 0 24 24" fill={i <= count ? "#FFB300" : "#E0E0E0"} stroke="none">
+        <svg key={i} width={14} height={14} viewBox="0 0 24 24" fill={i <= Math.round(rating) ? "#E05A3D" : "#D1D5DB"} stroke="none">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
         </svg>
       ))}
@@ -125,178 +149,35 @@ function Stars({ count, size = 14 }: { count: number; size?: number }) {
   );
 }
 
-/* ─── Expandable Review Card ─── */
-const AVATAR_COLORS = [
-  { bg: "#EFF6FF", text: "#3B82F6" },
-  { bg: "#E8F5E9", text: "#10B981" },
-  { bg: "#FEF3C7", text: "#D97706" },
-  { bg: "#F3E8FF", text: "#8B5CF6" },
-  { bg: "#FFE4E6", text: "#E11D48" },
-  { bg: "#E0F2FE", text: "#0284C7" },
-];
-
-function ReviewCard({ review, index = 0 }: { review: { name: string; stars: number; snippet: string; time: string }; index?: number }) {
-  const [expanded, setExpanded] = useState(false);
-  const isLong = review.snippet.length > 120;
-  const avatarColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
-
+function ProgressRing({ percentage }: { percentage: number }) {
+  const radius = 18;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percentage / 100) * circumference;
   return (
-    <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: avatarColor.bg }}>
-            <span className="text-[12px] font-semibold" style={{ color: avatarColor.text }}>
-              {review.name.split(" ").map((n) => n[0]).join("")}
-            </span>
-          </div>
-          <div>
-            <p className="text-[14px] font-semibold text-[#18181B]">{review.name}</p>
-            <Stars count={review.stars} size={12} />
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <GoogleLogo size={12} />
-          <span className="text-[11px] text-[#A1A1AA]">{review.time}</span>
-        </div>
-      </div>
-      <p className="mt-3 text-[13px] leading-relaxed text-[#71717A]">
-        &ldquo;{expanded || !isLong ? review.snippet : `${review.snippet.slice(0, 120)}...`}&rdquo;
-      </p>
-      {isLong && (
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="mt-1.5 py-0.5 text-[13px] font-medium text-[#0070EB] transition-colors hover:text-[#0058BB]"
-        >
-          {expanded ? "Show less" : "Read more"}
-        </button>
-      )}
-    </div>
+    <svg width={44} height={44} viewBox="0 0 44 44">
+      <circle cx="22" cy="22" r={radius} fill="none" stroke="#E8E5E0" strokeWidth="3" />
+      <circle
+        cx="22" cy="22" r={radius} fill="none"
+        stroke="#E05A3D" strokeWidth="3"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        transform="rotate(-90 22 22)"
+      />
+    </svg>
   );
 }
 
-/* ─── Stats Cards ─── */
-function StatsCards({ stats, loading }: { stats: DashboardStats; loading: boolean }) {
-  const cards = [
-    {
-      label: "Reviews this month",
-      value: stats.reviewsThisMonth.toString(),
-      icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-      ),
-      bg: "#E8F5E9",
-    },
-    {
-      label: "Avg rating",
-      value: stats.avgRating > 0 ? stats.avgRating.toFixed(1) : "—",
-      icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B" stroke="none">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-        </svg>
-      ),
-      bg: "#FEF3C7",
-    },
-    {
-      label: "Completion rate",
-      value: stats.totalLinks > 0 ? `${stats.completionRate}%` : "—",
-      icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-        </svg>
-      ),
-      bg: "#EFF6FF",
-    },
-  ];
-
+function StarDots({ count }: { count: number }) {
   return (
-    <div className="grid grid-cols-3 gap-2.5">
-      {cards.map((card) => (
+    <div className="flex gap-[3px]">
+      {[1, 2, 3, 4, 5].map((i) => (
         <div
-          key={card.label}
-          className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]"
-        >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: card.bg }}>
-            {card.icon}
-          </div>
-          {loading ? (
-            <div className="mt-3 h-[28px] w-12 animate-pulse rounded-[6px] bg-[#F4F4F5]" />
-          ) : (
-            <p className="mt-3 text-[24px] font-bold leading-none text-[#18181B]">{card.value}</p>
-          )}
-          <p className="mt-1.5 text-[11px] text-[#A1A1AA]">{card.label}</p>
-        </div>
+          key={i}
+          className="h-[7px] w-[7px] rounded-full"
+          style={{ backgroundColor: i <= count ? "#E05A3D" : "#D1D5DB" }}
+        />
       ))}
-    </div>
-  );
-}
-
-/* ─── Funnel ─── */
-function Funnel({ funnel, loading }: { funnel: FunnelData; loading: boolean }) {
-  const [open, setOpen] = useState(true);
-  const rate = funnel.sent > 0 ? Math.round((funnel.posted / funnel.sent) * 100) : 0;
-
-  const steps = [
-    { label: "Sent", value: funnel.sent, color: "#A1A1AA" },
-    { label: "Clicked", value: funnel.clicked, color: "#3B82F6" },
-    { label: "Drafted", value: funnel.drafted, color: "#F59E0B" },
-    { label: "Posted", value: funnel.posted, color: "#10B981" },
-  ];
-
-  return (
-    <div className="rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-4 py-3.5"
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] font-semibold text-[#18181B]">Review Funnel</span>
-          {!loading && (
-            <span className="rounded-full bg-[#E8F5E9] px-2 py-0.5 text-[11px] font-semibold text-[#10B981]">
-              {rate}% conversion
-            </span>
-          )}
-        </div>
-        <svg
-          width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="border-t border-[rgba(228,228,231,0.3)] px-4 pb-4 pt-3">
-          <div className="flex flex-col gap-2.5">
-            {steps.map((step) => {
-              const pct = funnel.sent > 0 ? (step.value / funnel.sent) * 100 : 0;
-              return (
-                <div key={step.label} className="flex items-center gap-3">
-                  <span className="w-[52px] text-right text-[12px] text-[#A1A1AA]">{step.label}</span>
-                  <div className="relative h-[22px] flex-1 overflow-hidden rounded-full bg-[#F4F4F5]">
-                    {loading ? (
-                      <div className="absolute inset-y-0 left-0 w-1/3 animate-pulse rounded-full bg-[#E4E4E7]" />
-                    ) : (
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: step.color }}
-                      />
-                    )}
-                  </div>
-                  {loading ? (
-                    <div className="h-[16px] w-[24px] animate-pulse rounded bg-[#F4F4F5]" />
-                  ) : (
-                    <span className="w-[24px] text-[13px] font-semibold text-[#18181B]">{step.value}</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <p className="mt-3 text-[11px] text-[#A1A1AA]">All time</p>
-        </div>
-      )}
     </div>
   );
 }
@@ -315,7 +196,6 @@ function isAtOrBeyond(status: string, target: string): boolean {
 }
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<"reviews" | "activity">("reviews");
   const [stats, setStats] = useState<DashboardStats>({
     reviewsThisMonth: 0,
     avgRating: 0,
@@ -325,7 +205,6 @@ export default function Dashboard() {
   const [funnel, setFunnel] = useState<FunnelData>({ sent: 0, clicked: 0, drafted: 0, posted: 0 });
   const [attention, setAttention] = useState<AttentionItem[]>([]);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
-  const [recentReviews, setRecentReviews] = useState<{ name: string; stars: number; snippet: string; time: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const { business } = useAuth();
   const searchParams = useSearchParams();
@@ -423,25 +302,8 @@ export default function Dashboard() {
         })
       );
 
-      // ── Recent Reviews (completed with review text) ──
-      const reviewsWithText = completedSessions
-        .filter((s) => s.generated_review && s.star_rating)
-        .slice(0, 5);
-
-      setRecentReviews(
-        reviewsWithText.map((s) => {
-          const link = s.review_links as unknown as { customer_name: string };
-          return {
-            name: link.customer_name,
-            stars: s.star_rating!,
-            snippet: s.generated_review!,
-            time: timeAgo(s.updated_at),
-          };
-        })
-      );
-
       // ── Activity Feed ──
-      const recentActivity = sessions.slice(0, 20);
+      const recentActivity = sessions.slice(0, 15);
       setActivityItems(
         recentActivity.map((s) => {
           const link = s.review_links as unknown as { customer_name: string };
@@ -462,193 +324,219 @@ export default function Dashboard() {
     fetchAll();
   }, [business]);
 
-  const monthName = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const funnelStages = [
+    { label: "Sent", value: funnel.sent },
+    { label: "Clicked", value: funnel.clicked },
+    { label: "Drafted", value: funnel.drafted },
+    { label: "Posted", value: funnel.posted },
+  ];
 
   return (
-    <div className="min-h-dvh bg-[#F8F9FA] font-dashboard sm:pl-[200px]">
-      <div className="mx-auto max-w-[600px] px-5 pb-32 pt-8 sm:pb-16">
+    <div className="min-h-dvh bg-[var(--dash-bg)] sm:pl-[220px]">
+      <div className="dash-page-enter mx-auto max-w-[960px] px-5 pb-32 pt-8 sm:pb-16">
 
-        {/* ─── Header ─── */}
+        {/* ─── Welcome Header ─── */}
         <div className="mb-6">
-          <h1 className="text-[20px] font-bold text-[#18181B]">{business?.name || "Dashboard"}</h1>
-          <p className="mt-1 text-[13px] text-[#A1A1AA]">{monthName}</p>
-        </div>
-
-        {/* ─── Google Hero Card — coming soon ─── */}
-        <div className="rounded-[16px] border border-dashed border-[#E4E4E7] bg-white p-5">
-          <div className="flex items-center gap-1.5 text-[12px] text-[#A1A1AA]">
-            <GoogleLogo size={14} />
-            Google Reviews
-            <span className="ml-1 rounded-[6px] bg-[#F4F4F5] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#A1A1AA]">Coming soon</span>
-          </div>
-          <p className="mt-3 text-[13px] leading-relaxed text-[#A1A1AA]">
-            Connect your Google Business Profile to see your live rating, review count, and trends here.
+          <h1 className="font-heading text-[24px] font-semibold text-[var(--dash-text)]">
+            {getGreeting()}, {business?.name || "there"}
+          </h1>
+          <p className="mt-1 text-[13px] text-[var(--dash-muted)]">
+            Here&rsquo;s how your reviews are doing
           </p>
         </div>
 
-        {/* ─── Stats ─── */}
-        <div className="mt-4">
-          <StatsCards stats={stats} loading={loading} />
-        </div>
-
-        {/* ─── Funnel ─── */}
-        <div className="mt-4">
-          <Funnel funnel={funnel} loading={loading} />
-        </div>
-
-        {/* ─── Needs Attention ─── */}
-        {attention.length > 0 && (
-          <div className="mt-5">
-            <h2 className="mb-2.5 px-1 text-[12px] font-semibold uppercase tracking-wider text-[#F59E0B]">
-              Needs attention
-            </h2>
-            <div className="flex flex-col gap-2">
-              {attention.map((item) => (
-                <div
-                  key={item.sessionId}
-                  className="flex items-center gap-3 rounded-[16px] border border-[#FEF3C7] bg-[#FFFBEB] px-4 py-3.5"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FEF3C7]">
-                    <span className="text-[12px] font-semibold text-[#D97706]">
-                      {item.name.split(" ").map((n) => n[0]).join("")}
-                    </span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-semibold text-[#18181B]">{item.name}</p>
-                    <p className="text-[13px] text-[#A1A1AA]">{item.detail}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="shrink-0 rounded-full bg-[#F59E0B] px-3 py-1.5 text-[11px] font-semibold text-white transition-all duration-200 hover:bg-[#E58E09] active:scale-95 focus-visible:ring-2 focus-visible:ring-[#F59E0B] focus-visible:ring-offset-2"
-                  >
-                    Nudge
-                  </button>
-                </div>
-              ))}
-            </div>
+        {/* ─── Stat Cards ─── */}
+        {loading ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard
+              icon={<CalendarIcon />}
+              label="Reviews This Month"
+              value={stats.reviewsThisMonth}
+            />
+            <StatCard
+              icon={<StarIcon />}
+              label="Average Rating"
+              value={stats.avgRating > 0 ? stats.avgRating.toFixed(1) : "\u2014"}
+              detail={stats.avgRating > 0 ? <MiniStars rating={stats.avgRating} /> : undefined}
+            />
+            <StatCard
+              icon={<ChartIcon />}
+              label="Completion Rate"
+              value={stats.totalLinks > 0 ? `${stats.completionRate}%` : "\u2014"}
+              detail={stats.totalLinks > 0 ? <ProgressRing percentage={stats.completionRate} /> : undefined}
+            />
           </div>
         )}
 
-        {/* ─── Tabs: Reviews / Activity ─── */}
-        <div className="mt-8">
-          <div className="flex gap-1 rounded-[10px] bg-[#EEEFF1] p-1">
-            <button
-              type="button"
-              onClick={() => setActiveTab("reviews")}
-              className={`flex-1 rounded-[8px] py-2 text-[13px] font-semibold transition-all duration-200 ${
-                activeTab === "reviews"
-                  ? "bg-white text-[#18181B] shadow-sm"
-                  : "text-[#A1A1AA]"
-              }`}
-            >
-              Recent Reviews
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("activity")}
-              className={`flex-1 rounded-[8px] py-2 text-[13px] font-semibold transition-all duration-200 ${
-                activeTab === "activity"
-                  ? "bg-white text-[#18181B] shadow-sm"
-                  : "text-[#A1A1AA]"
-              }`}
-            >
-              All Activity
-            </button>
-          </div>
+        {/* ─── Two-Column Layout ─── */}
+        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-5">
 
-          {/* Reviews tab */}
-          {activeTab === "reviews" && (
-            <div className="mt-3 flex flex-col gap-2.5">
+          {/* ─── Left Column: Recent Activity ─── */}
+          <div className="sm:col-span-3">
+            <h2 className="mb-3 text-[15px] font-semibold text-[var(--dash-text)]" style={{ fontFamily: "Inter, sans-serif" }}>
+              Recent Activity
+            </h2>
+            <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]">
               {loading ? (
-                Array.from({ length: 2 }).map((_, i) => (
-                  <div key={i} className="h-[120px] animate-pulse rounded-[16px] bg-[#F4F4F5]" />
-                ))
-              ) : recentReviews.length > 0 ? (
-                recentReviews.map((review, i) => (
-                  <ReviewCard key={i} review={review} index={i} />
-                ))
+                <>
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                </>
+              ) : activityItems.length > 0 ? (
+                activityItems.map((item, i) => {
+                  const initial = item.name.charAt(0).toUpperCase();
+                  return (
+                    <div
+                      key={i}
+                      className={`flex items-center gap-3 px-4 py-3.5 ${
+                        i < activityItems.length - 1 ? "border-b border-[var(--dash-border)]" : ""
+                      }`}
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--dash-border)]/60">
+                        <span className="text-[12px] font-semibold text-[var(--dash-muted)]">{initial}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-medium text-[var(--dash-text)]">{item.name}</span>
+                          <StatusPill status={item.status} />
+                        </div>
+                      </div>
+                      {item.stars && <StarDots count={item.stars} />}
+                      <span className="shrink-0 text-[11px] text-[var(--dash-muted)]">{item.time}</span>
+                    </div>
+                  );
+                })
               ) : (
-                <div className="flex flex-col items-center gap-2 rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white py-10 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F0F2F5]">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                <EmptyState
+                  icon={
+                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                     </svg>
-                  </div>
-                  <p className="text-[13px] text-[#A1A1AA]">No reviews yet. Send your first review link to get started.</p>
-                </div>
+                  }
+                  title="No activity yet"
+                  description="Send your first review link to see activity here"
+                />
               )}
             </div>
-          )}
+          </div>
 
-          {/* Activity tab */}
-          {activeTab === "activity" && (
-            loading ? (
-              <div className="mt-3 flex flex-col gap-0">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-[52px] animate-pulse border-b border-[rgba(228,228,231,0.3)] bg-[#F4F4F5] first:rounded-t-[16px] last:rounded-b-[16px] last:border-b-0" />
-                ))}
+          {/* ─── Right Column: Needs Attention ─── */}
+          <div className="sm:col-span-2">
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="text-[15px] font-semibold text-[var(--dash-text)]" style={{ fontFamily: "Inter, sans-serif" }}>
+                Needs Attention
+              </h2>
+              {attention.length > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#E05A3D] text-[10px] font-semibold text-white">
+                  {attention.length}
+                </span>
+              )}
+            </div>
+
+            {loading ? (
+              <div className="space-y-3">
+                <SkeletonCard />
+                <SkeletonCard />
               </div>
-            ) : activityItems.length > 0 ? (
-            <div className="mt-3 rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
-              {activityItems.map((item, i) => {
-                const initials = item.name.split(" ").map((n) => n[0]).join("");
-                return (
+            ) : attention.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {attention.map((item) => {
+                  const initial = item.name.charAt(0).toUpperCase();
+                  return (
+                    <div
+                      key={item.sessionId}
+                      className="rounded-[var(--dash-radius)] border border-[#FEF3C7] bg-[#FFFBEB] p-4"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FEF3C7]">
+                          <span className="text-[12px] font-semibold text-[#D97706]">{initial}</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-medium text-[var(--dash-text)]">{item.name}</p>
+                          <p className="mt-0.5 text-[12px] text-[var(--dash-muted)]">{item.detail}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          type="button"
+                          className="rounded-[var(--dash-radius-sm)] border border-[#E05A3D] px-3 py-1 text-[11px] font-semibold text-[#E05A3D] transition-colors hover:bg-[#E05A3D]/5 active:scale-[0.97]"
+                        >
+                          Nudge
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                  <p className="text-[13px] font-medium text-[#059669]">All caught up</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ─── Conversion Funnel ─── */}
+        <details className="group mt-6">
+          <summary className="flex cursor-pointer list-none items-center gap-2 text-[14px] font-medium text-[var(--dash-text)] [&::-webkit-details-marker]:hidden">
+            <svg
+              width={14} height={14} viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              className="transition-transform duration-200 group-open:rotate-90"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+            View conversion funnel
+          </summary>
+          <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-2">
+            {funnelStages.map((stage, i) => {
+              const prevValue = i > 0 ? funnelStages[i - 1].value : null;
+              const pctOfPrev = prevValue && prevValue > 0 ? Math.round((stage.value / prevValue) * 100) : null;
+              const isPosted = stage.label === "Posted";
+              return (
+                <div key={stage.label} className="flex items-center gap-2">
+                  {i > 0 && (
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--dash-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  )}
                   <div
-                    key={i}
-                    className={`flex items-center gap-3 px-4 py-3.5 ${
-                      i < activityItems.length - 1 ? "border-b border-[rgba(228,228,231,0.3)]" : ""
+                    className={`flex min-w-[100px] flex-col items-center rounded-[var(--dash-radius)] px-5 py-4 ${
+                      isPosted
+                        ? "bg-[#E05A3D]/8 ring-1 ring-[#E05A3D]/20"
+                        : "bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]"
                     }`}
                   >
-                    <div className="relative shrink-0">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F0F2F5]">
-                        <span className="text-[11px] font-semibold text-[#18181B]">{initials}</span>
-                      </div>
-                      <div
-                        className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white"
-                        style={{ backgroundColor: STATUS_DOT[item.status] || "#A1A1AA" }}
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] text-[#18181B]">
-                        <span className="font-semibold">{item.name}</span>{" "}
-                        <span className="text-[#71717A]">{item.action}</span>
-                      </p>
-                      {item.snippet && (
-                        <p className="mt-0.5 truncate text-[12px] text-[#A1A1AA]">
-                          &ldquo;{item.snippet.slice(0, 80)}{item.snippet.length > 80 ? "..." : ""}&rdquo;
-                        </p>
-                      )}
-                    </div>
-                    <span className="shrink-0 text-[11px] text-[#A1A1AA]">{item.time}</span>
+                    <span className={`text-[20px] font-bold ${isPosted ? "text-[#E05A3D]" : "text-[var(--dash-text)]"}`}>
+                      {loading ? "\u2014" : stage.value}
+                    </span>
+                    <span className="mt-0.5 text-[12px] text-[var(--dash-muted)]">{stage.label}</span>
+                    {pctOfPrev !== null && !loading && (
+                      <span className="mt-1 text-[11px] text-[var(--dash-muted)]">{pctOfPrev}%</span>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-            ) : (
-              <div className="mt-3 flex flex-col items-center gap-2 rounded-[16px] border border-[rgba(228,228,231,0.5)] bg-white py-10 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)]">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F0F2F5]">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                  </svg>
                 </div>
-                <p className="text-[13px] text-[#A1A1AA]">No activity yet. It&rsquo;ll show up here once you start sending links.</p>
-              </div>
-            )
-          )}
-        </div>
-      </div>
+              );
+            })}
+          </div>
+        </details>
 
-      {/* ─── FAB — hidden on mobile (tab bar has Send), visible on desktop ─── */}
-      <Link
-        href="/dashboard/send"
-        className="fixed bottom-8 right-8 z-30 hidden items-center gap-2 rounded-full bg-[#0070EB] px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_4px_20px_rgba(0,112,235,0.4)] transition-all duration-200 hover:shadow-[0_6px_24px_rgba(0,112,235,0.5)] active:scale-95 sm:flex"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-        Send Review Link
-      </Link>
+      </div>
     </div>
   );
 }
