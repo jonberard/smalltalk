@@ -1022,7 +1022,6 @@ function ReviewScreen({
 }) {
   const [reviewText, setReviewText] = useState("");
   const [voiceId, setVoiceId] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState("");
   const [generating, setGenerating] = useState(true);
   const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
@@ -1068,7 +1067,6 @@ function ReviewScreen({
         const result = await res.json();
         setReviewText(result.review_text);
         setVoiceId(result.voice_id);
-        setDebugInfo(`Voice: ${result.voice_name} · ${result.model}`);
 
         // Save to session
         supabase
@@ -1191,10 +1189,6 @@ function ReviewScreen({
           </button>
         )}
       </div>
-
-      {!generating && !error && debugInfo && (
-        <p className="mt-2 w-full text-center text-[11px] text-muted/50">{debugInfo}</p>
-      )}
 
       {!generating && !error && (
         <ButtonRow>
