@@ -69,21 +69,25 @@ export default function BillingPage() {
         <p className="mt-1 text-[13px] text-[var(--dash-muted)]">Manage your subscription and billing</p>
 
         {/* Current Plan Card */}
-        <div className="mt-6 rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">
+        <div className="mt-6 rounded-[var(--dash-radius)] bg-[var(--dash-surface)] px-6 py-7 shadow-[var(--dash-shadow)]">
           <div className="flex items-center gap-3">
-            <h2 className="text-[18px] font-bold text-[var(--dash-text)]">small Talk Pro</h2>
-            <StatusPill status={status} />
+            <div>
+              <h2 className="text-[18px] font-semibold text-[var(--dash-text)]">small Talk Pro</h2>
+              <p className="mt-0.5 text-[14px] text-[var(--dash-muted)]">$79/mo</p>
+            </div>
+            <StatusPill status={status} className="self-start" />
           </div>
 
-          <div className="mt-4">
+          <div className="mt-5">
             {status === "trialing" && trialEndsAt && (
               <div>
-                <p className="text-[14px] text-[var(--dash-muted)]">
-                  Your free trial ends on{" "}
-                  <span className="font-medium text-[var(--dash-text)]">
+                <p className="text-[14px] text-[var(--dash-text)]">
+                  Your free trial ends{" "}
+                  <span className="font-medium">
                     {trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
                   </span>
                 </p>
+                <p className="mt-1 text-[13px] font-semibold text-[#D97706]">{daysRemaining} day{daysRemaining !== 1 ? "s" : ""} remaining</p>
                 <div className="mt-3 flex items-center gap-3">
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--dash-border)]">
                     <div
@@ -91,14 +95,13 @@ export default function BillingPage() {
                       style={{ width: `${Math.max(5, ((7 - daysRemaining) / 7) * 100)}%` }}
                     />
                   </div>
-                  <span className="text-[13px] font-semibold text-[#D97706]">{daysRemaining} days left</span>
                 </div>
               </div>
             )}
 
             {status === "active" && (
               <p className="text-[14px] text-[var(--dash-muted)]">
-                Your subscription is active. Manage billing details in the Stripe portal.
+                Your subscription is active. Next billing date will appear in the Stripe portal.
               </p>
             )}
 

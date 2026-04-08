@@ -22,10 +22,13 @@ type DashboardStats = {
 
 type FunnelData = {
   sent: number;
-  clicked: number;
+  opened: number;
+  started: number;
   drafted: number;
   posted: number;
 };
+
+type FunnelFilter = "week" | "month" | "all";
 
 type AttentionItem = {
   name: string;
@@ -46,13 +49,6 @@ type ActivityItem = {
 /* ═══════════════════════════════════════════════════
    HELPERS
    ═══════════════════════════════════════════════════ */
-
-const STATUS_DOT: Record<string, string> = {
-  copied: "#10B981",
-  drafted: "#F59E0B",
-  in_progress: "#3B82F6",
-  created: "#A1A1AA",
-};
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -168,17 +164,15 @@ function ProgressRing({ percentage }: { percentage: number }) {
   );
 }
 
-function StarDots({ count }: { count: number }) {
+function RatingBadge({ rating }: { rating: number }) {
+  const color =
+    rating >= 4 ? "text-[#059669] bg-[#ECFDF5]" :
+    rating === 3 ? "text-[#D97706] bg-[#FFFBEB]" :
+    "text-[#DC2626] bg-[#FEF2F2]";
   return (
-    <div className="flex gap-[3px]">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <div
-          key={i}
-          className="h-[7px] w-[7px] rounded-full"
-          style={{ backgroundColor: i <= count ? "#E05A3D" : "#D1D5DB" }}
-        />
-      ))}
-    </div>
+    <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${color}`}>
+      {rating}<span className="text-[10px]">★</span>
+    </span>
   );
 }
 
@@ -202,7 +196,9 @@ export default function Dashboard() {
     completionRate: 0,
     totalLinks: 0,
   });
-  const [funnel, setFunnel] = useState<FunnelData>({ sent: 0, clicked: 0, drafted: 0, posted: 0 });
+  const [funnel, setFunnel] = useState<FunnelData>({ sent: 0, opened: 0, started: 0, drafted: 0, posted: 0 });
+  const [funnelFilter, setFunnelFilter] = useState<FunnelFilter>("month");
+  const [funnelLoading, setFunnelLoading] = useState(true);
   const [attention, setAttention] = useState<AttentionItem[]>([]);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -274,16 +270,6 @@ export default function Dashboard() {
 
       setStats({ reviewsThisMonth, avgRating, completionRate, totalLinks: linkCount });
 
-      // ── Funnel ──
-      // "Clicked" = any session was created (meaning the link was opened)
-      // "Drafted" = session reached drafted or beyond
-      // "Posted" = session status is "copied"
-      const clicked = sessions.filter((s) => isAtOrBeyond(s.status, "created")).length;
-      const drafted = sessions.filter((s) => isAtOrBeyond(s.status, "drafted")).length;
-      const posted = completedSessions.length;
-
-      setFunnel({ sent: linkCount, clicked, drafted, posted });
-
       // ── Needs Attention ──
       // Sessions that are stalled: drafted but not posted, or in_progress/created but not finished
       const attentionSessions = sessions.filter(
@@ -324,11 +310,68 @@ export default function Dashboard() {
     fetchAll();
   }, [business]);
 
-  const funnelStages = [
-    { label: "Sent", value: funnel.sent },
-    { label: "Clicked", value: funnel.clicked },
-    { label: "Drafted", value: funnel.drafted },
-    { label: "Posted", value: funnel.posted },
+  // ── Funnel (separate effect so time filter can re-trigger) ──
+  useEffect(() => {
+    if (!business) return;
+    const businessId = business.id;
+
+    async function fetchFunnel() {
+      setFunnelLoading(true);
+
+      // Determine date filter
+      let dateFrom: string | null = null;
+      const now = new Date();
+      if (funnelFilter === "month") {
+        dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      } else if (funnelFilter === "week") {
+        const d = new Date(now);
+        d.setDate(d.getDate() - d.getDay()); // start of week (Sunday)
+        d.setHours(0, 0, 0, 0);
+        dateFrom = d.toISOString();
+      }
+
+      // Count sent links
+      let linksQuery = supabase
+        .from("review_links")
+        .select("*", { count: "exact", head: true })
+        .eq("business_id", businessId);
+      if (dateFrom) linksQuery = linksQuery.gte("created_at", dateFrom);
+      const { count: sentCount } = await linksQuery;
+      const sent = sentCount ?? 0;
+
+      // Get sessions
+      let sessionsQuery = supabase
+        .from("review_sessions")
+        .select("status, review_links!inner(business_id)")
+        .eq("review_links.business_id", businessId);
+      if (dateFrom) sessionsQuery = sessionsQuery.gte("created_at", dateFrom);
+      const { data: funnelSessions } = await sessionsQuery;
+      const ss = funnelSessions || [];
+
+      const opened = ss.filter((s) => isAtOrBeyond(s.status, "created")).length;
+      const started = ss.filter((s) => isAtOrBeyond(s.status, "in_progress")).length;
+      const drafted = ss.filter((s) => isAtOrBeyond(s.status, "drafted")).length;
+      const posted = ss.filter((s) => s.status === "copied").length;
+
+      setFunnel({ sent, opened, started, drafted, posted });
+      setFunnelLoading(false);
+    }
+
+    fetchFunnel();
+  }, [business, funnelFilter]);
+
+  const FUNNEL_STAGES: { key: keyof FunnelData; label: string }[] = [
+    { key: "sent", label: "Sent" },
+    { key: "opened", label: "Opened" },
+    { key: "started", label: "Started" },
+    { key: "drafted", label: "Drafted" },
+    { key: "posted", label: "Posted" },
+  ];
+
+  const FILTER_OPTIONS: { key: FunnelFilter; label: string }[] = [
+    { key: "week", label: "This week" },
+    { key: "month", label: "This month" },
+    { key: "all", label: "All time" },
   ];
 
   return (
@@ -374,6 +417,178 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* ─── Conversion Funnel ─── */}
+        <div className="mt-8">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-[15px] font-semibold text-[var(--dash-text)]">Conversion Funnel</h2>
+            <div className="flex gap-1 rounded-[var(--dash-radius-sm)] bg-[var(--dash-border)]/40 p-1">
+              {FILTER_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setFunnelFilter(opt.key)}
+                  className={`rounded-[6px] px-3 py-1.5 text-[12px] font-medium transition-all duration-150 ${
+                    funnelFilter === opt.key
+                      ? "bg-[var(--dash-surface)] text-[var(--dash-text)] shadow-sm"
+                      : "text-[var(--dash-muted)] hover:text-[var(--dash-text)]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-5 shadow-[var(--dash-shadow)] sm:p-6">
+            {(() => {
+              const hasData = !funnelLoading && funnel.sent > 0;
+              const isEmpty = !funnelLoading && funnel.sent === 0;
+
+              // Coral gradient: lightest at Sent → full coral at Posted
+              const STAGE_FILLS = [
+                "bg-[#E05A3D]/[0.06]",
+                "bg-[#E05A3D]/[0.12]",
+                "bg-[#E05A3D]/[0.20]",
+                "bg-[#E05A3D]/[0.35]",
+                "bg-[#E05A3D] text-white shadow-[0_0_20px_rgba(224,90,61,0.25)]",
+              ];
+              const STAGE_TEXT_COLORS = [
+                "text-[var(--dash-text)]",
+                "text-[var(--dash-text)]",
+                "text-[var(--dash-text)]",
+                "text-[var(--dash-text)]",
+                "text-white",
+              ];
+              const STAGE_LABEL_COLORS = [
+                "text-[var(--dash-muted)]",
+                "text-[var(--dash-muted)]",
+                "text-[var(--dash-muted)]",
+                "text-[var(--dash-muted)]",
+                "text-white/70",
+              ];
+
+              return (
+                <>
+                  {/* Desktop: horizontal */}
+                  <div className="hidden sm:block">
+                    <div className="flex items-start">
+                      {FUNNEL_STAGES.map((stage, i) => {
+                        const value = funnel[stage.key];
+                        const prevValue = i > 0 ? funnel[FUNNEL_STAGES[i - 1].key] : null;
+                        const pct = prevValue && prevValue > 0 ? Math.round((value / prevValue) * 100) : null;
+                        const dropOff = prevValue !== null ? prevValue - value : null;
+                        const isLast = i === FUNNEL_STAGES.length - 1;
+
+                        return (
+                          <div key={stage.key} className="flex flex-1 items-start">
+                            {/* Arrow + conversion between stages */}
+                            {i > 0 && (
+                              <div className="flex flex-col items-center justify-center pt-5" style={{ width: 48 }}>
+                                <span className="text-[11px] font-semibold text-[var(--dash-muted)]">
+                                  {funnelLoading ? "\u2014" : pct !== null ? `${pct}%` : ""}
+                                </span>
+                                <svg width={24} height={14} viewBox="0 0 24 14" fill="none" className="my-0.5">
+                                  <path d="M0 7h20M16 3l4 4-4 4" stroke="var(--dash-border)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                                {hasData && dropOff !== null && dropOff > 0 && (
+                                  <span className="text-[10px] font-medium text-[#DC2626]">
+                                    {dropOff} lost
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Stage card */}
+                            <div
+                              className={`flex flex-1 flex-col items-center rounded-[var(--dash-radius)] px-3 py-5 transition-all duration-200 ${
+                                funnelLoading ? "bg-[var(--dash-border)]/30 animate-pulse" : STAGE_FILLS[i]
+                              }`}
+                            >
+                              <span className={`text-[11px] font-medium uppercase tracking-wide ${funnelLoading ? "text-transparent" : STAGE_LABEL_COLORS[i]}`}>
+                                {stage.label}
+                              </span>
+                              <span className={`mt-1 text-[24px] font-bold leading-none ${funnelLoading ? "text-transparent" : STAGE_TEXT_COLORS[i]}`}>
+                                {funnelLoading ? "0" : value}
+                              </span>
+                              {isLast && hasData && (
+                                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-1.5">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Mobile: vertical */}
+                  <div className="sm:hidden">
+                    <div className="flex flex-col">
+                      {FUNNEL_STAGES.map((stage, i) => {
+                        const value = funnel[stage.key];
+                        const prevValue = i > 0 ? funnel[FUNNEL_STAGES[i - 1].key] : null;
+                        const pct = prevValue && prevValue > 0 ? Math.round((value / prevValue) * 100) : null;
+                        const dropOff = prevValue !== null ? prevValue - value : null;
+                        const isLast = i === FUNNEL_STAGES.length - 1;
+
+                        return (
+                          <div key={stage.key}>
+                            {/* Arrow + stats between stages */}
+                            {i > 0 && (
+                              <div className="flex items-center gap-3 py-2 pl-6">
+                                <svg width={14} height={20} viewBox="0 0 14 20" fill="none">
+                                  <path d="M7 0v16M3 12l4 4 4-4" stroke="var(--dash-border)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                                <span className="text-[11px] font-semibold text-[var(--dash-muted)]">
+                                  {funnelLoading ? "" : pct !== null ? `${pct}%` : ""}
+                                </span>
+                                {hasData && dropOff !== null && dropOff > 0 && (
+                                  <span className="text-[10px] font-medium text-[#DC2626]">
+                                    {dropOff} lost
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Stage bar */}
+                            <div
+                              className={`flex items-center justify-between rounded-[var(--dash-radius)] px-5 py-4 transition-all duration-200 ${
+                                funnelLoading ? "bg-[var(--dash-border)]/30 animate-pulse" : STAGE_FILLS[i]
+                              }`}
+                            >
+                              <span className={`text-[12px] font-medium uppercase tracking-wide ${funnelLoading ? "text-transparent" : STAGE_LABEL_COLORS[i]}`}>
+                                {stage.label}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[22px] font-bold leading-none ${funnelLoading ? "text-transparent" : STAGE_TEXT_COLORS[i]}`}>
+                                  {funnelLoading ? "0" : value}
+                                </span>
+                                {isLast && hasData && (
+                                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Empty state message */}
+                  {isEmpty && (
+                    <p className="mt-4 text-center text-[13px] text-[var(--dash-muted)]">
+                      Send your first review link to start tracking conversions.
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
+
         {/* ─── Two-Column Layout ─── */}
         <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-5">
 
@@ -410,7 +625,7 @@ export default function Dashboard() {
                           <StatusPill status={item.status} />
                         </div>
                       </div>
-                      {item.stars && <StarDots count={item.stars} />}
+                      {item.stars && <RatingBadge rating={item.stars} />}
                       <span className="shrink-0 text-[11px] text-[var(--dash-muted)]">{item.time}</span>
                     </div>
                   );
@@ -490,51 +705,6 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-
-        {/* ─── Conversion Funnel ─── */}
-        <details className="group mt-6">
-          <summary className="flex cursor-pointer list-none items-center gap-2 text-[14px] font-medium text-[var(--dash-text)] [&::-webkit-details-marker]:hidden">
-            <svg
-              width={14} height={14} viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              className="transition-transform duration-200 group-open:rotate-90"
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-            View conversion funnel
-          </summary>
-          <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-2">
-            {funnelStages.map((stage, i) => {
-              const prevValue = i > 0 ? funnelStages[i - 1].value : null;
-              const pctOfPrev = prevValue && prevValue > 0 ? Math.round((stage.value / prevValue) * 100) : null;
-              const isPosted = stage.label === "Posted";
-              return (
-                <div key={stage.label} className="flex items-center gap-2">
-                  {i > 0 && (
-                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--dash-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
-                  )}
-                  <div
-                    className={`flex min-w-[100px] flex-col items-center rounded-[var(--dash-radius)] px-5 py-4 ${
-                      isPosted
-                        ? "bg-[#E05A3D]/8 ring-1 ring-[#E05A3D]/20"
-                        : "bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]"
-                    }`}
-                  >
-                    <span className={`text-[20px] font-bold ${isPosted ? "text-[#E05A3D]" : "text-[var(--dash-text)]"}`}>
-                      {loading ? "\u2014" : stage.value}
-                    </span>
-                    <span className="mt-0.5 text-[12px] text-[var(--dash-muted)]">{stage.label}</span>
-                    {pctOfPrev !== null && !loading && (
-                      <span className="mt-1 text-[11px] text-[var(--dash-muted)]">{pctOfPrev}%</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </details>
 
       </div>
     </div>

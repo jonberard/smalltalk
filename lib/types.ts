@@ -15,6 +15,8 @@ export type Business = {
   subscription_status: string;
   trial_requests_remaining: number;
   trial_ends_at: string | null;
+  api_key: string | null;
+  connected_crms: Record<string, unknown>;
   created_at: string;
 };
 
@@ -31,6 +33,8 @@ export type BusinessInsert = {
   subscription_status?: string;
   trial_requests_remaining?: number;
   trial_ends_at?: string | null;
+  api_key?: string | null;
+  connected_crms?: Record<string, unknown>;
   created_at?: string;
 };
 
@@ -118,6 +122,7 @@ export type ReviewLink = {
   customer_name: string;
   customer_contact: string;
   unique_code: string;
+  source: string;
   created_at: string;
 };
 
@@ -129,6 +134,7 @@ export type ReviewLinkInsert = {
   customer_name: string;
   customer_contact: string;
   unique_code: string;
+  source?: string;
   created_at?: string;
 };
 

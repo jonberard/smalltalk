@@ -3,26 +3,32 @@
 /* ═══════════════════════════════════════════════════
    GOOGLE REVIEW HANDOFF MOCKUP
    Animated loop: empty form → tap → paste → stars → post → success
-   Pure CSS @keyframes, 5s cycle, seamless loop.
+   Pure CSS @keyframes, 10s cycle, seamless loop.
 
-   TIMELINE (5s = 100%):
-   Step 1: 0-1s   (0-20%)   Empty form, idle
-   Step 2: 1-1.5s (20-30%)  Cursor appears, moves to textarea, taps, focus border
-   Step 3: 1.5-2s (30-40%)  Paste tooltip appears, cursor taps it
-   Step 4: 2-3s   (40-60%)  Text appears instantly (paste), tooltip gone
-   Step 5: 3-3.5s (60-70%)  Cursor to stars, tap, stars fill cascade
-   Step 6: 3.5-4s (70-80%)  Cursor to Post, tap, press animation
-   Step 7: 4-4.5s (80-90%)  Success checkmark
-   Step 8: 4.5-5s (90-100%) Fade out, reset to empty
+   TIMELINE (10s = 100%):
+   Phase 1: 0.0–1.5s  ( 0–15%)  Empty form visible, idle
+   Phase 2: 1.5–2.0s  (15–20%)  Cursor appears, moves to text field
+   Phase 3: 2.0–2.3s  (20–23%)  Cursor taps text field, focus border
+   Phase 4: 2.3–2.8s  (23–28%)  Paste tooltip appears, pause
+   Phase 5: 2.8–3.1s  (28–31%)  Cursor taps Paste
+   Phase 6: 3.1–4.6s  (31–46%)  Review text appears instantly, hold to read
+   Phase 7: 4.6–5.1s  (46–51%)  Cursor moves to 5th star
+   Phase 8: 5.1–5.9s  (51–59%)  Stars cascade fill L→R, hold filled
+   Phase 9: 5.9–6.3s  (59–63%)  Cursor moves to Post button
+   Phase10: 6.3–6.6s  (63–66%)  Post button press
+   Phase11: 6.6–7.6s  (66–76%)  Checkmark appears, hold
+   Phase12: 7.6–8.1s  (76���81%)  Fade to empty
+   Phase13: 8.1–10.0s (81–100%) Hold empty, seamless loop
    ═══════════════════════════════════════════════════ */
 
 export default function GoogleReviewMockup({
   businessName = "Crystal Clear Pools",
-  reviewText = "Marcus was fantastic. Pool looks crystal clear. Highly recommend.",
 }: {
   businessName?: string;
   reviewText?: string;
 }) {
+  const shortReview = "Pool looks crystal clear. Highly recommend.";
+
   const initials = businessName
     .split(/\s+/)
     .map((w) => w[0])
@@ -81,7 +87,7 @@ export default function GoogleReviewMockup({
             {/* Text area */}
             <div className="grm-textarea">
               <span className="grm-placeholder">Share details of your own experience at this place</span>
-              <span className="grm-pasted-text">{reviewText}</span>
+              <span className="grm-pasted-text">{shortReview}</span>
               <div className="grm-paste-bubble">Paste</div>
             </div>
 
@@ -132,7 +138,7 @@ export default function GoogleReviewMockup({
           position: relative; z-index: 2; background: #fff;
           border-radius: 12px; width: 88%; padding: 16px;
           box-shadow: 0 4px 24px rgba(0,0,0,0.15);
-          animation: grm-cardFade 5s ease infinite;
+          animation: grm-cardFade 10s ease infinite;
         }
 
         /* ═══ HEADER ═══ */
@@ -154,7 +160,7 @@ export default function GoogleReviewMockup({
         .grm-post-label { position: relative; z-index: 1; color: #fff; font-size: 12px; font-weight: 600; }
         .grm-post-overlay {
           position: absolute; inset: 0; background: rgba(0,0,0,0.18);
-          opacity: 0; animation: grm-postPress 5s ease infinite;
+          opacity: 0; animation: grm-postPress 10s ease infinite;
         }
 
         /* ═══ STARS ═══ */
@@ -165,32 +171,30 @@ export default function GoogleReviewMockup({
           position: absolute; top: 0; left: 0;
           opacity: 0; transform: scale(0.6);
         }
-        /* Stagger: stars fill at 62-64% (3.1-3.2s) */
-        .grm-star-fill-1 { animation: grm-starPop 5s ease infinite; animation-delay: 0s; }
-        .grm-star-fill-2 { animation: grm-starPop 5s ease infinite; animation-delay: 0.04s; }
-        .grm-star-fill-3 { animation: grm-starPop 5s ease infinite; animation-delay: 0.08s; }
-        .grm-star-fill-4 { animation: grm-starPop 5s ease infinite; animation-delay: 0.12s; }
-        .grm-star-fill-5 { animation: grm-starPop 5s ease infinite; animation-delay: 0.16s; }
+        /* Stars cascade at 53-55% with 80ms stagger */
+        .grm-star-fill-1 { animation: grm-starPop 10s ease infinite; animation-delay: 0s; }
+        .grm-star-fill-2 { animation: grm-starPop 10s ease infinite; animation-delay: 0.08s; }
+        .grm-star-fill-3 { animation: grm-starPop 10s ease infinite; animation-delay: 0.16s; }
+        .grm-star-fill-4 { animation: grm-starPop 10s ease infinite; animation-delay: 0.24s; }
+        .grm-star-fill-5 { animation: grm-starPop 10s ease infinite; animation-delay: 0.32s; }
 
         /* ═══ TEXTAREA ═══ */
         .grm-textarea {
           position: relative; border: 1.5px solid #DADCE0; border-radius: 8px;
           min-height: 72px; padding: 10px; font-size: 12px; line-height: 1.5; color: #202124;
-          animation: grm-textBorder 5s ease infinite;
+          animation: grm-textBorder 10s ease infinite;
         }
 
-        /* Placeholder: visible 0-25%, hidden 25-92%, visible 94-100% */
         .grm-placeholder {
           color: #9AA0A6; font-size: 12px;
           position: absolute; top: 10px; left: 10px; right: 10px;
           pointer-events: none;
-          animation: grm-placeholder 5s step-end infinite;
+          animation: grm-placeholder 10s step-end infinite;
         }
 
-        /* Pasted text: hidden 0-40%, visible 40-90%, hidden 92-100% */
         .grm-pasted-text {
           opacity: 0;
-          animation: grm-pasteText 5s step-end infinite;
+          animation: grm-pasteText 10s step-end infinite;
         }
 
         /* ═══ PASTE BUBBLE ═══ */
@@ -199,7 +203,7 @@ export default function GoogleReviewMockup({
           background: #2D2D2D; color: #fff; font-size: 11px; font-weight: 500;
           padding: 4px 12px; border-radius: 6px;
           opacity: 0; pointer-events: none;
-          animation: grm-pasteBubble 5s ease infinite;
+          animation: grm-pasteBubble 10s ease infinite;
         }
         .grm-paste-bubble::after {
           content: ''; position: absolute; bottom: -4px; left: 50%;
@@ -212,174 +216,198 @@ export default function GoogleReviewMockup({
           position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
           background: rgba(255,255,255,0.93); border-radius: 12px;
           opacity: 0; pointer-events: none;
-          animation: grm-success 5s ease infinite;
+          animation: grm-success 10s ease infinite;
         }
         .grm-check {
           stroke-dasharray: 40; stroke-dashoffset: 40;
-          animation: grm-checkDraw 5s ease infinite;
+          animation: grm-checkDraw 10s ease infinite;
         }
 
         /* ═══ CURSOR ═══ */
         .grm-cursor {
-          position: absolute; width: 24px; height: 24px; border-radius: 50%;
-          background: rgba(32,33,36,0.4); box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+          position: absolute; width: 20px; height: 20px; border-radius: 50%;
+          background: rgba(0, 0, 0, 0.35);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.25);
           z-index: 10; pointer-events: none;
           opacity: 0;
-          animation: grm-cursorPos 5s ease-in-out infinite, grm-cursorVis 5s ease infinite;
+          animation: grm-cursorPos 10s cubic-bezier(0.4, 0, 0.2, 1) infinite, grm-cursorVis 10s ease infinite;
         }
 
         /* ═══════════════════════════════════════════
-           KEYFRAMES — 5s cycle
-           0%=0s  20%=1s  30%=1.5s  40%=2s
-           60%=3s  70%=3.5s  80%=4s  90%=4.5s
+           KEYFRAMES — 10s cycle
+           ═══════════════════════════════════════════
+
+           ABSOLUTE TIMES → PERCENTAGES:
+           0.0s =  0%    1.5s = 15%    2.0s = 20%    2.3s = 23%
+           2.8s = 28%    3.1s = 31%    4.6s = 46%    5.1s = 51%
+           5.5s = 55%    5.9s = 59%    6.3s = 63%    6.6s = 66%
+           7.6s = 76%    8.1s = 81%   10.0s = 100%
            ═══════════════════════════════════════════ */
 
-        /* CURSOR POSITION + TAP SCALE */
+        /* CURSOR POSITION — ease-in-out via cubic-bezier on the animation */
         @keyframes grm-cursorPos {
-          /* Step 1: offscreen */
-          0%, 18% {
-            top: 80%; left: 60%;
+          /* Phase 1: offscreen below card */
+          0%, 15% {
+            top: 85%; left: 65%;
+            transform: translate(-50%, -50%) scale(1);
           }
-          /* Step 2: move to textarea center (1-1.3s) */
-          24% {
-            top: 68%; left: 50%;
+          /* Phase 2: arrive at textarea center (20%) */
+          20% {
+            top: 67%; left: 50%;
+            transform: translate(-50%, -50%) scale(1);
           }
-          /* Step 2: tap textarea (1.3s) */
-          26% {
-            top: 68%; left: 50%; transform: translate(-50%,-50%) scale(0.75);
+          /* Phase 3: tap textarea (20.5%) */
+          20.5% {
+            top: 67%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.7);
           }
-          28% {
-            top: 68%; left: 50%; transform: translate(-50%,-50%) scale(1);
+          21.5% {
+            top: 67%; left: 50%;
+            transform: translate(-50%, -50%) scale(1);
           }
-          /* Step 3: hold at textarea for paste tooltip */
-          30% {
-            top: 68%; left: 50%; transform: translate(-50%,-50%);
+          /* Phase 4: move up to paste bubble center (28%) */
+          27% {
+            top: 58.5%; left: 50%;
+            transform: translate(-50%, -50%) scale(1);
           }
-          /* Step 3: tap paste (1.7s = 34%) */
-          34% {
-            top: 60%; left: 50%; transform: translate(-50%,-50%);
+          /* Phase 5: tap paste (28.5%) */
+          28.5% {
+            top: 58.5%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.7);
           }
-          35% {
-            top: 60%; left: 50%; transform: translate(-50%,-50%) scale(0.75);
+          29.5% {
+            top: 58.5%; left: 50%;
+            transform: translate(-50%, -50%) scale(1);
           }
-          37% {
-            top: 60%; left: 50%; transform: translate(-50%,-50%) scale(1);
+          /* Phase 6: hold while text appears, then move */
+          45% {
+            top: 58.5%; left: 50%;
+            transform: translate(-50%, -50%) scale(1);
           }
-          /* Step 4: hold while text pastes */
-          55% {
-            top: 60%; left: 50%; transform: translate(-50%,-50%);
+          /* Phase 7: move to 5th star center (51%) */
+          51% {
+            top: 45.5%; left: 65%;
+            transform: translate(-50%, -50%) scale(1);
           }
-          /* Step 5: move to star 5 (3s = 60%) */
-          62% {
-            top: 46%; left: 66%; transform: translate(-50%,-50%);
+          /* Phase 8: tap star (52%) */
+          52% {
+            top: 45.5%; left: 65%;
+            transform: translate(-50%, -50%) scale(0.7);
           }
-          /* Tap star */
+          53% {
+            top: 45.5%; left: 65%;
+            transform: translate(-50%, -50%) scale(1);
+          }
+          /* Hold while stars fill */
+          58% {
+            top: 45.5%; left: 65%;
+            transform: translate(-50%, -50%) scale(1);
+          }
+          /* Phase 9: move to Post button center (63%) */
           63% {
-            top: 46%; left: 66%; transform: translate(-50%,-50%) scale(0.75);
+            top: 27.5%; left: 82%;
+            transform: translate(-50%, -50%) scale(1);
+          }
+          /* Phase 10: tap post (64%) */
+          64% {
+            top: 27.5%; left: 82%;
+            transform: translate(-50%, -50%) scale(0.7);
           }
           65% {
-            top: 46%; left: 66%; transform: translate(-50%,-50%) scale(1);
+            top: 27.5%; left: 82%;
+            transform: translate(-50%, -50%) scale(1);
           }
-          /* Step 6: move to Post button (3.5s = 70%) */
-          72% {
-            top: 28%; left: 82%; transform: translate(-50%,-50%);
-          }
-          /* Tap Post */
-          74% {
-            top: 28%; left: 82%; transform: translate(-50%,-50%) scale(0.75);
-          }
-          76% {
-            top: 28%; left: 82%; transform: translate(-50%,-50%) scale(1);
-          }
-          /* Hold */
+          /* Hold then fade out */
           100% {
-            top: 28%; left: 82%; transform: translate(-50%,-50%);
+            top: 27.5%; left: 82%;
+            transform: translate(-50%, -50%) scale(1);
           }
         }
 
         /* CURSOR VISIBILITY */
         @keyframes grm-cursorVis {
-          0%, 19%  { opacity: 0; }
-          22%      { opacity: 1; }
-          77%      { opacity: 1; }
-          80%      { opacity: 0; }
+          0%, 15%  { opacity: 0; }
+          18%      { opacity: 1; }
+          66%      { opacity: 1; }
+          68%      { opacity: 0; }
           100%     { opacity: 0; }
         }
 
-        /* TEXTAREA BORDER — focus at step 2 tap */
+        /* TEXTAREA BORDER — focus on tap at 21% */
         @keyframes grm-textBorder {
-          0%, 25%  { border-color: #DADCE0; }
-          27%      { border-color: #1A73E8; }
-          88%      { border-color: #1A73E8; }
-          92%,100% { border-color: #DADCE0; }
+          0%, 20%  { border-color: #DADCE0; }
+          21%      { border-color: #1A73E8; }
+          76%      { border-color: #1A73E8; }
+          79%, 100% { border-color: #DADCE0; }
         }
 
-        /* PLACEHOLDER — visible until cursor taps textarea */
+        /* PLACEHOLDER — hidden once cursor taps textarea */
         @keyframes grm-placeholder {
           0%   { opacity: 1; }
-          26%  { opacity: 1; }
-          27%  { opacity: 0; }
-          92%  { opacity: 0; }
-          93%  { opacity: 1; }
+          20%  { opacity: 1; }
+          21%  { opacity: 0; }
+          79%  { opacity: 0; }
+          80%  { opacity: 1; }
           100% { opacity: 1; }
         }
 
-        /* PASTE BUBBLE — appears 30-38% (1.5-1.9s) */
+        /* PASTE BUBBLE — appears 23-30% */
         @keyframes grm-pasteBubble {
-          0%, 29%  { opacity: 0; transform: translateX(-50%) scale(0.85); }
-          31%      { opacity: 1; transform: translateX(-50%) scale(1); }
-          37%      { opacity: 1; transform: translateX(-50%) scale(1); }
-          39%      { opacity: 0; transform: translateX(-50%) scale(0.85); }
+          0%, 22%  { opacity: 0; transform: translateX(-50%) scale(0.85); }
+          24%      { opacity: 1; transform: translateX(-50%) scale(1); }
+          29%      { opacity: 1; transform: translateX(-50%) scale(1); }
+          31%      { opacity: 0; transform: translateX(-50%) scale(0.85); }
           100%     { opacity: 0; }
         }
 
-        /* PASTED TEXT — appears instantly at 40% (2s), gone at 92% */
+        /* PASTED TEXT — appears instantly at 31%, gone at 78% */
         @keyframes grm-pasteText {
           0%   { opacity: 0; }
-          39%  { opacity: 0; }
-          40%  { opacity: 1; }
-          91%  { opacity: 1; }
-          92%  { opacity: 0; }
+          30%  { opacity: 0; }
+          31%  { opacity: 1; }
+          77%  { opacity: 1; }
+          78%  { opacity: 0; }
           100% { opacity: 0; }
         }
 
-        /* STARS — fill at 63% (3.15s), cascade via animation-delay */
+        /* STARS — cascade fill starting at 53% */
         @keyframes grm-starPop {
-          0%, 62%   { opacity: 0; transform: scale(0.6); }
-          64%       { opacity: 1; transform: scale(1.2); }
-          66%, 90%  { opacity: 1; transform: scale(1); }
-          93%, 100% { opacity: 0; transform: scale(0.6); }
+          0%, 52%   { opacity: 0; transform: scale(0.6); }
+          54%       { opacity: 1; transform: scale(1.15); }
+          56%, 76%  { opacity: 1; transform: scale(1); }
+          79%, 100% { opacity: 0; transform: scale(0.6); }
         }
 
-        /* POST PRESS — at 74% (3.7s) */
+        /* POST PRESS — at 64% */
         @keyframes grm-postPress {
-          0%, 73%  { opacity: 0; }
-          74%      { opacity: 1; }
-          77%      { opacity: 0; }
+          0%, 63%  { opacity: 0; }
+          64%      { opacity: 1; }
+          66%      { opacity: 0; }
           100%     { opacity: 0; }
         }
 
-        /* SUCCESS — 80-90% (4-4.5s) */
+        /* SUCCESS — 66-76% */
         @keyframes grm-success {
-          0%, 79%   { opacity: 0; }
-          82%       { opacity: 1; }
-          89%       { opacity: 1; }
-          92%, 100% { opacity: 0; }
+          0%, 65%   { opacity: 0; }
+          68%       { opacity: 1; }
+          75%       { opacity: 1; }
+          78%, 100% { opacity: 0; }
         }
 
         /* CHECK DRAW */
         @keyframes grm-checkDraw {
-          0%, 81%  { stroke-dashoffset: 40; }
-          86%      { stroke-dashoffset: 0; }
+          0%, 67%  { stroke-dashoffset: 40; }
+          72%      { stroke-dashoffset: 0; }
           100%     { stroke-dashoffset: 0; }
         }
 
         /* CARD FADE — reset at end */
         @keyframes grm-cardFade {
-          0%, 3%   { opacity: 1; }
-          91%      { opacity: 1; }
-          94%      { opacity: 0; }
-          98%      { opacity: 0; }
+          0%, 5%   { opacity: 1; }
+          77%      { opacity: 1; }
+          80%      { opacity: 0; }
+          84%      { opacity: 0; }
+          87%      { opacity: 1; }
           100%     { opacity: 1; }
         }
       `}</style>

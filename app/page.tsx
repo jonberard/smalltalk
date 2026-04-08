@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
 import Link from "next/link";
+import LandingDemo from "@/components/landing-demo";
 
 /* ═══════════════════════════════════════════════════
    SCROLL FADE-UP — IntersectionObserver, no library
@@ -316,6 +317,12 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 gap-12 md:grid-cols-3 md:gap-8">
           {/* Step 1 — Text the link */}
           <div className="flex flex-col items-center">
+            <h3 className="font-heading text-[22px] font-semibold text-text">
+              1. Text the link.
+            </h3>
+            <p className="mb-8 mt-2 text-center text-[15px] leading-relaxed text-muted">
+              One tap sends a personalized review request right after the job.
+            </p>
             <div className="relative mx-auto h-[480px] w-[232px] rounded-[40px] border border-[#D5D5D5] bg-[#F0F0F0] p-[3px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] sm:w-[250px]">
               <div className="absolute inset-x-0 top-[4px] z-20 flex justify-center">
                 <div className="h-[11px] w-[40px] rounded-full bg-black" />
@@ -353,16 +360,16 @@ export default function LandingPage() {
               </div>
               <div className="mx-auto mt-[2px] h-[3px] w-[70px] rounded-full bg-black/15" />
             </div>
-            <h3 className="mt-8 font-heading text-[22px] font-semibold text-text">
-              1. Text the link.
-            </h3>
-            <p className="mt-2 text-center text-[15px] leading-relaxed text-muted">
-              One tap sends a personalized review request right after the job.
-            </p>
           </div>
 
           {/* Step 2 — They tap, no typing */}
           <div className="flex flex-col items-center">
+            <h3 className="font-heading text-[22px] font-semibold text-text">
+              2. They tap, no typing.
+            </h3>
+            <p className="mb-8 mt-2 text-center text-[15px] leading-relaxed text-muted">
+              Your customer picks what stood out in a few quick taps. No blank page, no writer&rsquo;s block.
+            </p>
             <div className="relative mx-auto h-[480px] w-[232px] rounded-[40px] border border-[#D5D5D5] bg-[#F0F0F0] p-[3px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] sm:w-[250px]">
               <div className="absolute inset-x-0 top-[4px] z-20 flex justify-center">
                 <div className="h-[11px] w-[40px] rounded-full bg-black" />
@@ -405,16 +412,16 @@ export default function LandingPage() {
               </div>
               <div className="mx-auto mt-[2px] h-[3px] w-[70px] rounded-full bg-black/15" />
             </div>
-            <h3 className="mt-8 font-heading text-[22px] font-semibold text-text">
-              2. They tap, no typing.
-            </h3>
-            <p className="mt-2 text-center text-[15px] leading-relaxed text-muted">
-              Your customer picks what stood out in a few quick taps. No blank page, no writer&rsquo;s block.
-            </p>
           </div>
 
           {/* Step 3 — AI drafts, they post */}
           <div className="flex flex-col items-center">
+            <h3 className="font-heading text-[22px] font-semibold text-text">
+              3. AI drafts, they post.
+            </h3>
+            <p className="mb-8 mt-2 text-center text-[15px] leading-relaxed text-muted">
+              A detailed, genuine review — ready to copy and post to Google in seconds.
+            </p>
             <div className="relative mx-auto h-[480px] w-[232px] rounded-[40px] border border-[#D5D5D5] bg-[#F0F0F0] p-[3px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] sm:w-[250px]">
               <div className="absolute inset-x-0 top-[4px] z-20 flex justify-center">
                 <div className="h-[11px] w-[40px] rounded-full bg-black" />
@@ -457,12 +464,6 @@ export default function LandingPage() {
               </div>
               <div className="mx-auto mt-[2px] h-[3px] w-[70px] rounded-full bg-black/15" />
             </div>
-            <h3 className="mt-8 font-heading text-[22px] font-semibold text-text">
-              3. AI drafts, they post.
-            </h3>
-            <p className="mt-2 text-center text-[15px] leading-relaxed text-muted">
-              A detailed, genuine review — ready to copy and post to Google in seconds.
-            </p>
           </div>
         </div>
       </section>
@@ -587,86 +588,57 @@ export default function LandingPage() {
       </section>
 
       {/* ════════════════════════════════════════════
-         SECTION 7: PRICING
+         SECTION 7: INTERACTIVE DEMO
+         ════════════════════════════════════════════ */}
+      <section data-fade className="mx-auto max-w-[960px] px-6 pb-[160px]">
+        <div className="mb-16 text-center">
+          <SectionLabel>Try it</SectionLabel>
+          <Heading>See it in action</Heading>
+          <p className="mx-auto mt-4 max-w-[520px] text-[17px] leading-[1.6] text-muted">
+            Your customers tap through a 30-second flow. You watch the reviews roll in.
+          </p>
+        </div>
+        <LandingDemo />
+      </section>
+
+      {/* ════════════════════════════════════════════
+         SECTION 8: PRICING
          ════════════════════════════════════════════ */}
       <section data-fade className="mx-auto max-w-[960px] px-6 pb-[160px]">
         <div className="mb-20 text-center">
           <SectionLabel>Pricing</SectionLabel>
           <Heading>Simple, honest pricing</Heading>
           <p className="mx-auto mt-4 max-w-[480px] text-[17px] leading-[1.6] text-muted">
-            Pick the plan that fits. No hidden fees, cancel anytime.
+            One plan. Everything included. No hidden fees, cancel anytime.
           </p>
         </div>
 
-        <div className="grid gap-8 sm:grid-cols-2">
-          {/* Single Location */}
-          <div className={`flex flex-col rounded-card ${BORDER} bg-surface p-10`}>
-            <div className="mb-8">
+        <div className="mx-auto max-w-[480px]">
+          <div className="flex flex-col rounded-card border border-[#E8E5E0] bg-surface p-10 shadow-[0_8px_30px_rgba(26,46,37,0.08)]">
+            <div className="mb-8 text-center">
               <h3 className="font-heading text-[22px] font-semibold text-text">
-                Single Location
+                Small Talk
               </h3>
-              <p className="mt-2 text-[14px] text-muted">
-                Perfect for independent shops and solo operators.
+              <p className="mt-2 text-[15px] text-muted">
+                Everything you need. Nothing you don&rsquo;t.
               </p>
             </div>
-            <div className="mb-8 flex items-baseline gap-1">
-              <span className="font-heading text-[44px] font-bold tracking-tight text-text">$29</span>
+            <div className="mb-8 flex items-baseline justify-center gap-1">
+              <span className="font-heading text-[48px] font-bold tracking-tight text-text">$79</span>
               <span className="text-[15px] text-muted">/mo</span>
             </div>
-            <p className="mb-4 text-[13px] text-muted">7-day free trial · 10 free review requests</p>
-            <ul className="mb-10 flex flex-1 flex-col gap-4">
+            <ul className="mb-10 flex flex-col gap-4">
               {[
                 "Unlimited review requests",
-                "Unlimited review links",
-                "AI review generation",
-                "Real-time analytics",
-                "Email support",
+                "AI-powered review generation with 15 writing styles",
+                "SEO-optimized reviews (business name, service, city keywords)",
+                "Honest negative review handling with private feedback option",
+                "Real-time alerts when negative reviews are posted",
+                "Conversion funnel analytics",
+                "Google Maps app deep link handoff",
               ].map((f) => (
-                <li key={f} className="flex items-center gap-3 text-[14px] text-text">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              onClick={handlePricingCta}
-              className={`block w-full rounded-pill ${BORDER} bg-surface py-3.5 text-center text-[14px] font-semibold text-text transition-all duration-300 hover:bg-accent/30 active:scale-[0.98]`}
-            >
-              {loggedIn ? "Start Free Trial" : "Start free trial"}
-            </button>
-          </div>
-
-          {/* Multi-Crew */}
-          <div className="relative mt-5 flex flex-col rounded-card border-2 border-primary bg-surface p-10 sm:mt-0">
-            <span className="absolute -top-4 left-1/2 z-10 -translate-x-1/2 rounded-pill border border-primary bg-surface px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary shadow-sm">
-              Most Popular
-            </span>
-            <div className="mb-8">
-              <h3 className="font-heading text-[22px] font-semibold text-text">
-                Multi-Crew
-              </h3>
-              <p className="mt-2 text-[14px] text-muted">
-                For growing teams with multiple locations.
-              </p>
-            </div>
-            <div className="mb-8 flex items-baseline gap-1">
-              <span className="font-heading text-[44px] font-bold tracking-tight text-text">$49</span>
-              <span className="text-[15px] text-muted">/mo</span>
-            </div>
-            <p className="mb-4 text-[13px] text-muted">7-day free trial · 10 free review requests</p>
-            <ul className="mb-10 flex flex-1 flex-col gap-4">
-              {[
-                "Bulk CSV sends",
-                "Unlimited review requests",
-                "Everything in Single",
-                "Up to 5 locations",
-                "Priority support",
-              ].map((f) => (
-                <li key={f} className="flex items-center gap-3 text-[14px] text-text">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <li key={f} className="flex items-start gap-3 text-[14px] text-text">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                   {f}
@@ -678,8 +650,11 @@ export default function LandingPage() {
               onClick={handlePricingCta}
               className="block w-full rounded-pill bg-primary py-3.5 text-center text-[14px] font-semibold text-white transition-all duration-300 hover:opacity-90 active:scale-[0.98]"
             >
-              {loggedIn ? "Start Free Trial" : "Start free trial"}
+              Start your 7-day free trial
             </button>
+            <p className="mt-4 text-center text-[13px] text-muted">
+              No credit card required. 10 review requests included in trial.
+            </p>
           </div>
         </div>
       </section>
@@ -750,7 +725,7 @@ export default function LandingPage() {
          SECTION 9: FINAL CTA
          ════════════════════════════════════════════ */}
       <section data-fade id="get-started" className="mx-auto max-w-[1080px] px-6 pb-[160px]">
-        <div className="rounded-[16px] bg-accent/40 px-6 py-20 text-center sm:px-14">
+        <div className="rounded-card border border-[#E8E5E0] bg-surface px-6 py-20 text-center shadow-[0_8px_30px_rgba(26,46,37,0.08)] sm:px-14">
           <h2 className="mx-auto max-w-[640px] font-heading text-[36px] font-bold leading-tight text-text sm:text-[48px]">
             Get your first review in 5 minutes
           </h2>
@@ -772,7 +747,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── Footer ─── */}
-      <footer className="border-t border-[#D1C4B0] bg-accent/20 px-6 py-12">
+      <footer className="border-t border-[#E8E5E0] px-6 py-12">
         <div className="mx-auto flex max-w-[1200px] flex-col items-center gap-8 sm:flex-row sm:items-center sm:justify-between">
           <span className="font-heading text-[18px] font-bold text-text">small Talk</span>
           <div className="flex flex-wrap justify-center gap-6 text-[11px] uppercase tracking-widest text-muted">

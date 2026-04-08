@@ -19,9 +19,9 @@ export async function POST(req: NextRequest) {
     } = body as GenerateReviewInput;
 
     // Validate required fields
-    if (!star_rating || !business_name || !service_type || !topics_selected) {
+    if (!star_rating || !business_name || !service_type) {
       return NextResponse.json(
-        { error: "Missing required fields: star_rating, business_name, service_type, topics_selected" },
+        { error: "Missing required fields: star_rating, business_name, service_type" },
         { status: 400 }
       );
     }
@@ -33,9 +33,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!Array.isArray(topics_selected) || topics_selected.length === 0) {
+    // Topics can be empty when voice transcript (optional_text) is provided
+    const hasTopics = Array.isArray(topics_selected) && topics_selected.length > 0;
+    if (!hasTopics && !optional_text) {
       return NextResponse.json(
-        { error: "topics_selected must be a non-empty array" },
+        { error: "Either topics or additional text is required" },
         { status: 400 }
       );
     }
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
       employee_name: employee_name ?? null,
       business_city: business_city ?? null,
       neighborhood: neighborhood ?? null,
-      topics_selected,
+      topics_selected: Array.isArray(topics_selected) ? topics_selected : [],
       optional_text,
       provider,
       exclude_voice_id,

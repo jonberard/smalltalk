@@ -1,0 +1,41 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+/* ═══════════════════════════════════════════════════
+   API Key Management
+   POST /api/integrations/api-key — Generate or regenerate API key
+   Auth: Bearer token (Supabase session)
+   ═══════════════════════════════════════════════════ */
+
+export async function POST(req: NextRequest) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+
+  const authHeader = req.headers.get("authorization")?.replace("Bearer ", "");
+  const {
+    data: { user },
+  } = await supabase.auth.getUser(authHeader);
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Generate a new UUID-style API key
+  const apiKey = crypto.randomUUID();
+
+  const { error } = await supabase
+    .from("businesses")
+    .update({ api_key: apiKey })
+    .eq("id", user.id);
+
+  if (error) {
+    return NextResponse.json(
+      { error: `Failed to save API key: ${error.message}` },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ api_key: apiKey });
+}

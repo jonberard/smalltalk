@@ -689,6 +689,254 @@ function TeamList({ employees: initial, businessId }: { employees: EmployeeRow[]
    REVIEW TOPICS
    ═══════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════
+   INTEGRATIONS SECTION
+   ═══════════════════════════════════════════════════ */
+
+const WEBHOOK_URL = "https://usesmalltalk.com/api/v1/webhook/review-request";
+
+const CRM_APPS = [
+  { name: "Jobber", icon: "J", status: "connect" as const },
+  { name: "ServiceTitan", icon: "ST", status: "coming_soon" as const },
+  { name: "Housecall Pro", icon: "HP", status: "coming_soon" as const },
+];
+
+function IntegrationsSection({ businessId, initialApiKey }: {
+  businessId: string;
+  initialApiKey: string | null;
+}) {
+  const [apiKey, setApiKey] = useState<string | null>(initialApiKey);
+  const [revealed, setRevealed] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState<"url" | "key" | null>(null);
+  const [showRegenConfirm, setShowRegenConfirm] = useState(false);
+
+  async function generateOrReveal() {
+    if (apiKey) {
+      setRevealed(true);
+      return;
+    }
+    setGenerating(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/integrations/api-key", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+      const data = await res.json();
+      if (data.api_key) {
+        setApiKey(data.api_key);
+        setRevealed(true);
+      }
+    } catch {
+      // silently fail
+    }
+    setGenerating(false);
+  }
+
+  async function regenerateKey() {
+    setShowRegenConfirm(false);
+    setGenerating(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/integrations/api-key", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+      const data = await res.json();
+      if (data.api_key) {
+        setApiKey(data.api_key);
+        setRevealed(true);
+      }
+    } catch {
+      // silently fail
+    }
+    setGenerating(false);
+  }
+
+  function copyToClipboard(text: string, type: "url" | "key") {
+    navigator.clipboard?.writeText(text).catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    });
+    setCopied(type);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  const maskedKey = apiKey
+    ? `${apiKey.slice(0, 8)}${"•".repeat(24)}${apiKey.slice(-4)}`
+    : null;
+
+  return (
+    <div className="space-y-4">
+      <h2 className="px-1 text-[12px] font-semibold uppercase tracking-wider text-[var(--dash-muted)]">Integrations</h2>
+
+      {/* API Webhook card */}
+      <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-[var(--dash-primary)]/10">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--dash-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-[15px] font-semibold text-[var(--dash-text)]">API Webhook</h3>
+            <p className="text-[12px] text-[var(--dash-muted)]">Send a POST request from your CRM when a job is completed</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Webhook URL */}
+          <div>
+            <label className="mb-1.5 block text-[13px] font-medium text-[var(--dash-muted)]">Webhook URL</label>
+            <div className="flex items-center gap-2 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3 py-2.5">
+              <code className="flex-1 truncate text-[13px] text-[var(--dash-text)]">{WEBHOOK_URL}</code>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(WEBHOOK_URL, "url")}
+                className={`shrink-0 text-[12px] font-semibold transition-colors ${copied === "url" ? "text-[var(--dash-success)]" : "text-[var(--dash-primary)] hover:text-[#C7432A]"}`}
+              >
+                {copied === "url" ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+
+          {/* API Key */}
+          <div>
+            <label className="mb-1.5 block text-[13px] font-medium text-[var(--dash-muted)]">API Key</label>
+            {!apiKey && !revealed ? (
+              <button
+                type="button"
+                onClick={generateOrReveal}
+                disabled={generating}
+                className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2.5 text-[13px] font-medium text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)] disabled:opacity-50"
+              >
+                {generating ? "Generating..." : "Generate API Key"}
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3 py-2.5">
+                <code className="flex-1 truncate text-[13px] text-[var(--dash-text)]">
+                  {revealed ? apiKey : maskedKey}
+                </code>
+                <div className="flex shrink-0 items-center gap-2">
+                  {!revealed && (
+                    <button
+                      type="button"
+                      onClick={() => setRevealed(true)}
+                      className="text-[12px] font-semibold text-[var(--dash-primary)] hover:text-[#C7432A]"
+                    >
+                      Reveal
+                    </button>
+                  )}
+                  {revealed && (
+                    <button
+                      type="button"
+                      onClick={() => setRevealed(false)}
+                      className="text-[12px] font-semibold text-[var(--dash-muted)] hover:text-[var(--dash-text)]"
+                    >
+                      Hide
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => apiKey && copyToClipboard(apiKey, "key")}
+                    className={`text-[12px] font-semibold transition-colors ${copied === "key" ? "text-[var(--dash-success)]" : "text-[var(--dash-primary)] hover:text-[#C7432A]"}`}
+                  >
+                    {copied === "key" ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            )}
+            {apiKey && (
+              <button
+                type="button"
+                onClick={() => setShowRegenConfirm(true)}
+                className="mt-2 text-[12px] font-medium text-[var(--dash-muted)] underline underline-offset-2 hover:no-underline"
+              >
+                Regenerate key
+              </button>
+            )}
+          </div>
+
+          {/* Instructions */}
+          <div className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] p-3.5">
+            <p className="text-[12px] leading-relaxed text-[var(--dash-muted)]">
+              Send a POST request from your CRM when a job is completed. We&apos;ll automatically create a review link and can text it to your customer. Include <code className="rounded bg-[var(--dash-surface)] px-1 py-0.5 text-[11px]">customer_name</code> (required), plus optional <code className="rounded bg-[var(--dash-surface)] px-1 py-0.5 text-[11px]">customer_phone</code>, <code className="rounded bg-[var(--dash-surface)] px-1 py-0.5 text-[11px]">service_type</code>, and <code className="rounded bg-[var(--dash-surface)] px-1 py-0.5 text-[11px]">employee_name</code>.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Connected Apps card */}
+      <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">
+        <h3 className="mb-4 text-[15px] font-semibold text-[var(--dash-text)]">Connected Apps</h3>
+        <div className="divide-y divide-[var(--dash-border)]">
+          {CRM_APPS.map((app) => (
+            <div key={app.name} className="flex items-center gap-3 py-3.5 first:pt-0 last:pb-0">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-[var(--dash-bg)] text-[11px] font-bold text-[var(--dash-muted)]">
+                {app.icon}
+              </div>
+              <div className="flex-1">
+                <p className="text-[14px] font-medium text-[var(--dash-text)]">{app.name}</p>
+              </div>
+              {app.status === "connect" ? (
+                <button
+                  type="button"
+                  disabled
+                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--dash-muted)] opacity-50 cursor-not-allowed"
+                >
+                  Connect
+                </button>
+              ) : (
+                <span className="rounded-full bg-[var(--dash-bg)] px-3 py-1 text-[11px] font-medium text-[var(--dash-muted)]">
+                  Coming Soon
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Regenerate confirmation dialog */}
+      {showRegenConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 font-dashboard">
+          <div className="mx-4 w-full max-w-[400px] rounded-[var(--dash-radius)] bg-white p-6 shadow-lg">
+            <h3 className="text-[16px] font-bold text-[var(--dash-text)]">Regenerate API key?</h3>
+            <p className="mt-2 text-[13px] text-[var(--dash-muted)]">
+              Your current API key will stop working immediately. Any CRM integrations using the old key will need to be updated.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowRegenConfirm(false)}
+                className="flex-1 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] py-2.5 text-[13px] font-semibold text-[var(--dash-muted)] transition-all hover:bg-[var(--dash-bg)]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={regenerateKey}
+                className="flex-1 rounded-[var(--dash-radius-sm)] bg-[var(--dash-primary)] py-2.5 text-[13px] font-semibold text-white transition-all hover:brightness-95 active:scale-[0.98]"
+              >
+                Regenerate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TIER_META: { key: string; label: string; color: string; chipBg: string; dotColor: string }[] = [
   { key: "positive", label: "4-5 stars", color: "#059669", chipBg: "#ECFDF5", dotColor: "#10B981" },
   { key: "neutral", label: "3 stars", color: "#D97706", chipBg: "#FFFBEB", dotColor: "#F59E0B" },
@@ -919,6 +1167,9 @@ export default function SettingsPage() {
             <NeighborhoodsList neighborhoods={business.neighborhoods || []} businessId={business.id} />
             <TeamList employees={employees} businessId={business.id} />
             <TopicSection topics={topics} businessId={business.id} isCustomized={isCustomized} />
+
+            {/* Integrations */}
+            <IntegrationsSection businessId={business.id} initialApiKey={business.api_key ?? null} />
 
             {/* Account */}
             <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">

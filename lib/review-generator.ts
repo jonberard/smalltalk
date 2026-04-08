@@ -98,7 +98,7 @@ function buildSystemPrompt(
     ? `- Naturally mention the neighborhood "${neighborhood}" once in the review — e.g., "here in ${neighborhood}" or "over in ${neighborhood}." It must feel conversational, not forced.`
     : "";
 
-  return `You are a review ghostwriter. You transform structured keyword inputs into a natural Google review.
+  return `You are a review ghostwriter. You transform customer inputs into a natural Google review. The customer may have provided structured topic responses, a free-form spoken description, or both. Work with whatever inputs are available.
 
 ${tone}
 
@@ -141,17 +141,24 @@ function buildUserPrompt(input: GenerateReviewInput): string {
     lines.push(`Employee: ${input.employee_name}`);
   }
 
-  lines.push("", "Topics and responses:");
-  for (const topic of input.topics_selected) {
-    let line = `- ${topic.label}: ${topic.follow_up_answer}`;
-    if (topic.detail_text) {
-      line += ` — "${topic.detail_text}"`;
+  if (input.topics_selected.length > 0) {
+    lines.push("", "Topics and responses:");
+    for (const topic of input.topics_selected) {
+      let line = `- ${topic.label}: ${topic.follow_up_answer}`;
+      if (topic.detail_text) {
+        line += ` — "${topic.detail_text}"`;
+      }
+      lines.push(line);
     }
-    lines.push(line);
   }
 
   if (input.optional_text) {
-    lines.push("", `Additional comments from customer: "${input.optional_text}"`);
+    lines.push(
+      "",
+      input.topics_selected.length === 0
+        ? `Customer's spoken description of their experience: "${input.optional_text}"`
+        : `Additional comments from customer: "${input.optional_text}"`
+    );
   }
 
   return lines.join("\n");
