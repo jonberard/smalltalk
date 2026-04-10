@@ -26,10 +26,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Use service role key to bypass RLS for the update
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY is required for this operation" }, { status: 500 });
+  }
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
   );
 
   // Fetch current business record
@@ -56,7 +58,6 @@ export async function POST(req: NextRequest) {
       const sub = subs.data[0];
       subscriptionId = sub.id;
       status = mapStatus(sub.status);
-      console.log(`[verify-subscription] Found subscription ${sub.id} via customer ${customerId}: ${sub.status} → ${status}`);
     }
   } else {
     // Path B: No stripe_customer_id yet — search recent checkout sessions
@@ -73,10 +74,8 @@ export async function POST(req: NextRequest) {
       if (subscriptionId) {
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
         status = mapStatus(sub.status);
-        console.log(`[verify-subscription] Found session match for user ${user.id}: customer=${customerId}, sub=${subscriptionId}, status=${sub.status} → ${status}`);
       }
     } else {
-      console.log(`[verify-subscription] No matching checkout session found for user ${user.id}`);
       return NextResponse.json({
         updated: false,
         subscription_status: status,
@@ -99,7 +98,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
   }
 
-  console.log(`[verify-subscription] Updated business ${user.id}:`, JSON.stringify(updateFields));
 
   return NextResponse.json({
     updated: true,

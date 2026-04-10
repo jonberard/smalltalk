@@ -1,5 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { REVIEW_VOICES } from "./review-voices";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -23,6 +22,49 @@ export type GenerateReplyResult = {
 };
 
 /* ═══════════════════════════════════════════════════
+   REPLY VOICES — tone guidance for business owner responses
+   ═══════════════════════════════════════════════════ */
+
+export type ReplyVoice = {
+  id: string;
+  name: string;
+  prompt: string;
+};
+
+export const REPLY_VOICES: ReplyVoice[] = [
+  {
+    id: "warm_owner",
+    name: "Warm Owner",
+    prompt:
+      "Friendly and grateful. Mention the employee by name if they were involved. Express genuine appreciation for the specifics they shared. End with a warm invitation to come back.",
+  },
+  {
+    id: "professional_owner",
+    name: "Professional",
+    prompt:
+      "Polished and measured. Acknowledge specific points from the review without being effusive. Maintain a composed, business-appropriate tone throughout. Precise language, no slang.",
+  },
+  {
+    id: "casual_owner",
+    name: "Casual",
+    prompt:
+      "Relaxed and short. Feels like a quick text from the owner — contractions, simple words, genuine but not formal. Skip corporate phrases entirely. Keep it to 1-2 sentences when possible.",
+  },
+  {
+    id: "empathetic_owner",
+    name: "Empathetic",
+    prompt:
+      "For negative or mixed reviews. Take responsibility without making excuses. Acknowledge what went wrong specifically. Offer a concrete path to resolution — not vague promises. Show the owner genuinely cares.",
+  },
+  {
+    id: "brief_owner",
+    name: "Brief",
+    prompt:
+      "One to two sentences maximum. Match the energy of short reviews. No fluff, no filler, no formalities. Just a quick, genuine acknowledgment and maybe a thank-you.",
+  },
+];
+
+/* ═══════════════════════════════════════════════════
    VOICE RESOLUTION
    ═══════════════════════════════════════════════════ */
 
@@ -30,11 +72,11 @@ function getVoiceInstruction(voiceId: string, customVoice?: string): string {
   if (voiceId === "custom" && customVoice) {
     return `VOICE STYLE: Custom — ${customVoice}`;
   }
-  const voice = REVIEW_VOICES.find((v) => v.id === voiceId);
+  const voice = REPLY_VOICES.find((v) => v.id === voiceId);
   if (voice) {
-    return `VOICE STYLE: ${voice.name} — Write in a ${voice.name.toLowerCase()} tone.`;
+    return `VOICE STYLE: ${voice.name} — ${voice.prompt}`;
   }
-  return `VOICE STYLE: Warm — Write in a warm, personable tone.`;
+  return `VOICE STYLE: Warm Owner — Friendly and grateful. Mention the employee by name if they were involved. Express genuine appreciation and invite them back.`;
 }
 
 /* ═══════════════════════════════════════════════════

@@ -4,8 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
 import { REVIEW_VOICES } from "@/lib/review-voices";
-
-const REPLY_VOICES = REVIEW_VOICES;
+import { REPLY_VOICES } from "@/lib/reply-generator";
+import { useToast } from "@/components/dashboard/toast";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -324,6 +324,7 @@ function ServicesList({ services: initial, businessId }: { services: ServiceRow[
   const [services, setServices] = useState(initial);
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
+  const { toast } = useToast();
 
   async function handleAdd() {
     const trimmed = draft.trim();
@@ -333,8 +334,11 @@ function ServicesList({ services: initial, businessId }: { services: ServiceRow[
       .insert({ business_id: businessId, name: trimmed })
       .select("id, name")
       .single();
-    if (data) setServices([...services, data]);
-    if (error) alert(`Failed to add service: ${error.message}`);
+    if (data) {
+      setServices([...services, data]);
+      toast("Service added!", "success");
+    }
+    if (error) toast(`Something went wrong: ${error.message}`, "error");
     setDraft("");
     setAdding(false);
   }
@@ -568,6 +572,7 @@ function TeamList({ employees: initial, businessId }: { employees: EmployeeRow[]
   const [employees, setEmployees] = useState(initial);
   const [draftName, setDraftName] = useState("");
   const [adding, setAdding] = useState(false);
+  const { toast } = useToast();
 
   async function handleAdd() {
     const n = draftName.trim();
@@ -577,8 +582,11 @@ function TeamList({ employees: initial, businessId }: { employees: EmployeeRow[]
       .insert({ business_id: businessId, name: n })
       .select("id, name")
       .single();
-    if (data) setEmployees([...employees, data]);
-    if (error) alert(`Failed to add employee: ${error.message}`);
+    if (data) {
+      setEmployees([...employees, data]);
+      toast("Team member added!", "success");
+    }
+    if (error) toast(`Something went wrong: ${error.message}`, "error");
     setDraftName("");
     setAdding(false);
   }
@@ -833,6 +841,7 @@ function TopicSection({ topics: initial, businessId, isCustomized }: {
   const [topics, setTopics] = useState(initial);
   const [addingTier, setAddingTier] = useState<string | null>(null);
   const [draftLabel, setDraftLabel] = useState("");
+  const { toast } = useToast();
   const [draftQuestion, setDraftQuestion] = useState("");
   const [draftOptions, setDraftOptions] = useState("");
 
@@ -857,8 +866,11 @@ function TopicSection({ topics: initial, businessId, isCustomized }: {
       .select()
       .single();
 
-    if (data) setTopics([...topics, data]);
-    if (error) alert(`Failed to add topic: ${error.message}`);
+    if (data) {
+      setTopics([...topics, data]);
+      toast("Topic added!", "success");
+    }
+    if (error) toast(`Something went wrong: ${error.message}`, "error");
     setDraftLabel("");
     setDraftQuestion("");
     setDraftOptions("");
@@ -982,6 +994,7 @@ function TopicSection({ topics: initial, businessId, isCustomized }: {
 
 export default function SettingsPage() {
   const { business, session, signOut } = useAuth();
+  const { toast } = useToast();
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [topics, setTopics] = useState<TopicRow[]>([]);
@@ -1074,7 +1087,7 @@ export default function SettingsPage() {
                     const email = session?.user?.email;
                     if (email) {
                       await supabase.auth.resetPasswordForEmail(email);
-                      alert("Password reset email sent to " + email);
+                      toast("Password reset email sent!", "success");
                     }
                   }}
                   className="text-[13px] font-medium text-[var(--dash-primary)] underline underline-offset-2 hover:no-underline"
@@ -1119,8 +1132,8 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        console.log("Account deletion requested");
                         setShowDeleteConfirm(false);
+                        toast("Your account deletion has been requested. We\u2019ll process this within 48 hours and email you a confirmation.", "info");
                       }}
                       className="flex-1 rounded-[var(--dash-radius-sm)] bg-[#DC2626] py-2.5 text-[13px] font-semibold text-white transition-all hover:brightness-95 active:scale-[0.98]"
                     >

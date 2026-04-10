@@ -540,7 +540,7 @@ function QRBlock({ businessName }: { businessName: string }) {
    PAYWALL — expired trial or canceled
    ═══════════════════════════════════════════════════ */
 
-function Paywall() {
+function Paywall({ hadTrial }: { hadTrial: boolean }) {
   const [redirecting, setRedirecting] = useState(false);
 
   async function handleSubscribe() {
@@ -558,6 +558,12 @@ function Paywall() {
     }
   }
 
+  const heading = hadTrial
+    ? "Keep it going \u2014 subscribe to pick up where you left off."
+    : "Try it free for 7 days.";
+
+  const buttonLabel = hadTrial ? "Subscribe Now" : "Start Free Trial";
+
   return (
     <div className="flex flex-col items-center gap-4 py-10 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#E05A3D]/10">
@@ -568,10 +574,10 @@ function Paywall() {
       </div>
       <div>
         <h3 className="text-[18px] font-bold text-[var(--dash-text)]">
-          Start your free trial to send review requests
+          {heading}
         </h3>
         <p className="mx-auto mt-2 max-w-[360px] text-[14px] leading-relaxed text-[var(--dash-muted)]">
-          7-day free trial. Unlimited review links and everything you need to grow your reviews.
+          Unlimited review links and everything you need to grow your reviews.
         </p>
       </div>
       <button
@@ -580,7 +586,7 @@ function Paywall() {
         disabled={redirecting}
         className="mt-2 rounded-[var(--dash-radius-sm)] bg-[var(--dash-primary)] px-8 py-3 text-[15px] font-semibold text-white shadow-[0_2px_12px_rgba(224,90,61,0.3)] transition-all active:scale-[0.98] disabled:opacity-60"
       >
-        {redirecting ? "Redirecting..." : "Subscribe Now"}
+        {redirecting ? "Redirecting..." : buttonLabel}
       </button>
     </div>
   );
@@ -707,7 +713,7 @@ export default function SendPage() {
               ))}
             </div>
           ) : effectiveTier === "expired" ? (
-            <Paywall />
+            <Paywall hadTrial={business?.subscription_status === "trial" || business?.subscription_status === "canceled"} />
           ) : (
             <SingleForm
               services={services}

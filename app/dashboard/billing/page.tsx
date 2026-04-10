@@ -45,7 +45,7 @@ export default function BillingPage() {
     if (!business?.stripe_customer_id) return;
     setRedirecting(true);
     try {
-      const res = await fetchWithAuth("/api/customer-portal", {
+      const res = await fetchWithAuth("/api/billing-portal", {
         method: "POST",
       });
       const data = await res.json();

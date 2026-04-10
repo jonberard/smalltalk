@@ -209,6 +209,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [replyModal, setReplyModal] = useState<ActivityItem | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [replyError, setReplyError] = useState("");
   const [replyLoading, setReplyLoading] = useState(false);
   const [replyCopied, setReplyCopied] = useState(false);
   const { business } = useAuth();
@@ -227,8 +228,6 @@ export default function Dashboard() {
       .then((res) => res.json())
       .then((data) => {
         if (data.updated) {
-          console.log("[dashboard] Subscription verified via Stripe:", data.subscription_status);
-          // Reload to pick up the updated business record
           window.location.href = "/dashboard";
         }
       })
@@ -381,6 +380,7 @@ export default function Dashboard() {
   async function generateReplyForItem(item: ActivityItem) {
     setReplyModal(item);
     setReplyText("");
+    setReplyError("");
     setReplyLoading(true);
     setReplyCopied(false);
 
@@ -403,11 +403,12 @@ export default function Dashboard() {
       const data = await res.json();
       if (data.reply_text) {
         setReplyText(data.reply_text);
+        setReplyError("");
       } else {
-        setReplyText("Failed to generate reply. Please try again.");
+        setReplyError("Failed to generate reply. Please try again.");
       }
     } catch {
-      setReplyText("Failed to generate reply. Please try again.");
+      setReplyError("Failed to generate reply. Please try again.");
     }
     setReplyLoading(false);
   }
@@ -465,7 +466,7 @@ export default function Dashboard() {
         {/* ─── Welcome Header ─── */}
         <div className="mb-6">
           <h1 className="font-heading text-[24px] font-semibold text-[var(--dash-text)]">
-            {getGreeting()}, {business?.name || "there"}
+            {getGreeting()}{business?.name ? `, ${business.name}` : "!"}
           </h1>
           <p className="mt-1 text-[13px] text-[var(--dash-muted)]">
             Here&rsquo;s how your reviews are doing
@@ -845,6 +846,10 @@ export default function Dashboard() {
                 <div className="h-4 w-full animate-pulse rounded bg-[var(--dash-border)]" />
                 <div className="h-4 w-4/5 animate-pulse rounded bg-[var(--dash-border)]" />
                 <div className="h-4 w-3/5 animate-pulse rounded bg-[var(--dash-border)]" />
+              </div>
+            ) : replyError ? (
+              <div className="rounded-[var(--dash-radius-sm)] border border-[#DC2626]/20 bg-[#FEF2F2] px-4 py-3 text-[13px] text-[#DC2626]">
+                {replyError}
               </div>
             ) : (
               <textarea

@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     process.env;
 
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER) {
-    console.log("[send-sms] Twilio not configured");
+    console.error("[send-sms] Twilio not configured");
     return NextResponse.json(
       { error: "Twilio is not configured" },
       { status: 503 }
@@ -76,8 +76,6 @@ export async function POST(req: NextRequest) {
     `Hi ${customer_name}! How was your experience with ${business_name}? ` +
     `Tap to share — takes 30 seconds, no writing required: ${review_link_url}`;
 
-  console.log("[send-sms] Sending SMS");
-
   try {
     const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
     const result = await client.messages.create({
@@ -85,8 +83,6 @@ export async function POST(req: NextRequest) {
       from: TWILIO_FROM_NUMBER,
       to,
     });
-
-    console.log("[send-sms] Twilio success:", { sid: result.sid, status: result.status });
     return NextResponse.json({ sid: result.sid, status: result.status });
   } catch (err: unknown) {
     console.error("[send-sms] Twilio error:", err);

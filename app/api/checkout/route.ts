@@ -47,7 +47,6 @@ export async function POST(req: NextRequest) {
       metadata: { userId: user.id },
     });
 
-    console.log(`[checkout] Created session for user ${user.id}`);
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
     const stripeErr = err as { message?: string };

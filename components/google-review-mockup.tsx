@@ -23,11 +23,15 @@
 
 export default function GoogleReviewMockup({
   businessName = "Crystal Clear Pools",
+  reviewText,
 }: {
   businessName?: string;
   reviewText?: string;
 }) {
-  const shortReview = "Pool looks crystal clear. Highly recommend.";
+  const defaultReview = "Pool looks crystal clear. Highly recommend.";
+  const raw = reviewText && reviewText.trim() ? reviewText.trim() : defaultReview;
+  // Shorten to ~80 chars for the mockup display
+  const shortReview = raw.length > 80 ? raw.slice(0, 77) + "..." : raw;
 
   const initials = businessName
     .split(/\s+/)

@@ -11,6 +11,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,12 +25,30 @@ export default function LoginPage() {
     });
 
     if (authError) {
-      setError(authError.message);
+      if (authError.message === "Invalid login credentials") {
+        setError("That email and password don\u2019t match. Try again?");
+      } else if (authError.message === "Email not confirmed") {
+        setError("Check your inbox \u2014 you need to confirm your email before signing in.");
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
       setLoading(false);
       return;
     }
 
     router.push("/dashboard");
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      setError("Enter your email above, then click forgot password.");
+      return;
+    }
+    setResetLoading(true);
+    setError("");
+    await supabase.auth.resetPasswordForEmail(email.trim());
+    setResetSent(true);
+    setResetLoading(false);
   }
 
   return (
@@ -50,6 +70,12 @@ export default function LoginPage() {
             {error && (
               <div className="rounded-[8px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-600">
                 {error}
+              </div>
+            )}
+
+            {resetSent && (
+              <div className="rounded-[8px] border border-[#059669]/20 bg-[#ECFDF5] px-4 py-3 text-[13px] text-[#059669]">
+                We sent you a reset link &mdash; check your inbox.
               </div>
             )}
 
@@ -81,6 +107,14 @@ export default function LoginPage() {
                 placeholder="Your password"
                 className="w-full rounded-[8px] border border-[#E4E4E7] bg-white px-3.5 py-2.5 text-[14px] text-[#18181B] placeholder-[#A1A1AA] outline-none transition-colors focus:border-[#0070EB] focus:ring-2 focus:ring-[#0070EB]/20"
               />
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={resetLoading}
+                className="mt-2 text-[12px] font-medium text-[#0070EB] hover:underline disabled:opacity-50"
+              >
+                {resetLoading ? "Sending..." : "Forgot password?"}
+              </button>
             </div>
 
             <button

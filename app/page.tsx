@@ -425,7 +425,7 @@ export default function LandingPage() {
               <em className="font-medium text-primary">hate</em> writing reviews.
             </h1>
             <p className="mx-auto mt-6 max-w-[540px] text-[17px] leading-relaxed text-muted sm:text-[19px] lg:mx-0">
-              Turn happy clients into detailed 5-star Google reviews with an
+              Turn happy clients into detailed Google reviews with an
               AI-guided flow that takes 30 seconds. No more blank-box
               paralysis.
             </p>
@@ -809,7 +809,7 @@ export default function LandingPage() {
 
         <div className="mt-16 text-center">
           <p className="mx-auto max-w-[620px] text-[17px] leading-[1.7] text-muted">
-            Small Talk drafts the reply. You tweak it if you want. Copy, paste, done. Every review gets a response &mdash; and you never have to wonder what to say again.
+            small Talk drafts the reply. You tweak it if you want. Copy, paste, done. Every review gets a response &mdash; and you never have to wonder what to say again.
           </p>
           <p className="mx-auto mt-6 max-w-[580px] text-[15px] leading-[1.7] text-muted/80">
             Works for five-star praise. Works for one-star disasters. Works for the guy who just wrote &ldquo;Good.&rdquo; and nothing else.
@@ -836,7 +836,7 @@ export default function LandingPage() {
           <div className="flex flex-col rounded-card border border-[#E8E5E0] bg-surface p-10 shadow-[0_8px_30px_rgba(26,46,37,0.08)]">
             <div className="mb-8 text-center">
               <h3 className="font-heading text-[22px] font-semibold text-text">
-                Small Talk
+                small Talk
               </h3>
               <p className="mt-2 text-[15px] text-muted">
                 Everything you need. Nothing you don&rsquo;t.
@@ -971,9 +971,9 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-[1200px] flex-col items-center gap-8 sm:flex-row sm:items-center sm:justify-between">
           <span className="font-heading text-[18px] font-bold text-text">small Talk</span>
           <div className="flex flex-wrap justify-center gap-6 text-[11px] uppercase tracking-widest text-muted">
-            <a href="#" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Privacy Policy</a>
-            <a href="#" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Terms of Service</a>
-            <a href="#" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Contact</a>
+            <Link href="/privacy" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Privacy Policy</Link>
+            <Link href="/terms" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Terms of Service</Link>
+            <Link href="/contact" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Contact</Link>
           </div>
           <p className="text-[11px] uppercase tracking-widest text-muted">
             &copy; 2026 small Talk. All rights reserved.

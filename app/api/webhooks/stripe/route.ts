@@ -3,9 +3,12 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 
 // Service role key required to bypass RLS — webhooks have no user auth context
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for this operation");
+}
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
 function mapSubscriptionStatus(stripeStatus: string): string {
@@ -67,8 +70,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  console.log(`[stripe-webhook] Received event: ${event.type}`);
-
   switch (event.type) {
     /* ─── Checkout ─── */
     case "checkout.session.completed": {
@@ -93,8 +94,6 @@ export async function POST(req: NextRequest) {
 
       if (error) {
         console.error("[stripe-webhook] Failed to update business:", error.message);
-      } else {
-        console.log(`[stripe-webhook] Business ${userId} checkout complete — customer ${customerId}`);
       }
       break;
     }
@@ -109,7 +108,6 @@ export async function POST(req: NextRequest) {
         stripe_subscription_id: sub.id,
         subscription_status: status,
       });
-      console.log(`[stripe-webhook] Subscription created for ${customerId}: ${status}`);
       break;
     }
 
@@ -119,7 +117,6 @@ export async function POST(req: NextRequest) {
       const status = mapSubscriptionStatus(sub.status);
 
       await updateByCustomerId(customerId, { subscription_status: status });
-      console.log(`[stripe-webhook] Subscription updated for ${customerId}: ${status}`);
       break;
     }
 
@@ -128,7 +125,6 @@ export async function POST(req: NextRequest) {
       const customerId = sub.customer as string;
 
       await updateByCustomerId(customerId, { subscription_status: "canceled" });
-      console.log(`[stripe-webhook] Subscription canceled for ${customerId}`);
       break;
     }
 
@@ -137,7 +133,6 @@ export async function POST(req: NextRequest) {
       const customerId = sub.customer as string;
 
       await updateByCustomerId(customerId, { subscription_status: "paused" });
-      console.log(`[stripe-webhook] Subscription paused for ${customerId}`);
       break;
     }
 
@@ -146,13 +141,11 @@ export async function POST(req: NextRequest) {
       const customerId = sub.customer as string;
 
       await updateByCustomerId(customerId, { subscription_status: "active" });
-      console.log(`[stripe-webhook] Subscription resumed for ${customerId}`);
       break;
     }
 
     case "customer.subscription.trial_will_end": {
       const sub = event.data.object as Stripe.Subscription;
-      console.log(`[stripe-webhook] Trial ending soon for customer ${sub.customer}, trial ends ${sub.trial_end}`);
       break;
     }
 
@@ -161,9 +154,16 @@ export async function POST(req: NextRequest) {
       const invoice = event.data.object as Stripe.Invoice;
       const customerId = invoice.customer as string;
 
-      // Recover from past_due when payment succeeds
-      await updateByCustomerId(customerId, { subscription_status: "active" });
-      console.log(`[stripe-webhook] Invoice paid for ${customerId}`);
+      // Only set to "active" if currently past_due or active — don't overwrite "trialing"
+      const { data: biz } = await supabaseAdmin
+        .from("businesses")
+        .select("subscription_status")
+        .eq("stripe_customer_id", customerId)
+        .single();
+
+      if (biz && (biz.subscription_status === "past_due" || biz.subscription_status === "active")) {
+        await updateByCustomerId(customerId, { subscription_status: "active" });
+      }
       break;
     }
 
@@ -172,18 +172,15 @@ export async function POST(req: NextRequest) {
       const customerId = invoice.customer as string;
 
       await updateByCustomerId(customerId, { subscription_status: "past_due" });
-      console.log(`[stripe-webhook] Payment failed for ${customerId}`);
       break;
     }
 
     case "invoice.upcoming": {
       const invoice = event.data.object as Stripe.Invoice;
-      console.log(`[stripe-webhook] Upcoming invoice for customer ${invoice.customer}`);
       break;
     }
 
     default:
-      console.log(`[stripe-webhook] Unhandled event type: ${event.type}`);
   }
 
   return NextResponse.json({ received: true });
