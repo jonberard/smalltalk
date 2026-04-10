@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 import type { Business } from "@/lib/types";
@@ -26,6 +26,7 @@ export function useAuth() {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [session, setSession] = useState<Session | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,14 +65,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function fetchBusiness(userId: string) {
     const { data, error } = await supabase
       .from("businesses")
-      .select("id, name, logo_url, google_review_url, google_place_id, business_city, neighborhoods, subscription_status, trial_requests_remaining, trial_ends_at, reply_voice_id, custom_reply_voice, connected_crms, created_at, stripe_customer_id, stripe_subscription_id")
+      .select("id, name, logo_url, google_review_url, google_place_id, business_city, neighborhoods, subscription_status, trial_requests_remaining, trial_ends_at, reply_voice_id, custom_reply_voice, connected_crms, created_at, stripe_customer_id, stripe_subscription_id, onboarding_completed")
       .eq("id", userId)
       .single();
 
     if (error || !data) {
       setBusiness(null);
     } else {
-      setBusiness(data as Business);
+      const biz = data as Business;
+      setBusiness(biz);
+
+      // Redirect to onboarding if not completed (unless already there)
+      if (!biz.onboarding_completed && !window.location.pathname.startsWith("/onboarding")) {
+        router.replace("/onboarding");
+      }
     }
     setLoading(false);
   }

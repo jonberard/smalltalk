@@ -10,7 +10,6 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [businessName, setBusinessName] = useState("");
-  const [googleUrl, setGoogleUrl] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -44,7 +43,6 @@ export default function SignupPage() {
       const { error: bizError } = await supabase.from("businesses").insert({
         id: userId,
         name: businessName,
-        google_review_url: googleUrl,
         trial_ends_at: trialEndsAt,
       });
 
@@ -87,8 +85,8 @@ export default function SignupPage() {
         }
       }
 
-      // 4. Redirect to dashboard
-      router.push("/dashboard");
+      // 4. Redirect to onboarding
+      router.push("/onboarding");
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
@@ -150,8 +148,6 @@ export default function SignupPage() {
               />
             </div>
 
-            <div className="h-px bg-[#E4E4E7]" />
-
             <div>
               <label htmlFor="businessName" className="mb-1.5 block text-[13px] font-medium text-[#18181B]">
                 Business name
@@ -166,24 +162,6 @@ export default function SignupPage() {
                 autoComplete="organization"
                 className="w-full rounded-[8px] border border-[#E4E4E7] bg-white px-3.5 py-2.5 text-[14px] text-[#18181B] placeholder-[#A1A1AA] outline-none transition-colors focus:border-[#0070EB] focus:ring-2 focus:ring-[#0070EB]/20"
               />
-            </div>
-
-            <div>
-              <label htmlFor="googleUrl" className="mb-1.5 block text-[13px] font-medium text-[#18181B]">
-                Google Business review link
-              </label>
-              <input
-                id="googleUrl"
-                type="url"
-                required
-                value={googleUrl}
-                onChange={(e) => setGoogleUrl(e.target.value)}
-                placeholder="https://search.google.com/local/writereview?placeid=..."
-                className="w-full rounded-[8px] border border-[#E4E4E7] bg-white px-3.5 py-2.5 text-[14px] text-[#18181B] placeholder-[#A1A1AA] outline-none transition-colors focus:border-[#0070EB] focus:ring-2 focus:ring-[#0070EB]/20"
-              />
-              <p className="mt-1.5 text-[12px] text-[#A1A1AA]">
-                The link where customers leave Google reviews for your business.
-              </p>
             </div>
 
             <button

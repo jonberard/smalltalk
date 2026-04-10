@@ -19,6 +19,7 @@ export type Business = {
   connected_crms: Record<string, unknown>;
   reply_voice_id: string;
   custom_reply_voice: string | null;
+  onboarding_completed: boolean;
   created_at: string;
 };
 
@@ -39,6 +40,7 @@ export type BusinessInsert = {
   connected_crms?: Record<string, unknown>;
   reply_voice_id?: string;
   custom_reply_voice?: string | null;
+  onboarding_completed?: boolean;
   created_at?: string;
 };
 
