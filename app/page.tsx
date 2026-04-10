@@ -391,6 +391,41 @@ export default function LandingPage() {
 
   return (
     <div ref={wrapRef} className="min-h-dvh bg-background font-body text-text">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Organization",
+              name: "small Talk",
+              url: "https://usesmalltalk.com",
+              description: "Collect honest, detailed Google reviews through a guided conversation.",
+              logo: "https://usesmalltalk.com/favicon.svg",
+            },
+            {
+              "@type": "FAQPage",
+              mainEntity: [
+                {
+                  "@type": "Question",
+                  name: "How does small Talk work?",
+                  acceptedAnswer: { "@type": "Answer", text: "small Talk guides your customers through a quick conversation about their experience, then AI drafts a review from their honest inputs. They approve it and post it to Google." },
+                },
+                {
+                  "@type": "Question",
+                  name: "Is this review gating?",
+                  acceptedAnswer: { "@type": "Answer", text: "No. small Talk captures honest reviews, not just positive ones. Customers with low ratings get an equal choice to share publicly or send private feedback." },
+                },
+                {
+                  "@type": "Question",
+                  name: "Do customers write their own reviews?",
+                  acceptedAnswer: { "@type": "Answer", text: "Customers provide their honest inputs — star rating, topics, and details. AI drafts a review matching their sentiment. They review, edit if needed, and approve before posting." },
+                },
+              ],
+            },
+          ],
+        }) }}
+      />
 
       {/* ─── Nav ─── */}
       <nav className="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5 lg:px-12">
@@ -432,7 +467,7 @@ export default function LandingPage() {
             <div className="mt-8 flex flex-col items-center gap-5 pt-2 sm:flex-row lg:justify-start">
               <Link
                 href={ctaHref}
-                className="flex w-full items-center justify-center gap-2 rounded-[8px] bg-primary px-8 py-4 text-[17px] font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#c84a2f] active:scale-[0.98] sm:w-auto"
+                className="flex w-full items-center justify-center gap-2 rounded-pill bg-primary px-8 py-4 text-[17px] font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#c84a2f] active:scale-[0.98] sm:w-auto"
               >
                 {loggedIn ? "Go to Dashboard" : "Start Free Trial"}
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>

@@ -83,8 +83,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#F8F9FA] font-dashboard">
-        <div className="text-[14px] text-[#A1A1AA]">Loading...</div>
+      <div className="flex min-h-dvh bg-[#F8F9FA] font-dashboard">
+        {/* Sidebar skeleton (desktop) */}
+        <div className="hidden w-[220px] shrink-0 border-r border-[#E8E5E0] bg-white sm:block">
+          <div className="px-5 pt-7 pb-6">
+            <div className="h-4 w-20 animate-pulse rounded bg-[#E8E5E0]" />
+            <div className="mt-2 h-3 w-14 animate-pulse rounded bg-[#E8E5E0]" />
+          </div>
+          <div className="flex flex-col gap-2 px-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-10 animate-pulse rounded-[10px] bg-[#F3F0EB]" />
+            ))}
+          </div>
+        </div>
+        {/* Content skeleton */}
+        <div className="flex-1 px-6 pt-20 sm:pt-10">
+          <div className="mx-auto max-w-[600px]">
+            <div className="h-6 w-40 animate-pulse rounded bg-[#E8E5E0]" />
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-28 animate-pulse rounded-[12px] bg-white shadow-sm" />
+              ))}
+            </div>
+            <div className="mt-6 h-64 animate-pulse rounded-[12px] bg-white shadow-sm" />
+          </div>
+        </div>
       </div>
     );
   }

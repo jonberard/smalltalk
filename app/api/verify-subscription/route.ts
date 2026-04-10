@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { mapSubscriptionStatus } from "@/lib/stripe-utils";
 
 export async function POST(req: NextRequest) {
   const { STRIPE_SECRET_KEY } = process.env;
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
     if (subs.data.length > 0) {
       const sub = subs.data[0];
       subscriptionId = sub.id;
-      status = mapStatus(sub.status);
+      status = mapSubscriptionStatus(sub.status);
     }
   } else {
     // Path B: No stripe_customer_id yet — search recent checkout sessions
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
       // Look up the actual subscription status
       if (subscriptionId) {
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
-        status = mapStatus(sub.status);
+        status = mapSubscriptionStatus(sub.status);
       }
     } else {
       return NextResponse.json({
@@ -105,16 +106,4 @@ export async function POST(req: NextRequest) {
     stripe_customer_id: customerId,
     stripe_subscription_id: subscriptionId,
   });
-}
-
-function mapStatus(stripeStatus: string): string {
-  switch (stripeStatus) {
-    case "active": return "active";
-    case "trialing": return "trialing";
-    case "past_due": return "past_due";
-    case "canceled":
-    case "unpaid": return "canceled";
-    case "paused": return "paused";
-    default: return "none";
-  }
 }

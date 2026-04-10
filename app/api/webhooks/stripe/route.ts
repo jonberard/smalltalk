@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { mapSubscriptionStatus } from "@/lib/stripe-utils";
 
 // Service role key required to bypass RLS — webhooks have no user auth context
 if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -10,27 +11,6 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
-
-function mapSubscriptionStatus(stripeStatus: string): string {
-  switch (stripeStatus) {
-    case "active":
-      return "active";
-    case "trialing":
-      return "trialing";
-    case "past_due":
-      return "past_due";
-    case "canceled":
-    case "unpaid":
-      return "canceled";
-    case "paused":
-      return "paused";
-    case "incomplete":
-    case "incomplete_expired":
-      return "incomplete";
-    default:
-      return "none";
-  }
-}
 
 async function updateByCustomerId(customerId: string, fields: Record<string, unknown>) {
   const { error } = await supabaseAdmin

@@ -638,6 +638,7 @@ function VoiceInputScreen({
         <button
           type="button"
           onClick={listening ? stopListening : startListening}
+          aria-label={listening ? "Stop recording" : "Start recording"}
           className="relative flex h-20 w-20 items-center justify-center rounded-full transition-all duration-300"
           style={{
             backgroundColor: listening ? "rgba(224, 90, 61, 0.1)" : "var(--color-accent)",
@@ -928,6 +929,7 @@ function DetailScreen({
         <button
           type="button"
           onClick={listening ? stopListening : startListening}
+          aria-label={listening ? "Stop recording" : "Start voice input"}
           className={`flex items-center gap-2 self-center rounded-pill border px-5 py-2.5 text-[13px] font-medium transition-all duration-200 active:scale-[0.98] ${listening ? "border-primary bg-primary/10 text-primary" : "border-accent bg-surface text-muted hover:border-primary hover:text-primary"}`}
         >
           {listening ? (

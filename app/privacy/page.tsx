@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy — small Talk",
+  description: "How small Talk collects, stores, and protects your data.",
+};
 
 export default function PrivacyPage() {
   return (

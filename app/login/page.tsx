@@ -68,7 +68,7 @@ export default function LoginPage() {
         <div className="rounded-[12px] border border-[#E4E4E7] bg-white p-8 shadow-sm">
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             {error && (
-              <div className="rounded-[8px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-600">
+              <div role="alert" className="rounded-[8px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-600">
                 {error}
               </div>
             )}
@@ -90,6 +90,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
+                autoComplete="email"
                 className="w-full rounded-[8px] border border-[#E4E4E7] bg-white px-3.5 py-2.5 text-[14px] text-[#18181B] placeholder-[#A1A1AA] outline-none transition-colors focus:border-[#0070EB] focus:ring-2 focus:ring-[#0070EB]/20"
               />
             </div>
@@ -105,6 +106,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Your password"
+                autoComplete="current-password"
                 className="w-full rounded-[8px] border border-[#E4E4E7] bg-white px-3.5 py-2.5 text-[14px] text-[#18181B] placeholder-[#A1A1AA] outline-none transition-colors focus:border-[#0070EB] focus:ring-2 focus:ring-[#0070EB]/20"
               />
               <button

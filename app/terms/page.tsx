@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Terms of Service — small Talk",
+  description: "Terms and conditions for using small Talk.",
+};
 
 export default function TermsPage() {
   return (

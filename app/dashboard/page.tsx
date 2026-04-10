@@ -460,7 +460,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="min-h-dvh bg-[var(--dash-bg)] sm:pl-[220px]">
+    <main className="min-h-dvh bg-[var(--dash-bg)] sm:pl-[220px]">
       <div className="dash-page-enter mx-auto max-w-[960px] px-5 pb-32 pt-8 sm:pb-16">
 
         {/* ─── Welcome Header ─── */}
@@ -809,8 +809,11 @@ export default function Dashboard() {
 
       {/* ─── Reply Modal ─── */}
       {replyModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setReplyModal(null)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setReplyModal(null)} onKeyDown={(e) => { if (e.key === "Escape") setReplyModal(null); }}>
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Draft reply"
             className="w-full max-w-[520px] rounded-t-[16px] bg-white p-6 shadow-xl sm:mx-4 sm:rounded-[var(--dash-radius)]"
             onClick={(e) => e.stopPropagation()}
           >
@@ -820,6 +823,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setReplyModal(null)}
+                aria-label="Close"
                 className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--dash-muted)] transition-colors hover:bg-[var(--dash-bg)]"
               >
                 <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -892,6 +896,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }

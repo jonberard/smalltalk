@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Contact Us — small Talk",
+  description: "Get in touch with the small Talk team.",
+};
 
 export default function ContactPage() {
   return (

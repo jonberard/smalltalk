@@ -1115,8 +1115,8 @@ export default function SettingsPage() {
 
             {/* Delete confirmation dialog */}
             {showDeleteConfirm && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 font-dashboard">
-                <div className="mx-4 w-full max-w-[400px] rounded-[var(--dash-radius)] bg-white p-6 shadow-lg">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 font-dashboard" onKeyDown={(e) => { if (e.key === "Escape") setShowDeleteConfirm(false); }}>
+                <div role="dialog" aria-modal="true" aria-label="Delete account confirmation" className="mx-4 w-full max-w-[400px] rounded-[var(--dash-radius)] bg-white p-6 shadow-lg">
                   <h3 className="text-[16px] font-bold text-[var(--dash-text)]">Delete your account?</h3>
                   <p className="mt-2 text-[13px] text-[var(--dash-muted)]">
                     This will permanently delete your business, all review links, and cancel your subscription. This action cannot be undone.

@@ -136,3 +136,14 @@ details[open] summary ~ * {
 .dash-page-enter {
   animation: dash-page-enter 200ms ease-out;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

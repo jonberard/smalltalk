@@ -105,7 +105,7 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
     <>
       {/* ─── Mobile Top Bar ─── */}
       <div className="fixed left-0 right-0 top-0 z-40 flex items-center justify-between border-b border-[var(--dash-border)] bg-white/95 px-4 py-2.5 backdrop-blur-md font-dashboard sm:hidden">
-        <p className="font-heading text-[15px] font-bold tracking-tight text-[var(--dash-text)]">small Talk</p>
+        <Link href="/dashboard" className="font-heading text-[15px] font-bold tracking-tight text-[var(--dash-text)]">small Talk</Link>
         <div className="relative">
           <button
             type="button"
@@ -157,7 +157,7 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
       {children}
 
       {/* ─── Bottom Tab Bar ─── */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--dash-border)] bg-white/95 backdrop-blur-md font-dashboard sm:hidden">
+      <nav aria-label="Main navigation" className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--dash-border)] bg-white/95 backdrop-blur-md font-dashboard sm:hidden">
         <div className="mx-auto flex max-w-[600px] items-stretch">
           {TABS.map((tab) => {
             const active = isActive(tab.href);
@@ -183,9 +183,9 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* ─── Desktop Sidebar Nav ─── */}
-      <nav className="fixed left-0 top-0 z-40 hidden h-full w-[220px] flex-col border-r border-[var(--dash-border)] bg-white font-dashboard sm:flex">
+      <nav aria-label="Main navigation" className="fixed left-0 top-0 z-40 hidden h-full w-[220px] flex-col border-r border-[var(--dash-border)] bg-white font-dashboard sm:flex">
         <div className="px-5 pt-7 pb-6">
-          <p className="font-heading text-[15px] font-bold tracking-tight text-[var(--dash-text)]">small Talk</p>
+          <Link href="/dashboard" className="font-heading text-[15px] font-bold tracking-tight text-[var(--dash-text)]">small Talk</Link>
           <p className="text-[11px] text-[var(--dash-muted)]">Dashboard</p>
         </div>
         <div className="flex flex-1 flex-col gap-1 px-3">

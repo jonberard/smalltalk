@@ -24,6 +24,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://usesmalltalk.com"),
   title: "small Talk — Get More Detailed Google Reviews",
   description:
     "Collect honest, detailed reviews through a guided conversation. Customers approve before posting.",
@@ -33,11 +34,14 @@ export const metadata: Metadata = {
       "Collect honest, detailed reviews through a guided conversation.",
     type: "website",
     url: "https://usesmalltalk.com",
+    siteName: "small Talk",
+    images: [{ url: "/og-image.svg", width: 1200, height: 630, alt: "small Talk — Get more detailed Google reviews" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "small Talk",
     description: "Collect honest, detailed Google reviews",
+    images: ["/og-image.svg"],
   },
   other: {
     "theme-color": "#E05A3D",
