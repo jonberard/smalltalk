@@ -31,11 +31,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        fetchBusiness(session.user.id);
+    // Get initial session — use getUser() for server-verified auth
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          setSession(session);
+          fetchBusiness(user.id);
+        });
       } else {
         setLoading(false);
         router.replace("/login");
@@ -62,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function fetchBusiness(userId: string) {
     const { data, error } = await supabase
       .from("businesses")
-      .select("*")
+      .select("id, name, logo_url, google_review_url, google_place_id, business_city, neighborhoods, subscription_status, trial_requests_remaining, trial_ends_at, reply_voice_id, custom_reply_voice, connected_crms, created_at, stripe_customer_id, stripe_subscription_id")
       .eq("id", userId)
       .single();
 

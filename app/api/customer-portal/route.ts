@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 
 export async function POST(req: NextRequest) {
@@ -8,18 +9,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Stripe is not configured" }, { status: 503 });
   }
 
-  let body: { stripe_customer_id?: string };
-
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  // Authenticate the request
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+  const authHeader = req.headers.get("authorization")?.replace("Bearer ", "");
+  const { data: { user } } = await supabase.auth.getUser(authHeader);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { stripe_customer_id } = body;
+  // Derive stripe_customer_id from the authenticated user's business record
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("stripe_customer_id")
+    .eq("id", user.id)
+    .single();
 
+  const stripe_customer_id = business?.stripe_customer_id;
   if (!stripe_customer_id) {
-    return NextResponse.json({ error: "Missing stripe_customer_id" }, { status: 400 });
+    return NextResponse.json({ error: "No Stripe customer found" }, { status: 400 });
   }
 
   const stripe = new Stripe(STRIPE_SECRET_KEY);

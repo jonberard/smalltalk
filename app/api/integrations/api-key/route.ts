@@ -22,8 +22,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Generate a new UUID-style API key
-  const apiKey = crypto.randomUUID();
+  // Generate a cryptographically strong API key
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const apiKey = `st_${Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("")}`;
 
   const { error } = await supabase
     .from("businesses")

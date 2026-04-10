@@ -1031,6 +1031,7 @@ function ReviewScreen({
 
   const buildPayload = useCallback(
     (excludeVoice?: string) => ({
+      session_id: data.sessionId,
       star_rating: rating,
       business_name: data.businessName,
       service_type: data.serviceType,

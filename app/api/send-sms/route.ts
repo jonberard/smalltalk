@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import twilio from "twilio";
 
 function normalizePhone(raw: string): string {
@@ -12,13 +13,22 @@ function normalizePhone(raw: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  console.log("[send-sms] SMS route hit");
+  // Authenticate the request
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+  const authHeader = req.headers.get("authorization")?.replace("Bearer ", "");
+  const { data: { user } } = await supabase.auth.getUser(authHeader);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER } =
     process.env;
 
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER) {
-    console.log("[send-sms] Twilio not configured — SID:", !!TWILIO_ACCOUNT_SID, "TOKEN:", !!TWILIO_AUTH_TOKEN, "FROM:", TWILIO_FROM_NUMBER);
+    console.log("[send-sms] Twilio not configured");
     return NextResponse.json(
       { error: "Twilio is not configured" },
       { status: 503 }
@@ -55,19 +65,18 @@ export async function POST(req: NextRequest) {
 
   if (digits.length < 10 || digits.length > 15) {
     return NextResponse.json(
-      { error: `Invalid phone number format (got ${digits.length} digits from "${customer_contact}")` },
+      { error: "Invalid phone number format" },
       { status: 422 }
     );
   }
 
   const to = normalizePhone(customer_contact);
-  console.log(`[send-sms] Normalized "${customer_contact}" → "${to}"`);
 
   const message =
     `Hi ${customer_name}! How was your experience with ${business_name}? ` +
     `Tap to share — takes 30 seconds, no writing required: ${review_link_url}`;
 
-  console.log("[send-sms] About to call Twilio:", { from: TWILIO_FROM_NUMBER, to, bodyLength: message.length, body: message });
+  console.log("[send-sms] Sending SMS");
 
   try {
     const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);

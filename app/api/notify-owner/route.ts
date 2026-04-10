@@ -4,8 +4,12 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 
 function starHtml(rating: number): string {
   const filled = "★";
@@ -38,14 +42,14 @@ function buildEmailHtml({
         <tr><td style="padding:32px 32px 24px;border-bottom:1px solid #EDE8DE;">
           <p style="margin:0 0 12px;font-size:13px;color:#8A9B93;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Heads Up</p>
           <h1 style="margin:0;font-size:20px;color:#1A2E25;font-weight:700;line-height:1.3;">
-            ${customerName} may have posted a ${starRating}-star review
+            ${escapeHtml(customerName)} may have posted a ${starRating}-star review
           </h1>
         </td></tr>
 
         <!-- Body -->
         <tr><td style="padding:24px 32px;">
           <p style="margin:0 0 16px;font-size:15px;color:#1A2E25;line-height:1.5;">
-            ${customerName} just completed a <strong>${starRating}-star review</strong> and was directed to post it on Google. They copied the text below and the Google review page opened — but we can't confirm they actually submitted it.
+            ${escapeHtml(customerName)} just completed a <strong>${starRating}-star review</strong> and was directed to post it on Google. They copied the text below and the Google review page opened — but we can't confirm they actually submitted it.
           </p>
 
           <!-- Stars -->

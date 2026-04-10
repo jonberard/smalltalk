@@ -38,12 +38,17 @@ type AttentionItem = {
 };
 
 type ActivityItem = {
+  sessionId: string;
   name: string;
   action: string;
   time: string;
   status: string;
   stars: number | null;
   snippet: string | null;
+  repliedAt: string | null;
+  employeeName: string | null;
+  serviceType: string | null;
+  topicsSelected: { label: string; follow_up_answer: string }[] | null;
 };
 
 /* ═══════════════════════════════════════════════════
@@ -202,6 +207,10 @@ export default function Dashboard() {
   const [attention, setAttention] = useState<AttentionItem[]>([]);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [replyModal, setReplyModal] = useState<ActivityItem | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replyLoading, setReplyLoading] = useState(false);
+  const [replyCopied, setReplyCopied] = useState(false);
   const { business } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -247,7 +256,7 @@ export default function Dashboard() {
       // 2. All sessions for this business
       const { data: allSessions } = await supabase
         .from("review_sessions")
-        .select("id, star_rating, status, generated_review, created_at, updated_at, review_links!inner(business_id, customer_name)")
+        .select("id, star_rating, status, generated_review, topics_selected, replied_at, created_at, updated_at, review_links!inner(business_id, customer_name, services(name), employees(name))")
         .eq("review_links.business_id", businessId)
         .order("updated_at", { ascending: false });
 
@@ -292,14 +301,23 @@ export default function Dashboard() {
       const recentActivity = sessions.slice(0, 15);
       setActivityItems(
         recentActivity.map((s) => {
-          const link = s.review_links as unknown as { customer_name: string };
+          const link = s.review_links as unknown as {
+            customer_name: string;
+            services: { name: string } | null;
+            employees: { name: string } | null;
+          };
           return {
+            sessionId: s.id,
             name: link.customer_name,
             action: statusToAction(s.status, s.star_rating),
             time: timeAgo(s.updated_at),
             status: s.status,
             stars: s.star_rating,
             snippet: s.generated_review,
+            repliedAt: s.replied_at ?? null,
+            employeeName: link.employees?.name ?? null,
+            serviceType: link.services?.name ?? null,
+            topicsSelected: s.topics_selected as { label: string; follow_up_answer: string }[] | null,
           };
         })
       );
@@ -359,6 +377,72 @@ export default function Dashboard() {
 
     fetchFunnel();
   }, [business, funnelFilter]);
+
+  async function generateReplyForItem(item: ActivityItem) {
+    setReplyModal(item);
+    setReplyText("");
+    setReplyLoading(true);
+    setReplyCopied(false);
+
+    try {
+      const res = await fetchWithAuth("/api/generate-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessName: business?.name ?? "",
+          reviewText: item.snippet ?? "",
+          starRating: item.stars ?? 5,
+          employeeName: item.employeeName,
+          serviceType: item.serviceType,
+          topicsSelected: item.topicsSelected,
+          replyVoiceId: (business as Record<string, unknown>)?.reply_voice_id ?? "warm",
+          customReplyVoice: (business as Record<string, unknown>)?.custom_reply_voice ?? undefined,
+          reviewSource: "smalltalk",
+        }),
+      });
+      const data = await res.json();
+      if (data.reply_text) {
+        setReplyText(data.reply_text);
+      } else {
+        setReplyText("Failed to generate reply. Please try again.");
+      }
+    } catch {
+      setReplyText("Failed to generate reply. Please try again.");
+    }
+    setReplyLoading(false);
+  }
+
+  async function copyReplyAndMark() {
+    if (!replyText || !replyModal) return;
+    try {
+      await navigator.clipboard.writeText(replyText);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = replyText;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setReplyCopied(true);
+
+    // Mark session as replied
+    await supabase
+      .from("review_sessions")
+      .update({ reply_text: replyText, replied_at: new Date().toISOString() })
+      .eq("id", replyModal.sessionId);
+
+    // Update local state
+    setActivityItems((prev) =>
+      prev.map((a) =>
+        a.sessionId === replyModal.sessionId
+          ? { ...a, repliedAt: new Date().toISOString() }
+          : a
+      )
+    );
+
+    setTimeout(() => setReplyCopied(false), 3000);
+  }
 
   const FUNNEL_STAGES: { key: keyof FunnelData; label: string }[] = [
     { key: "sent", label: "Sent" },
@@ -609,9 +693,11 @@ export default function Dashboard() {
               ) : activityItems.length > 0 ? (
                 activityItems.map((item, i) => {
                   const initial = item.name.charAt(0).toUpperCase();
+                  const isCopied = item.status === "copied";
+                  const hasReplied = !!item.repliedAt;
                   return (
                     <div
-                      key={i}
+                      key={item.sessionId}
                       className={`flex items-center gap-3 px-4 py-3.5 ${
                         i < activityItems.length - 1 ? "border-b border-[var(--dash-border)]" : ""
                       }`}
@@ -623,8 +709,20 @@ export default function Dashboard() {
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] font-medium text-[var(--dash-text)]">{item.name}</span>
                           <StatusPill status={item.status} />
+                          {hasReplied && (
+                            <span className="text-[10px] font-medium text-[#059669]">Replied &#10003;</span>
+                          )}
                         </div>
                       </div>
+                      {isCopied && !hasReplied && (
+                        <button
+                          type="button"
+                          onClick={() => generateReplyForItem(item)}
+                          className="shrink-0 rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-2.5 py-1 text-[11px] font-semibold text-[var(--dash-primary)] transition-colors hover:bg-[var(--dash-primary)]/5 active:scale-[0.97]"
+                        >
+                          Draft Reply
+                        </button>
+                      )}
                       {item.stars && <RatingBadge rating={item.stars} />}
                       <span className="shrink-0 text-[11px] text-[var(--dash-muted)]">{item.time}</span>
                     </div>
@@ -707,6 +805,88 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      {/* ─── Reply Modal ─── */}
+      {replyModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setReplyModal(null)}>
+          <div
+            className="w-full max-w-[520px] rounded-t-[16px] bg-white p-6 shadow-xl sm:mx-4 sm:rounded-[var(--dash-radius)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-[16px] font-bold text-[var(--dash-text)]">Draft Reply</h3>
+              <button
+                type="button"
+                onClick={() => setReplyModal(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--dash-muted)] transition-colors hover:bg-[var(--dash-bg)]"
+              >
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Original review */}
+            <div className="mb-4 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-[13px] font-semibold text-[var(--dash-text)]">{replyModal.name}</span>
+                {replyModal.stars && <MiniStars rating={replyModal.stars} />}
+              </div>
+              <p className="text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                {replyModal.snippet || <em>Star-only review — no text</em>}
+              </p>
+            </div>
+
+            {/* Reply area */}
+            {replyLoading ? (
+              <div className="space-y-2">
+                <div className="h-4 w-full animate-pulse rounded bg-[var(--dash-border)]" />
+                <div className="h-4 w-4/5 animate-pulse rounded bg-[var(--dash-border)]" />
+                <div className="h-4 w-3/5 animate-pulse rounded bg-[var(--dash-border)]" />
+              </div>
+            ) : (
+              <textarea
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                rows={5}
+                className="w-full resize-none rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-white px-3 py-2.5 text-[13px] leading-relaxed text-[var(--dash-text)] focus:border-[var(--dash-primary)] focus:outline-none"
+              />
+            )}
+
+            {/* Actions */}
+            <div className="mt-4 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => generateReplyForItem(replyModal)}
+                disabled={replyLoading}
+                className="text-[12px] font-medium text-[var(--dash-muted)] underline underline-offset-2 hover:no-underline disabled:opacity-50"
+              >
+                Regenerate
+              </button>
+              <button
+                type="button"
+                onClick={copyReplyAndMark}
+                disabled={replyLoading || !replyText}
+                className={`rounded-[var(--dash-radius-sm)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all active:scale-[0.97] disabled:opacity-50 ${
+                  replyCopied
+                    ? "bg-[#059669]"
+                    : "bg-[var(--dash-primary)] hover:brightness-95"
+                }`}
+              >
+                {replyCopied ? "Copied! Paste on Google" : "Copy Reply"}
+              </button>
+            </div>
+
+            {!replyCopied && !replyLoading && (
+              <p className="mt-3 text-center text-[11px] text-[var(--dash-muted)]">
+                Paste this reply on your Google Business page
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

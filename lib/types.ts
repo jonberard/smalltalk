@@ -17,6 +17,8 @@ export type Business = {
   trial_ends_at: string | null;
   api_key: string | null;
   connected_crms: Record<string, unknown>;
+  reply_voice_id: string;
+  custom_reply_voice: string | null;
   created_at: string;
 };
 
@@ -35,6 +37,8 @@ export type BusinessInsert = {
   trial_ends_at?: string | null;
   api_key?: string | null;
   connected_crms?: Record<string, unknown>;
+  reply_voice_id?: string;
+  custom_reply_voice?: string | null;
   created_at?: string;
 };
 
@@ -163,6 +167,8 @@ export type ReviewSession = {
   generated_review: string | null;
   status: ReviewSessionStatus;
   feedback_type: FeedbackType;
+  reply_text: string | null;
+  replied_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -176,6 +182,8 @@ export type ReviewSessionInsert = {
   generated_review?: string | null;
   status?: ReviewSessionStatus;
   feedback_type?: FeedbackType;
+  reply_text?: string | null;
+  replied_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };

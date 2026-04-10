@@ -165,6 +165,199 @@ function HeroPhone() {
 }
 
 /* ═══════════════════════════════════════════════════
+   REPLY DEMO — auto-toggling review/reply animation
+   ═══════════════════════════════════════════════════ */
+
+const REPLY_EXAMPLES = [
+  {
+    stars: 5,
+    author: "Sarah M.",
+    initial: "S",
+    review: "Crystal Clear Pools was fantastic. Marcus showed up right on time and the pool looks crystal clear. Highly recommend.",
+    reply: "Thanks so much \u2014 Marcus will love hearing this. Showing up on time and getting the water right is what we\u2019re all about. See you next month!",
+  },
+  {
+    stars: 2,
+    author: "Jason R.",
+    initial: "J",
+    review: "Waited over an hour past the scheduled window. Nobody called to let me know they\u2019d be late.",
+    reply: "I\u2019m really sorry about the wait \u2014 that\u2019s not how we do things. I\u2019d like to make this right. Give me a call directly at (512) 555-0100 and I\u2019ll personally handle your next visit.",
+  },
+];
+
+function ReviewCard({ stars, author, initial, text, muted: isMuted }: {
+  stars: number;
+  author: string;
+  initial: string;
+  text: string;
+  muted?: boolean;
+}) {
+  return (
+    <div className={`flex items-start gap-3 ${isMuted ? "opacity-60" : ""}`}>
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8EAED]">
+        <span className="text-[13px] font-bold text-[#5F6368]">{initial}</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-semibold text-text">{author}</p>
+        <div className="mt-0.5 flex gap-0.5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <svg key={i} width="14" height="14" viewBox="0 0 24 24" fill={i <= stars ? "#FBBC04" : "#D1D5DB"} stroke="none">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+          ))}
+        </div>
+        <p className="mt-1 text-[11px] text-muted">2 weeks ago</p>
+        <p className="mt-3 text-[15px] leading-relaxed text-text">{text}</p>
+      </div>
+    </div>
+  );
+}
+
+function ReplyDemo() {
+  const [exampleIdx, setExampleIdx] = useState(0);
+  const [phase, setPhase] = useState<"empty" | "typing" | "done">("empty");
+  const [visibleWords, setVisibleWords] = useState(0);
+  const [fading, setFading] = useState(false);
+
+  const example = REPLY_EXAMPLES[exampleIdx];
+  const replyWords = example.reply.split(" ");
+
+  // Phase machine: empty(2s) → typing(~2s) → done(4s) → fade → next example
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+
+    if (phase === "empty") {
+      setVisibleWords(0);
+      timer = setTimeout(() => setPhase("typing"), 2000);
+    } else if (phase === "typing") {
+      // Already handled by word-by-word effect below
+    } else if (phase === "done") {
+      timer = setTimeout(() => {
+        setFading(true);
+        setTimeout(() => {
+          setExampleIdx((prev) => (prev + 1) % REPLY_EXAMPLES.length);
+          setPhase("empty");
+          setFading(false);
+        }, 400);
+      }, 4000);
+    }
+
+    return () => clearTimeout(timer);
+  }, [phase]);
+
+  // Word-by-word typing
+  useEffect(() => {
+    if (phase !== "typing") return;
+
+    if (visibleWords >= replyWords.length) {
+      setPhase("done");
+      return;
+    }
+
+    const delay = 60 + Math.random() * 40;
+    const timer = setTimeout(() => setVisibleWords((v) => v + 1), delay);
+    return () => clearTimeout(timer);
+  }, [phase, visibleWords, replyWords.length]);
+
+  const showReply = phase === "typing" || phase === "done";
+  const typedText = replyWords.slice(0, visibleWords).join(" ");
+
+  return (
+    <div className={`transition-opacity duration-300 ${fading ? "opacity-0" : "opacity-100"}`}>
+      <div className="grid gap-8 md:grid-cols-2">
+        {/* LEFT — The problem */}
+        <div>
+          <p className="mb-5 text-[12px] font-semibold uppercase tracking-[0.15em] text-muted">The review</p>
+          <div className={`rounded-card ${BORDER} bg-surface p-8`}>
+            <ReviewCard
+              stars={example.stars}
+              author={example.author}
+              initial={example.initial}
+              text={example.review}
+            />
+
+            {/* Reply box — empty state */}
+            <div className="mt-6 border-t border-accent pt-5">
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15">
+                  <span className="text-[10px] font-bold text-primary">CCP</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="mb-2 text-[12px] font-semibold text-text">Crystal Clear Pools</p>
+                  <div className="relative rounded-[8px] border border-[#D1C4B0] bg-[#F9F6F0] p-3" style={{ minHeight: 80 }}>
+                    {!showReply && (
+                      <>
+                        <div className="h-5 w-[2px] animate-[blink_1s_step-end_infinite] bg-primary" />
+                        <span className="pointer-events-none absolute left-4 top-3 text-[13px] text-muted/40">
+                          Write a reply...
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {!showReply && (
+                    <p className="mt-2 text-[12px] italic text-muted/50">You&rsquo;ve been staring at this for 4 minutes.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT — The fix */}
+        <div>
+          <p className="mb-5 text-[12px] font-semibold uppercase tracking-[0.15em] text-primary">With small Talk</p>
+          <div className="rounded-card border-2 border-primary bg-surface p-8">
+            <ReviewCard
+              stars={example.stars}
+              author={example.author}
+              initial={example.initial}
+              text={example.review}
+            />
+
+            {/* Reply box — AI-filled */}
+            <div className="mt-6 border-t border-accent pt-5">
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15">
+                  <span className="text-[10px] font-bold text-primary">CCP</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="mb-2 text-[12px] font-semibold text-text">Crystal Clear Pools</p>
+                  <div className="rounded-[8px] border border-primary/30 bg-white p-3" style={{ minHeight: 80 }}>
+                    {showReply ? (
+                      <p className="text-[13px] leading-relaxed text-text">
+                        {typedText}
+                        {phase === "typing" && (
+                          <span className="ml-0.5 inline-block h-4 w-[2px] animate-[blink_1s_step-end_infinite] bg-primary align-text-bottom" />
+                        )}
+                      </p>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <svg className="animate-spin text-primary" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                        <span className="text-[12px] font-medium text-primary">Drafting reply...</span>
+                      </div>
+                    )}
+                  </div>
+                  {phase === "done" && (
+                    <button
+                      type="button"
+                      className="mt-3 rounded-pill bg-primary px-5 py-2 text-[12px] font-semibold text-white transition-all duration-300 hover:opacity-90 active:scale-[0.97]"
+                    >
+                      Copy Reply
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
    PAGE
    ═══════════════════════════════════════════════════ */
 
@@ -271,12 +464,12 @@ export default function LandingPage() {
       <section data-fade className="mx-auto max-w-[800px] px-6 pb-[160px]">
         <div className="text-center">
           <Heading>
-            You ask for a review. They see a{" "}
-            <span className="italic text-muted/60">blank box</span>.
-            {" "}They close the tab.
+            You know the drill. Great job. Happy customer.{" "}
+            <span className="italic text-muted/60">&ldquo;I&rsquo;ll definitely leave you a review!&rdquo;</span>{" "}
+            ...Nothing.
           </Heading>
-          <p className="mx-auto mt-8 max-w-[540px] font-heading text-[19px] text-muted sm:text-[22px]">
-            50% of Google reviews have no text.
+          <p className="mx-auto mt-8 max-w-[580px] text-[17px] leading-[1.7] text-muted">
+            The blank box wins 95% of the time.
           </p>
 
           {/* Blank review box with blinking cursor */}
@@ -321,7 +514,7 @@ export default function LandingPage() {
               1. Text the link.
             </h3>
             <p className="mb-8 mt-2 text-center text-[15px] leading-relaxed text-muted">
-              One tap sends a personalized review request right after the job.
+              You finish the job. You tap send. That&rsquo;s your part done.
             </p>
             <div className="relative mx-auto h-[480px] w-[232px] rounded-[40px] border border-[#D5D5D5] bg-[#F0F0F0] p-[3px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] sm:w-[250px]">
               <div className="absolute inset-x-0 top-[4px] z-20 flex justify-center">
@@ -368,7 +561,7 @@ export default function LandingPage() {
               2. They tap, no typing.
             </h3>
             <p className="mb-8 mt-2 text-center text-[15px] leading-relaxed text-muted">
-              Your customer picks what stood out in a few quick taps. No blank page, no writer&rsquo;s block.
+              Your customer picks what stood out in a few quick taps. No blank page, no writer&rsquo;s block. No more hoping they&rsquo;ll get around to it.
             </p>
             <div className="relative mx-auto h-[480px] w-[232px] rounded-[40px] border border-[#D5D5D5] bg-[#F0F0F0] p-[3px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] sm:w-[250px]">
               <div className="absolute inset-x-0 top-[4px] z-20 flex justify-center">
@@ -420,7 +613,7 @@ export default function LandingPage() {
               3. AI drafts, they post.
             </h3>
             <p className="mb-8 mt-2 text-center text-[15px] leading-relaxed text-muted">
-              A detailed, genuine review — ready to copy and post to Google in seconds.
+              AI turns their taps into a review that sounds like they spent ten minutes writing it. They approve it and post to Google.
             </p>
             <div className="relative mx-auto h-[480px] w-[232px] rounded-[40px] border border-[#D5D5D5] bg-[#F0F0F0] p-[3px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] sm:w-[250px]">
               <div className="absolute inset-x-0 top-[4px] z-20 flex justify-center">
@@ -550,7 +743,7 @@ export default function LandingPage() {
             What happens when it&rsquo;s not 5 stars?
           </Heading>
           <p className="mx-auto mt-6 max-w-[580px] text-[17px] leading-[1.7] text-muted">
-            small Talk captures honest reviews, not just positive ones. For 1&ndash;2 star ratings, your customer gets a genuine choice:
+            For 1&ndash;2 star ratings, your customer gets a genuine choice:
           </p>
         </div>
 
@@ -564,7 +757,7 @@ export default function LandingPage() {
             </div>
             <h3 className="font-heading text-[18px] font-semibold text-text">Share publicly</h3>
             <p className="mt-2 text-[15px] leading-[1.7] text-muted">
-              The flow continues normally — topics, follow-ups, AI draft. The review is honest and critical, exactly like the customer experienced it.
+              The review goes through just like any other — honest and real. You get an alert so you can respond fast.
             </p>
           </div>
 
@@ -577,13 +770,13 @@ export default function LandingPage() {
             </div>
             <h3 className="font-heading text-[18px] font-semibold text-text">Send private feedback</h3>
             <p className="mt-2 text-[15px] leading-[1.7] text-muted">
-              Goes directly to you. No public post. Many unhappy customers would rather tell you first — now they can. You get a chance to make it right.
+              Goes straight to your inbox. Nothing goes public. You get a chance to make it right before it hits Google.
             </p>
           </div>
         </div>
 
         <p className="mt-10 text-center text-[15px] leading-[1.7] text-muted">
-          Both options are equally prominent. This isn&rsquo;t review gating — it&rsquo;s giving your customer a choice they&rsquo;ve never had.
+          Both options get equal weight. No sneaky filtering. Just a real choice your customers have never had — and peace of mind you&rsquo;ve never had.
         </p>
       </section>
 
@@ -602,14 +795,40 @@ export default function LandingPage() {
       </section>
 
       {/* ════════════════════════════════════════════
-         SECTION 8: PRICING
+         SECTION 8: AI REPLY ASSISTANT
+         ════════════════════════════════════════════ */}
+      <section data-fade className="mx-auto max-w-[1080px] px-6 pb-[160px]">
+        <div className="mb-16 text-center">
+          <Heading>They left a review. Now what?</Heading>
+          <p className="mx-auto mt-6 max-w-[620px] text-[17px] leading-[1.7] text-muted">
+            Most business owners see a 5-star review and think &ldquo;nice.&rdquo; Then they see a 1-star review and panic. Either way, they don&rsquo;t reply &mdash; because what do you even say?
+          </p>
+        </div>
+
+        <ReplyDemo />
+
+        <div className="mt-16 text-center">
+          <p className="mx-auto max-w-[620px] text-[17px] leading-[1.7] text-muted">
+            Small Talk drafts the reply. You tweak it if you want. Copy, paste, done. Every review gets a response &mdash; and you never have to wonder what to say again.
+          </p>
+          <p className="mx-auto mt-6 max-w-[580px] text-[15px] leading-[1.7] text-muted/80">
+            Works for five-star praise. Works for one-star disasters. Works for the guy who just wrote &ldquo;Good.&rdquo; and nothing else.
+          </p>
+          <p className="mt-10 font-heading text-[17px] font-semibold text-text">
+            Every plan includes unlimited AI replies.
+          </p>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════
+         SECTION 9: PRICING
          ════════════════════════════════════════════ */}
       <section data-fade className="mx-auto max-w-[960px] px-6 pb-[160px]">
         <div className="mb-20 text-center">
           <SectionLabel>Pricing</SectionLabel>
           <Heading>Simple, honest pricing</Heading>
           <p className="mx-auto mt-4 max-w-[480px] text-[17px] leading-[1.6] text-muted">
-            One plan. Everything included. No hidden fees, cancel anytime.
+            One plan. Everything you need. Cancel whenever.
           </p>
         </div>
 
@@ -631,6 +850,7 @@ export default function LandingPage() {
               {[
                 "Unlimited review requests",
                 "AI-powered review generation with 15 writing styles",
+                "Unlimited AI reply drafting for every review",
                 "SEO-optimized reviews (business name, service, city keywords)",
                 "Honest negative review handling with private feedback option",
                 "Real-time alerts when negative reviews are posted",
@@ -672,23 +892,23 @@ export default function LandingPage() {
           {[
             {
               q: "Is this allowed by Google?",
-              a: "Yes. small Talk does not post reviews automatically or gate bad reviews. We provide a drafted text based on the customer\u2019s selections to make writing easier. The customer posts it from their own Google account.",
+              a: "Yes. Every review comes from a real customer with a real experience. The AI helps them put it into words \u2014 they review, edit, and post it themselves from their own Google account.",
             },
             {
               q: "Are the reviews authentic?",
-              a: "Absolutely. The AI only drafts content based on specific tags and details the customer selects. It expands their genuine sentiment into full sentences, ensuring the review accurately reflects their actual experience.",
+              a: "Completely. The AI only works with what your customer actually selected. It doesn\u2019t invent details or exaggerate. It just helps them say what they\u2019re already thinking.",
             },
             {
               q: "How does the customer post it?",
-              a: "After the AI generates the draft, the customer taps one button that copies the text and opens your Google Business review link. They paste the text and hit submit. Start to finish, about 30 seconds.",
+              a: "One tap copies the review and opens your Google page. They paste, tap their stars, and hit post. Thirty seconds, done.",
             },
             {
-              q: "Can I customize the topics my customers see?",
-              a: "Yes. You can add, remove, or reword any topic from your Settings screen. Choose the categories that matter most for your trade so every review highlights what sets you apart.",
+              q: "Can I customize the topics?",
+              a: "Yes. You pick the topics that matter for your trade \u2014 so every review highlights what sets you apart.",
             },
             {
               q: "Do I need a credit card to start?",
-              a: "No. You can sign up and test the entire flow for free. We only ask for payment when you\u2019re ready to send links to real customers.",
+              a: "No. Try the whole thing free. We only ask for payment when you\u2019re ready to send links to real customers.",
             },
           ].map((item, i) => (
             <details
@@ -730,7 +950,7 @@ export default function LandingPage() {
             Get your first review in 5 minutes
           </h2>
           <p className="mx-auto mt-6 max-w-[520px] text-[17px] leading-[1.6] text-muted">
-            Set up your account, send one link, and see the difference a guided review makes.
+            Sign up, send one link, and see what your customers actually want to say about you.
           </p>
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link

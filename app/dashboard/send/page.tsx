@@ -59,7 +59,8 @@ async function sendSms(
   businessName: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch("/api/send-sms", {
+    const { fetchWithAuth } = await import("@/lib/supabase");
+    const res = await fetchWithAuth("/api/send-sms", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
