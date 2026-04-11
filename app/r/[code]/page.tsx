@@ -39,7 +39,6 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import GoogleReviewMockup from "@/components/google-review-mockup";
 
 /* ═══════════════════════════════════════════════════
    DATA TYPES
@@ -1231,12 +1230,48 @@ function ReviewScreen({
    SCREEN: INTERSTITIAL HANDOFF
    ═══════════════════════════════════════════════════ */
 
+/* Animation phases for the interstitial Google card */
+type InterstitialPhase =
+  | "empty"        // blank card, grey stars, placeholder text
+  | "cursor-text"  // cursor slides to text box
+  | "paste"        // paste tooltip appears
+  | "paste-tap"    // cursor clicks paste, tooltip highlighted
+  | "text-fill"    // review text fades in
+  | "cursor-stars" // cursor slides to stars
+  | "stars-fill"   // stars cascade gold
+  | "cursor-post"  // cursor slides to Post button
+  | "post-tap"     // Post lights up blue, cursor gone
+  | "check"        // checkmark overlay
+  | "fade-out";    // card fades, then resets
+
+const PHASE_DURATIONS: Record<InterstitialPhase, number> = {
+  empty: 800,
+  "cursor-text": 600,
+  paste: 1000,
+  "paste-tap": 300,
+  "text-fill": 1000,
+  "cursor-stars": 600,
+  "stars-fill": 1000,
+  "cursor-post": 600,
+  "post-tap": 500,
+  check: 1500,
+  "fade-out": 1000,
+};
+
+const PHASE_ORDER: InterstitialPhase[] = [
+  "empty", "cursor-text", "paste", "paste-tap", "text-fill",
+  "cursor-stars", "stars-fill",
+  "cursor-post", "post-tap", "check", "fade-out",
+];
+
 function InterstitialScreen({
   reviewText,
+  rating,
   data,
   onContinue,
 }: {
   reviewText: string;
+  rating: number;
   data: ReviewData;
   onContinue: () => void;
 }) {
@@ -1244,6 +1279,38 @@ function InterstitialScreen({
     if (typeof window === "undefined") return false;
     return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   }, []);
+
+  const [phase, setPhase] = useState<InterstitialPhase>("empty");
+  const [filledStars, setFilledStars] = useState(0);
+
+  // Animation always shows a 5-star positive review
+  const animStars = 5;
+  const animText = "Marcus was fantastic. He showed up right on time for our weekly pool cleaning and the pool looks crystal clear...";
+
+  // Phase machine — advance through phases on a timer loop
+  useEffect(() => {
+    const idx = PHASE_ORDER.indexOf(phase);
+    const duration = PHASE_DURATIONS[phase];
+
+    // Stars cascade during stars-fill phase
+    if (phase === "stars-fill" && filledStars < animStars) {
+      const starTimer = setTimeout(() => {
+        setFilledStars((s) => s + 1);
+      }, 150);
+      return () => clearTimeout(starTimer);
+    }
+
+    const timer = setTimeout(() => {
+      if (phase === "fade-out") {
+        // Reset everything for next loop
+        setFilledStars(0);
+        setPhase("empty");
+      } else {
+        setPhase(PHASE_ORDER[idx + 1]);
+      }
+    }, duration);
+    return () => clearTimeout(timer);
+  }, [phase, filledStars, animStars]);
 
   function handleOpenGoogle() {
     let url: string;
@@ -1261,46 +1328,168 @@ function InterstitialScreen({
     onContinue();
   }
 
+  // truncated is kept for any non-animation uses; animation uses animText
+  const truncated = reviewText.length > 80
+    ? reviewText.slice(0, 77) + "..."
+    : reviewText;
+
+  // Derived animation state from phase
+  const phaseIdx = PHASE_ORDER.indexOf(phase);
+  const showCursor = phase === "cursor-text" || phase === "paste" || phase === "paste-tap" || phase === "cursor-stars" || phase === "cursor-post";
+  const showPaste = phase === "paste" || phase === "paste-tap";
+  const pasteTapped = phase === "paste-tap";
+  const showText = phaseIdx >= PHASE_ORDER.indexOf("text-fill") && phase !== "fade-out";
+  const showStars = phaseIdx >= PHASE_ORDER.indexOf("stars-fill") && phase !== "fade-out";
+  const photoPulse = phase !== "empty" && phase !== "cursor-text" && phase !== "fade-out";
+  const postActive = phaseIdx >= PHASE_ORDER.indexOf("cursor-post") && phase !== "fade-out";
+  const showCheck = phase === "check";
+  const cardFaded = phase === "fade-out";
+
+  // Cursor position per phase
+  let cursorX = "50%";
+  let cursorY = "50%";
+  if (phase === "cursor-text" || phase === "paste") { cursorX = "25%"; cursorY = "60%"; }
+  if (phase === "paste-tap") { cursorX = "25%"; cursorY = "60%"; }
+  if (phase === "cursor-stars") { cursorX = "42%"; cursorY = "26%"; }
+  if (phase === "cursor-post") { cursorX = "88%"; cursorY = "10%"; }
+
   return (
-    <div className="animate-fade-in flex flex-col items-center text-center pb-28">
-      <h2 className="font-heading text-[26px] font-bold leading-tight text-text sm:text-[30px]">
-        You&rsquo;re almost there.
+    <div className="animate-fade-in mx-auto flex max-w-[360px] flex-col items-center text-center">
+      <style>{`
+        @keyframes photos-breathe {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.06); }
+        }
+      `}</style>
+      {/* Heading */}
+      <h2 className="font-heading text-[24px] font-bold text-text">
+        Your review is copied.
       </h2>
-      <p className="mt-2 text-[14px] text-muted">
-        We copied your review — here&rsquo;s how to finish posting it on Google.
-      </p>
-      <p className="mt-3 text-[13px] text-[#92700C]">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="#D4960A" className="mr-1 inline-block align-[-2px]">
-          <path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l7.1-1.01L12 2z" />
-        </svg>
-        Tap your stars on Google first — then paste &amp; post
-      </p>
 
-      <div className="mt-6 w-full overflow-hidden rounded-card bg-white shadow-card">
-        <GoogleReviewMockup
-          businessName={data.businessName}
-          reviewText={reviewText}
-        />
-      </div>
+      {/* Animated dark-mode Google review card */}
+      <div
+        className="relative mt-6 w-full overflow-hidden rounded-[16px] p-5"
+        style={{
+          backgroundColor: "#2D2D2D",
+          fontFamily: '"Google Sans", "Roboto", -apple-system, sans-serif',
+          opacity: cardFaded ? 0 : 1,
+          transition: "opacity 0.5s",
+        }}
+      >
+        {/* Header row: business name + Post button */}
+        <div className="flex items-center justify-between">
+          <p className="text-[15px] font-medium text-[#E8EAED]">{data.businessName}</p>
+          <span
+            className="rounded-full px-4 py-1.5 text-[13px] font-medium transition-all duration-300"
+            style={{
+              backgroundColor: postActive ? "#8AB4F8" : "#303134",
+              color: postActive ? "#202124" : "#8E8E8E",
+            }}
+          >
+            Post
+          </span>
+        </div>
 
-      {/* Sticky bottom button */}
-      <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center">
-        <div className="w-full max-w-[480px]">
-          <div className="pointer-events-none h-8 bg-gradient-to-t from-white to-transparent sm:from-surface" />
-          <div className="bg-white px-6 pb-8 pt-1 text-center sm:bg-surface">
-            <p className="mb-3 text-[13px] text-muted">
-              Signed into Google? You&rsquo;re good to go.
-            </p>
-            <button
-              type="button"
-              onClick={handleOpenGoogle}
-              className="pointer-events-auto w-full rounded-pill bg-primary py-3.5 text-[15px] font-bold text-white shadow-[0_4px_16px_rgba(224,90,61,0.3)] transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            >
-              Take me to Google →
-            </button>
+        {/* Stars row */}
+        <div className="mt-3 flex gap-1.5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <svg key={i} width="28" height="28" viewBox="0 0 24 24">
+              <path
+                d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l7.1-1.01L12 2z"
+                fill={showStars && i <= filledStars ? "#FBBC04" : "#5F6368"}
+                stroke="none"
+                style={{ transition: `fill 0.15s ${i * 0.08}s` }}
+              />
+            </svg>
+          ))}
+        </div>
+
+        {/* Text area */}
+        <div className="relative mt-4 rounded-[8px] border border-[#5F6368] px-3 py-3" style={{ minHeight: 60 }}>
+          {/* Paste tooltip — inside the text box */}
+          <div
+            className="pointer-events-none absolute left-3 top-2.5 z-10 rounded-md px-3 py-1 text-[11px] font-medium transition-all duration-150"
+            style={{
+              opacity: showPaste ? 1 : 0,
+              backgroundColor: pasteTapped ? "#8AB4F8" : "#E8EAED",
+              color: "#202124",
+              transform: pasteTapped ? "scale(0.95)" : "scale(1)",
+            }}
+          >
+            Paste
+          </div>
+
+          {/* Placeholder text */}
+          <p
+            className="text-[13px] text-[#9AA0A6] transition-opacity duration-300"
+            style={{ opacity: showText ? 0 : 1, position: showText ? "absolute" : "relative" }}
+          >
+            Share details of your own experience at this place
+          </p>
+
+          {/* Filled review text */}
+          <p
+            className="text-[13px] leading-relaxed text-[#E8EAED] transition-opacity duration-400"
+            style={{ opacity: showText ? 1 : 0 }}
+          >
+            {animText}
+          </p>
+        </div>
+
+        {/* Add photos — pulses throughout animation */}
+        <div
+          className="mt-3 flex items-center gap-2 text-[#8AB4F8]"
+          style={{
+            animation: photoPulse ? "photos-breathe 1.5s ease-in-out infinite" : "none",
+            transform: "scale(1)",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <path d="m21 15-5-5L5 21" />
+          </svg>
+          <span className="text-[12px]">Add photos</span>
+        </div>
+
+        {/* Animated cursor */}
+        <div
+          className="pointer-events-none absolute h-5 w-5"
+          style={{
+            left: cursorX,
+            top: cursorY,
+            opacity: showCursor ? 1 : 0,
+            transition: "left 0.5s ease-out, top 0.5s ease-out, opacity 0.2s",
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#FFFFFF" stroke="none">
+            <path d="M4 1l16 11.5-6.5 1.5 4 8-3 1.5-4-8L4 20V1z" />
+          </svg>
+        </div>
+
+        {/* Checkmark overlay */}
+        <div
+          className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[16px] bg-[#2D2D2D]/90 transition-opacity duration-300"
+          style={{ opacity: showCheck ? 1 : 0 }}
+        >
+          <div className="flex flex-col items-center gap-2">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#81C995" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+            <span className="text-[14px] font-medium text-[#81C995]">Posted!</span>
           </div>
         </div>
       </div>
+
+      {/* Open Google button */}
+      <button
+        type="button"
+        onClick={handleOpenGoogle}
+        className="mt-8 rounded-full bg-primary px-10 py-3 text-[15px] font-bold text-white shadow-[0_4px_16px_rgba(224,90,61,0.25)] transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      >
+        Open Google →
+      </button>
     </div>
   );
 }
@@ -1978,6 +2167,7 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
           {step === "interstitial" && (
             <InterstitialScreen
               reviewText={finalReview}
+              rating={rating}
               data={data}
               onContinue={() => setStep("success")}
             />
