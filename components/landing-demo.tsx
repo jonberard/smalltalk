@@ -444,7 +444,7 @@ function DashboardPreview() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h3 className="text-[20px] font-semibold text-[#1A2E25]">Crystal Clear Pools</h3>
-          <p className="mt-0.5 text-[13px] text-[#8A9B93]">Dashboard &middot; This month</p>
+          <p className="mt-0.5 text-[13px] text-[#5E7268]">Dashboard &middot; This month</p>
         </div>
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E05A3D]">
           <span className="text-[12px] font-bold text-white">CCP</span>
@@ -465,7 +465,7 @@ function DashboardPreview() {
               </svg>
             </div>
             <p className="text-[24px] font-bold leading-none text-[#1A2E25] sm:text-[28px]">{s.value}</p>
-            <p className="mt-1 text-[12px] text-[#8A9B93]">{s.label}</p>
+            <p className="mt-1 text-[12px] text-[#5E7268]">{s.label}</p>
           </div>
         ))}
       </div>
@@ -481,7 +481,7 @@ function DashboardPreview() {
                 className={`rounded-full px-3 py-1 text-[11px] font-medium ${
                   i === 1
                     ? "bg-[#E05A3D] text-white"
-                    : "text-[#8A9B93]"
+                    : "text-[#5E7268]"
                 }`}
               >
                 {label}
@@ -496,7 +496,7 @@ function DashboardPreview() {
             const dropoff = prevValue ? prevValue - stage.value : null;
             return (
               <div key={stage.label} className="flex items-center gap-3">
-                <span className="w-[60px] text-right text-[12px] font-medium text-[#8A9B93]">{stage.label}</span>
+                <span className="w-[60px] text-right text-[12px] font-medium text-[#5E7268]">{stage.label}</span>
                 <div className="h-[20px] flex-1 overflow-hidden rounded-full bg-[#F3F4F6]">
                   <div
                     className="flex h-full items-center justify-end rounded-full px-2.5 transition-all"
@@ -528,13 +528,13 @@ function DashboardPreview() {
         <div className="space-y-3">
           {ACTIVITIES.map((a, i) => (
             <div key={i} className="flex items-center gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[10px] font-bold text-[#8A9B93]">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[10px] font-bold text-[#5E7268]">
                 {a.name.split(" ").map((w) => w[0]).join("")}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] text-[#1A2E25]">
                   <span className="font-semibold">{a.name}</span>{" "}
-                  <span className="text-[#8A9B93]">{a.action}</span>
+                  <span className="text-[#5E7268]">{a.action}</span>
                 </p>
               </div>
               {a.stars ? (
@@ -547,12 +547,12 @@ function DashboardPreview() {
                 <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                   a.status === "in_progress"
                     ? "bg-[#FFF7ED] text-[#EA580C]"
-                    : "bg-[#F3F4F6] text-[#8A9B93]"
+                    : "bg-[#F3F4F6] text-[#5E7268]"
                 }`}>
                   {a.status === "in_progress" ? "In Progress" : "Opened"}
                 </span>
               )}
-              <span className="shrink-0 text-[11px] text-[#8A9B93]">{a.time}</span>
+              <span className="shrink-0 text-[11px] text-[#5E7268]">{a.time}</span>
             </div>
           ))}
         </div>

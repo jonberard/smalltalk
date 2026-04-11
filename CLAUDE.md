@@ -39,7 +39,7 @@ primary:    #E05A3D  /* Burnt orange — CTAs, active states, stars */
 background: #F9F6F0  /* Warm off-white — page background, NEVER grey or pure white */
 surface:    #FFFFFF  /* White cards floating ON the warm background */
 text:       #1A2E25  /* Deep forest green — not black */
-muted:      #8A9B93  /* Sage — secondary text, placeholders */
+muted:      #5E7268  /* Sage — secondary text, placeholders (WCAG AA on #F9F6F0) */
 accent:     #DDE5DF  /* Soft sage — inactive states, outlines */
 ```
 
@@ -156,13 +156,15 @@ const TEST_DATA = {
 ---
 
 ## Dashboard Design Identity (Phase 2)
-Clean, professional, simple. Like checking your bank balance. Inspired by Square Dashboard, Venmo Business.
+Clean, warm, professional. Redesigned to share the coral brand accent with the consumer flow. Inspired by Square Dashboard, Venmo Business.
 
-- Font: Inter for everything
-- Primary: #0070EB (blue)
-- Background: #F8F9FA, Surface: #FFFFFF
+- Font: Inter for body, Fraunces for page titles only
+- Primary: #E05A3D (coral — unified brand accent, same as consumer flow)
+- Background: #FAFAF8 (warm grey), Surface: #FFFFFF
+- Text: #1A1D20, Muted: #6B7280, Border: #E8E5E0
 - Status dots: #00C853 (posted), #FF9800 (drafted), #F44336 (abandoned), #9E9E9E (sent)
-- Border radius: 12px
+- Border radius: 12px (cards), 8px (buttons/inputs)
+- Shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04)
 - Mobile-first, max-width 600px centered
 
 ## Landing Page Design Identity (Phase 3)

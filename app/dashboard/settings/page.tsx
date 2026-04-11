@@ -338,7 +338,7 @@ function ServicesList({ services: initial, businessId }: { services: ServiceRow[
       setServices([...services, data]);
       toast("Service added!", "success");
     }
-    if (error) toast(`Something went wrong: ${error.message}`, "error");
+    if (error) toast("Something went wrong. Please try again.", "error");
     setDraft("");
     setAdding(false);
   }
@@ -586,7 +586,7 @@ function TeamList({ employees: initial, businessId }: { employees: EmployeeRow[]
       setEmployees([...employees, data]);
       toast("Team member added!", "success");
     }
-    if (error) toast(`Something went wrong: ${error.message}`, "error");
+    if (error) toast("Something went wrong. Please try again.", "error");
     setDraftName("");
     setAdding(false);
   }
@@ -870,7 +870,7 @@ function TopicSection({ topics: initial, businessId, isCustomized }: {
       setTopics([...topics, data]);
       toast("Topic added!", "success");
     }
-    if (error) toast(`Something went wrong: ${error.message}`, "error");
+    if (error) toast("Something went wrong. Please try again.", "error");
     setDraftLabel("");
     setDraftQuestion("");
     setDraftOptions("");

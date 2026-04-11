@@ -52,20 +52,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-[#F8F9FA] px-4 font-dashboard">
+    <div className="flex min-h-dvh items-center justify-center bg-background px-4 font-body">
       <div className="w-full max-w-[420px]">
         {/* Brand */}
         <div className="mb-8 text-center">
-          <h1 className="text-[22px] font-bold tracking-tight text-[#18181B]">
-            Sign in to small Talk
-          </h1>
-          <p className="mt-1.5 text-[14px] text-[#71717A]">
+          <h1 className="font-heading text-[28px] font-bold tracking-tight text-text">
             Welcome back.
+          </h1>
+          <p className="mt-1.5 text-[14px] text-muted">
+            Sign in to your small Talk account.
           </p>
         </div>
 
         {/* Card */}
-        <div className="rounded-[12px] border border-[#E4E4E7] bg-white p-8 shadow-sm">
+        <div className="rounded-card border border-accent bg-surface p-8 shadow-card">
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             {error && (
               <div role="alert" className="rounded-[8px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-600">
@@ -80,7 +80,7 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label htmlFor="email" className="mb-1.5 block text-[13px] font-medium text-[#18181B]">
+              <label htmlFor="email" className="mb-1.5 block text-[13px] font-medium text-text">
                 Email
               </label>
               <input
@@ -91,12 +91,12 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
                 autoComplete="email"
-                className="w-full rounded-[8px] border border-[#E4E4E7] bg-white px-3.5 py-2.5 text-[14px] text-[#18181B] placeholder-[#A1A1AA] outline-none transition-colors focus:border-[#0070EB] focus:ring-2 focus:ring-[#0070EB]/20"
+                className="w-full rounded-[8px] border border-accent bg-surface px-3.5 py-2.5 text-[14px] text-text placeholder-muted outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="mb-1.5 block text-[13px] font-medium text-[#18181B]">
+              <label htmlFor="password" className="mb-1.5 block text-[13px] font-medium text-text">
                 Password
               </label>
               <input
@@ -107,13 +107,13 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Your password"
                 autoComplete="current-password"
-                className="w-full rounded-[8px] border border-[#E4E4E7] bg-white px-3.5 py-2.5 text-[14px] text-[#18181B] placeholder-[#A1A1AA] outline-none transition-colors focus:border-[#0070EB] focus:ring-2 focus:ring-[#0070EB]/20"
+                className="w-full rounded-[8px] border border-accent bg-surface px-3.5 py-2.5 text-[14px] text-text placeholder-muted outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
               <button
                 type="button"
                 onClick={handleForgotPassword}
                 disabled={resetLoading}
-                className="mt-2 text-[12px] font-medium text-[#0070EB] hover:underline disabled:opacity-50"
+                className="mt-2 text-[12px] font-medium text-primary hover:underline disabled:opacity-50"
               >
                 {resetLoading ? "Sending..." : "Forgot password?"}
               </button>
@@ -122,7 +122,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-1 w-full rounded-[8px] bg-[#0070EB] py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#005BBF] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-1 w-full rounded-pill bg-primary py-2.5 text-[14px] font-semibold text-white transition-colors hover:brightness-95 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Signing in..." : "Sign in"}
             </button>
@@ -130,9 +130,9 @@ export default function LoginPage() {
         </div>
 
         {/* Footer link */}
-        <p className="mt-6 text-center text-[13px] text-[#71717A]">
+        <p className="mt-6 text-center text-[13px] text-muted">
           Don&rsquo;t have an account?{" "}
-          <Link href="/signup" className="font-medium text-[#0070EB] hover:underline">
+          <Link href="/signup" className="font-medium text-primary hover:underline">
             Create one
           </Link>
         </p>

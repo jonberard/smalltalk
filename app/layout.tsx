@@ -35,13 +35,13 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://usesmalltalk.com",
     siteName: "small Talk",
-    images: [{ url: "/og-image.svg", width: 1200, height: 630, alt: "small Talk — Get more detailed Google reviews" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "small Talk — Get more detailed Google reviews" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "small Talk",
     description: "Collect honest, detailed Google reviews",
-    images: ["/og-image.svg"],
+    images: ["/opengraph-image"],
   },
   other: {
     "theme-color": "#E05A3D",

@@ -43,7 +43,7 @@ function buildEmailHtml({
 
         <!-- Header -->
         <tr><td style="padding:32px 32px 24px;border-bottom:1px solid #EDE8DE;">
-          <p style="margin:0 0 12px;font-size:13px;color:#8A9B93;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Heads Up</p>
+          <p style="margin:0 0 12px;font-size:13px;color:#5E7268;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Heads Up</p>
           <h1 style="margin:0;font-size:20px;color:#1A2E25;font-weight:700;line-height:1.3;">
             ${escapeHtml(customerName)} may have posted a ${starRating}-star review
           </h1>
@@ -65,7 +65,7 @@ function buildEmailHtml({
             <p style="margin:0;font-size:14px;color:#1A2E25;line-height:1.6;white-space:pre-wrap;">${reviewText.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
           </div>
 
-          <p style="margin:0 0 24px;font-size:14px;color:#8A9B93;line-height:1.5;">
+          <p style="margin:0 0 24px;font-size:14px;color:#5E7268;line-height:1.5;">
             You may want to check Google Reviews so you can respond promptly if it appears.
           </p>
 
@@ -88,7 +88,7 @@ function buildEmailHtml({
 
         <!-- Footer -->
         <tr><td style="padding:20px 32px;border-top:1px solid #EDE8DE;">
-          <p style="margin:0;font-size:12px;color:#8A9B93;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#5E7268;text-align:center;">
             Sent by <strong>small Talk</strong> — helping you stay on top of customer feedback.
           </p>
         </td></tr>
