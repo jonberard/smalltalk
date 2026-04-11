@@ -25,13 +25,13 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://usesmalltalk.com"),
-  title: "small Talk — Get More Detailed Google Reviews",
+  title: "Get More Detailed Google Reviews for Your Business | small Talk",
   description:
-    "Collect honest, detailed reviews through a guided conversation. Customers approve before posting.",
+    "Get more detailed Google reviews for your home service business. AI guides customers through a 30-second conversation — they approve and post. Start free, no credit card required.",
   openGraph: {
-    title: "small Talk — Get More Detailed Google Reviews",
+    title: "Get More Detailed Google Reviews for Your Business | small Talk",
     description:
-      "Collect honest, detailed reviews through a guided conversation.",
+      "Get more detailed Google reviews for your home service business. AI guides customers through a 30-second conversation — they approve and post.",
     type: "website",
     url: "https://usesmalltalk.com",
     siteName: "small Talk",
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "small Talk",
-    description: "Collect honest, detailed Google reviews",
+    description: "Get more detailed Google reviews for your home service business. AI-guided, 30 seconds, no blank box.",
     images: ["/opengraph-image"],
   },
   other: {

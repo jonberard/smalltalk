@@ -6,4 +6,5 @@ Disallow: /r/
 Disallow: /login
 Disallow: /signup
 Disallow: /onboarding
+Disallow: /admin
 Sitemap: https://usesmalltalk.com/sitemap.xml
