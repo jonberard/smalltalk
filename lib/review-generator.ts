@@ -111,7 +111,7 @@ RULES — always apply:
 - HIGHEST PRIORITY: If the customer provided specific detail text for any topic, that detail MUST appear in the review nearly verbatim. Specific details like "he wore booties to protect my carpet" or "she texted 10 minutes before arriving" are proof of authenticity — they are more important than any keyword or voice instruction. Build the review around these details.
 - Target 30-80 words. Minimum 15 words (short_direct voice only). Maximum 100 words (thorough voice only). No voice ever exceeds 100 words.
 - ${empRule}
-- Never mention AI, Small Talk, or that this review was generated.
+- Never mention AI, small Talk, or that this review was generated.
 - Never start with "I" — vary your opening.
 - No hashtags, no emojis.
 - No "highly recommend" on anything below 4 stars.

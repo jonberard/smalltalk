@@ -713,7 +713,7 @@ export default function SendPage() {
               ))}
             </div>
           ) : effectiveTier === "expired" ? (
-            <Paywall hadTrial={business?.subscription_status === "trial" || business?.subscription_status === "canceled"} />
+            <Paywall hadTrial={business?.subscription_status === "trialing" || business?.subscription_status === "canceled"} />
           ) : (
             <SingleForm
               services={services}

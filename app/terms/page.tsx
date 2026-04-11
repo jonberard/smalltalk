@@ -19,7 +19,7 @@ export default function TermsPage() {
           Terms of Service
         </h1>
         <p className="mt-8 text-[17px] leading-[1.7] text-muted">
-          Use Small Talk to get honest reviews. Don&rsquo;t do anything shady. Respect Google&rsquo;s review policies. Full terms coming soon.
+          Use small Talk to get honest reviews. Don&rsquo;t do anything shady. Respect Google&rsquo;s review policies. Full terms coming soon.
         </p>
       </main>
     </div>

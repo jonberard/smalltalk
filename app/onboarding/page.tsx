@@ -71,12 +71,16 @@ function ChipInput({
   onRemove,
   placeholder,
   suggestions,
+  inputId,
+  label,
 }: {
   items: string[];
   onAdd: (value: string) => void;
   onRemove: (value: string) => void;
   placeholder: string;
   suggestions?: string[];
+  inputId: string;
+  label: string;
 }) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -95,9 +99,11 @@ function ChipInput({
 
   return (
     <div>
+      <label htmlFor={inputId} className="sr-only">{label}</label>
       <div className="flex gap-2">
         <input
           ref={inputRef}
+          id={inputId}
           type="text"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -338,8 +344,28 @@ function StepServices({
 
   const SUGGESTIONS = ["Maintenance", "Repair", "Installation", "Inspection", "Consultation"];
 
+  // Load existing services on mount (handles page refresh)
+  useEffect(() => {
+    supabase.from("services").select("id, name").eq("business_id", businessId).then(({ data }) => {
+      if (data) setServices(data);
+    });
+  }, [businessId]);
+
   async function handleAdd(name: string) {
     if (services.some((s) => s.name.toLowerCase() === name.toLowerCase())) return;
+    // Check for existing duplicate in DB (in case local state is stale)
+    const { data: existing } = await supabase
+      .from("services")
+      .select("id, name")
+      .eq("business_id", businessId)
+      .ilike("name", name);
+    if (existing && existing.length > 0) {
+      setServices((prev) => {
+        if (prev.some((s) => s.id === existing[0].id)) return prev;
+        return [...prev, existing[0]];
+      });
+      return;
+    }
     const { data, error } = await supabase
       .from("services")
       .insert({ business_id: businessId, name })
@@ -368,6 +394,8 @@ function StepServices({
 
       <div className="mt-8">
         <ChipInput
+          inputId="service-input"
+          label="Add a service"
           items={services.map((s) => s.name)}
           onAdd={handleAdd}
           onRemove={handleRemove}
@@ -412,8 +440,28 @@ function StepTeam({
 }) {
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
 
+  // Load existing employees on mount (handles page refresh)
+  useEffect(() => {
+    supabase.from("employees").select("id, name").eq("business_id", businessId).then(({ data }) => {
+      if (data) setEmployees(data);
+    });
+  }, [businessId]);
+
   async function handleAdd(name: string) {
     if (employees.some((e) => e.name.toLowerCase() === name.toLowerCase())) return;
+    // Check for existing duplicate in DB
+    const { data: existing } = await supabase
+      .from("employees")
+      .select("id, name")
+      .eq("business_id", businessId)
+      .ilike("name", name);
+    if (existing && existing.length > 0) {
+      setEmployees((prev) => {
+        if (prev.some((e) => e.id === existing[0].id)) return prev;
+        return [...prev, existing[0]];
+      });
+      return;
+    }
     const { data, error } = await supabase
       .from("employees")
       .insert({ business_id: businessId, name })
@@ -442,6 +490,8 @@ function StepTeam({
 
       <div className="mt-8">
         <ChipInput
+          inputId="employee-input"
+          label="Add a team member"
           items={employees.map((e) => e.name)}
           onAdd={handleAdd}
           onRemove={handleRemove}
@@ -492,6 +542,13 @@ function StepNeighborhoods({
 }) {
   const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
 
+  // Load existing neighborhoods on mount (handles page refresh)
+  useEffect(() => {
+    supabase.from("businesses").select("neighborhoods").eq("id", businessId).single().then(({ data }) => {
+      if (data?.neighborhoods) setNeighborhoods(data.neighborhoods);
+    });
+  }, [businessId]);
+
   async function persist(updated: string[]) {
     await supabase.from("businesses").update({ neighborhoods: updated }).eq("id", businessId);
   }
@@ -520,6 +577,8 @@ function StepNeighborhoods({
 
       <div className="mt-8">
         <ChipInput
+          inputId="neighborhood-input"
+          label="Add a neighborhood"
           items={neighborhoods}
           onAdd={handleAdd}
           onRemove={handleRemove}

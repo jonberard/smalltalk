@@ -110,7 +110,7 @@ function buildSystemPrompt(input: GenerateReplyInput): string {
   const isStarOnly = !input.reviewText || input.reviewText.trim().length === 0;
 
   const sourceContext = input.reviewSource === "smalltalk"
-    ? `This review came through Small Talk, so you have internal data about what the customer experienced. Use the topics and specific answers to make the reply personal and specific. Reference what they mentioned — e.g., "Marcus will love hearing this" or "I'm sorry the timing didn't meet your expectations."`
+    ? `This review came through small Talk, so you have internal data about what the customer experienced. Use the topics and specific answers to make the reply personal and specific. Reference what they mentioned — e.g., "Marcus will love hearing this" or "I'm sorry the timing didn't meet your expectations."`
     : `This is an organic Google review. You only have the review text to work with. Still be specific — pull details from what they wrote and respond to them directly.`;
 
   return `You are a business owner writing a reply to a customer's Google review. You are replying AS the business, not as a third party.

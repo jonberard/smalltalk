@@ -441,7 +441,7 @@ export default function LandingPage() {
           )}
           <Link
             href={ctaHref}
-            className="rounded-[8px] border border-accent px-6 py-2.5 text-[14px] font-semibold text-text transition-colors duration-300 hover:border-primary hover:text-primary"
+            className="rounded-full border border-accent px-6 py-2.5 text-[14px] font-semibold text-text transition-colors duration-300 hover:border-primary hover:text-primary"
           >
             {loggedIn ? "Dashboard" : "Get Started"}
           </Link>

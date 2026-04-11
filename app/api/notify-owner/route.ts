@@ -89,7 +89,7 @@ function buildEmailHtml({
         <!-- Footer -->
         <tr><td style="padding:20px 32px;border-top:1px solid #EDE8DE;">
           <p style="margin:0;font-size:12px;color:#8A9B93;text-align:center;">
-            Sent by <strong>Small Talk</strong> — helping you stay on top of customer feedback.
+            Sent by <strong>small Talk</strong> — helping you stay on top of customer feedback.
           </p>
         </td></tr>
 
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { data, error } = await resend.emails.send({
-      from: "Small Talk <notifications@usesmalltalk.com>",
+      from: "small Talk <notifications@usesmalltalk.com>",
       to: ownerEmail,
       subject: `${customer_name} may have posted a ${star_rating}-star review`,
       html: buildEmailHtml({

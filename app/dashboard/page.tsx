@@ -679,7 +679,7 @@ export default function Dashboard() {
 
           {/* ─── Left Column: Recent Activity ─── */}
           <div className="sm:col-span-3">
-            <h2 className="mb-3 text-[15px] font-semibold text-[var(--dash-text)]" style={{ fontFamily: "Inter, sans-serif" }}>
+            <h2 className="mb-3 text-[15px] font-semibold text-[var(--dash-text)] font-dashboard">
               Recent Activity
             </h2>
             <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]">
@@ -746,7 +746,7 @@ export default function Dashboard() {
           {/* ─── Right Column: Needs Attention ─── */}
           <div className="sm:col-span-2">
             <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-[15px] font-semibold text-[var(--dash-text)]" style={{ fontFamily: "Inter, sans-serif" }}>
+              <h2 className="text-[15px] font-semibold text-[var(--dash-text)] font-dashboard">
                 Needs Attention
               </h2>
               {attention.length > 0 && (
