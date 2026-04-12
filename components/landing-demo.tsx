@@ -567,7 +567,7 @@ function DashboardPreview() {
 
 function PhoneFrame({ children, bg = "bg-white" }: { children: React.ReactNode; bg?: string }) {
   return (
-    <div className="relative mx-auto h-[600px] w-[290px] rounded-[40px] border border-[#D5D5D5] bg-[#F0F0F0] p-[3px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] sm:h-[660px] sm:w-[320px]">
+    <div className="relative mx-auto h-[600px] w-[290px] rounded-[40px] border border-muted/20 bg-text p-[3px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] sm:h-[660px] sm:w-[320px]">
       <div className="absolute inset-x-0 top-[5px] z-20 flex justify-center">
         <div className="h-[13px] w-[44px] rounded-full bg-black" />
       </div>
