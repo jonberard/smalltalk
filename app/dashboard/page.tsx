@@ -450,7 +450,7 @@ export default function Dashboard() {
     { key: "opened", label: "Opened" },
     { key: "started", label: "Started" },
     { key: "drafted", label: "Drafted" },
-    { key: "posted", label: "Posted" },
+    { key: "posted", label: "Copied" },
   ];
 
   const FILTER_OPTIONS: { key: FunnelFilter; label: string }[] = [
@@ -484,7 +484,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard
               icon={<CalendarIcon />}
-              label="Reviews This Month"
+              label="Copied This Month"
               value={stats.reviewsThisMonth}
             />
             <StatCard
@@ -589,17 +589,24 @@ export default function Dashboard() {
                                 funnelLoading ? "bg-[var(--dash-border)]/30 animate-pulse" : STAGE_FILLS[i]
                               }`}
                             >
-                              <span className={`text-[11px] font-medium uppercase tracking-wide ${funnelLoading ? "text-transparent" : STAGE_LABEL_COLORS[i]}`}>
+                              <span className={`flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide ${funnelLoading ? "text-transparent" : STAGE_LABEL_COLORS[i]}`}>
                                 {stage.label}
+                                {isLast && !funnelLoading && (
+                                  <span className="group relative cursor-help">
+                                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <circle cx="12" cy="12" r="10" />
+                                      <path d="M12 16v-4" />
+                                      <path d="M12 8h.01" />
+                                    </svg>
+                                    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-[200px] -translate-x-1/2 rounded-lg bg-[var(--dash-text)] px-3 py-2 text-[10px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                                      Copied to clipboard and opened Google &mdash; we can&rsquo;t confirm posting yet.
+                                    </span>
+                                  </span>
+                                )}
                               </span>
                               <span className={`mt-1 text-[24px] font-bold leading-none ${funnelLoading ? "text-transparent" : STAGE_TEXT_COLORS[i]}`}>
                                 {funnelLoading ? "0" : value}
                               </span>
-                              {isLast && hasData && (
-                                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-1.5">
-                                  <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                              )}
                             </div>
                           </div>
                         );
@@ -649,11 +656,6 @@ export default function Dashboard() {
                                 <span className={`text-[22px] font-bold leading-none ${funnelLoading ? "text-transparent" : STAGE_TEXT_COLORS[i]}`}>
                                   {funnelLoading ? "0" : value}
                                 </span>
-                                {isLast && hasData && (
-                                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="20 6 9 17 4 12" />
-                                  </svg>
-                                )}
                               </div>
                             </div>
                           </div>

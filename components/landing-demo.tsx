@@ -327,7 +327,7 @@ function DemoFlow() {
                 </span>
                 <div className="relative flex-1">
                   <div className="rounded-full bg-primary py-2.5 text-center text-[11px] font-bold text-white">
-                    Copy &amp; post
+                    Copy &amp; Open Google
                   </div>
                   {currentPhase === "review-tap" && <CursorDot style={{ bottom: "-4px", right: "-4px" }} />}
                 </div>
@@ -340,10 +340,10 @@ function DemoFlow() {
         {currentScreen === "interstitial" && (
           <div className="flex flex-col items-center text-center -mt-2">
             <p className="font-heading text-[18px] font-bold leading-tight text-text">
-              You&rsquo;re almost there.
+              Your review is copied.
             </p>
             <p className="mt-2 text-[11px] text-muted">
-              We copied your review — here&rsquo;s how to post it.
+              Paste it in the Google tab we just opened.
             </p>
 
             <div className="mt-5 flex items-center gap-2 rounded-full bg-[#ECFDF5] px-4 py-2">
@@ -353,8 +353,13 @@ function DemoFlow() {
               <span className="text-[11px] font-medium text-[#059669]">Review copied to clipboard</span>
             </div>
 
-            <div className="mt-5 w-full rounded-full bg-primary py-3 text-center text-[13px] font-bold text-white">
-              Take me to Google &rarr;
+            <div className="mt-5 flex w-full gap-2">
+              <span className="flex-1 rounded-full border border-[#D1C4B0] py-2.5 text-center text-[11px] font-bold text-muted">
+                Copy again
+              </span>
+              <span className="flex-1 rounded-full bg-primary py-2.5 text-center text-[11px] font-bold text-white">
+                Open Google again
+              </span>
             </div>
           </div>
         )}
@@ -426,16 +431,16 @@ function DashboardPreview() {
     { label: "Opened", value: 52, pct: 80 },
     { label: "Started", value: 48, pct: 74 },
     { label: "Drafted", value: 42, pct: 65 },
-    { label: "Posted", value: 38, pct: 58 },
+    { label: "Copied", value: 38, pct: 58 },
   ];
 
   const ACTIVITIES = [
-    { name: "Sarah M.", action: "posted a 5-star review", time: "12m ago", stars: 5, status: "posted" },
-    { name: "James T.", action: "started the review flow", time: "34m ago", stars: null, status: "in_progress" },
-    { name: "Maria L.", action: "posted a 4-star review", time: "1h ago", stars: 4, status: "posted" },
-    { name: "David K.", action: "drafted a review", time: "2h ago", stars: 5, status: "drafted" },
-    { name: "Lisa P.", action: "posted a 5-star review", time: "3h ago", stars: 5, status: "posted" },
-    { name: "Robert C.", action: "opened the link", time: "5h ago", stars: null, status: "created" },
+    { name: "Sarah M.", action: "copied a 5-star review", time: "12m ago", stars: 5, status: "copied", canReply: true, replied: false },
+    { name: "James T.", action: "started the review flow", time: "34m ago", stars: null, status: "in_progress", canReply: false, replied: false },
+    { name: "Maria L.", action: "copied a 4-star review", time: "1h ago", stars: 4, status: "copied", canReply: false, replied: true },
+    { name: "David K.", action: "drafted a review", time: "2h ago", stars: 5, status: "drafted", canReply: false, replied: false },
+    { name: "Lisa P.", action: "copied a 5-star review", time: "3h ago", stars: 5, status: "copied", canReply: true, replied: false },
+    { name: "Robert C.", action: "opened the link", time: "5h ago", stars: null, status: "created", canReply: false, replied: false },
   ];
 
   return (
@@ -537,6 +542,14 @@ function DashboardPreview() {
                   <span className="text-[#5E7268]">{a.action}</span>
                 </p>
               </div>
+              {a.replied && (
+                <span className="shrink-0 text-[10px] font-medium text-[#059669]">Replied &#10003;</span>
+              )}
+              {a.canReply && !a.replied && (
+                <span className="shrink-0 rounded-lg border border-[#E05A3D] px-2.5 py-1 text-[11px] font-semibold text-[#E05A3D]">
+                  Draft Reply
+                </span>
+              )}
               {a.stars ? (
                 <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
                   a.stars >= 4 ? "bg-[#ECFDF5] text-[#059669]" : "bg-[#FFFBEB] text-[#D97706]"

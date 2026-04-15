@@ -1106,7 +1106,7 @@ function ReviewScreen({
     callApi(voiceId || undefined);
   }, [callApi, voiceId]);
 
-  const handleCopy = useCallback(async () => {
+  const handleCopyAndOpen = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(reviewText);
     } catch {
@@ -1118,7 +1118,7 @@ function ReviewScreen({
       document.body.removeChild(ta);
     }
     setCopied(true);
-    setTimeout(() => onPost(reviewText, voiceId || ""), 800);
+    onPost(reviewText, voiceId || "");
   }, [reviewText, voiceId, onPost]);
 
   return (
@@ -1208,7 +1208,7 @@ function ReviewScreen({
             </svg>
             Try another
           </button>
-          <PrimaryButton onClick={handleCopy} disabled={copied}>
+          <PrimaryButton onClick={handleCopyAndOpen} disabled={copied}>
             {copied ? (
               <>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-fade-in">
@@ -1217,7 +1217,7 @@ function ReviewScreen({
                 Copied!
               </>
             ) : (
-              "Copy & post"
+              "Copy & Open Google"
             )}
           </PrimaryButton>
         </ButtonRow>
@@ -1241,7 +1241,6 @@ type InterstitialPhase =
   | "stars-fill"   // stars cascade gold
   | "cursor-post"  // cursor slides to Post button
   | "post-tap"     // Post lights up blue, cursor gone
-  | "check"        // checkmark overlay
   | "fade-out";    // card fades, then resets
 
 const PHASE_DURATIONS: Record<InterstitialPhase, number> = {
@@ -1253,15 +1252,14 @@ const PHASE_DURATIONS: Record<InterstitialPhase, number> = {
   "cursor-stars": 600,
   "stars-fill": 1000,
   "cursor-post": 600,
-  "post-tap": 500,
-  check: 1500,
+  "post-tap": 1200,
   "fade-out": 1000,
 };
 
 const PHASE_ORDER: InterstitialPhase[] = [
   "empty", "cursor-text", "paste", "paste-tap", "text-fill",
   "cursor-stars", "stars-fill",
-  "cursor-post", "post-tap", "check", "fade-out",
+  "cursor-post", "post-tap", "fade-out",
 ];
 
 function InterstitialScreen({
@@ -1282,10 +1280,11 @@ function InterstitialScreen({
 
   const [phase, setPhase] = useState<InterstitialPhase>("empty");
   const [filledStars, setFilledStars] = useState(0);
+  const [justCopied, setJustCopied] = useState(false);
 
-  // Animation always shows a 5-star positive review
-  const animStars = 5;
-  const animText = "Marcus was fantastic. He showed up right on time for our weekly pool cleaning and the pool looks crystal clear...";
+  // Animation uses the customer's actual star rating
+  const animStars = rating;
+  const animText = reviewText.length > 120 ? reviewText.slice(0, 117) + "..." : reviewText;
 
   // Phase machine — advance through phases on a timer loop
   useEffect(() => {
@@ -1328,6 +1327,21 @@ function InterstitialScreen({
     onContinue();
   }
 
+  async function handleCopyAgain() {
+    try {
+      await navigator.clipboard.writeText(reviewText);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = reviewText;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setJustCopied(true);
+    setTimeout(() => setJustCopied(false), 2000);
+  }
+
   // truncated is kept for any non-animation uses; animation uses animText
   const truncated = reviewText.length > 80
     ? reviewText.slice(0, 77) + "..."
@@ -1342,7 +1356,6 @@ function InterstitialScreen({
   const showStars = phaseIdx >= PHASE_ORDER.indexOf("stars-fill") && phase !== "fade-out";
   const photoPulse = phase !== "empty" && phase !== "cursor-text" && phase !== "fade-out";
   const postActive = phaseIdx >= PHASE_ORDER.indexOf("cursor-post") && phase !== "fade-out";
-  const showCheck = phase === "check";
   const cardFaded = phase === "fade-out";
 
   // Cursor position per phase
@@ -1365,6 +1378,9 @@ function InterstitialScreen({
       <h2 className="font-heading text-[24px] font-bold text-text">
         Your review is copied.
       </h2>
+      <p className="mt-2 text-[14px] text-muted">
+        Paste it in the Google tab we just opened.
+      </p>
 
       {/* Animated dark-mode Google review card */}
       <div
@@ -1468,28 +1484,34 @@ function InterstitialScreen({
           </svg>
         </div>
 
-        {/* Checkmark overlay */}
-        <div
-          className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[16px] bg-[#2D2D2D]/90 transition-opacity duration-300"
-          style={{ opacity: showCheck ? 1 : 0 }}
-        >
-          <div className="flex flex-col items-center gap-2">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#81C995" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 6L9 17l-5-5" />
-            </svg>
-            <span className="text-[14px] font-medium text-[#81C995]">Posted!</span>
-          </div>
-        </div>
       </div>
 
-      {/* Open Google button */}
-      <button
-        type="button"
-        onClick={handleOpenGoogle}
-        className="mt-8 rounded-full bg-primary px-10 py-3 text-[15px] font-bold text-white shadow-[0_4px_16px_rgba(224,90,61,0.25)] transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-      >
-        Open Google →
-      </button>
+      {/* Fallback buttons */}
+      <div className="mt-8 flex w-full gap-3">
+        <button
+          type="button"
+          onClick={handleCopyAgain}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-accent px-4 py-3 text-[14px] font-bold text-muted transition-all duration-200 active:scale-[0.98]"
+        >
+          {justCopied ? (
+            <>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Copied!
+            </>
+          ) : (
+            "Copy again"
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={handleOpenGoogle}
+          className="flex-1 rounded-full bg-primary px-4 py-3 text-[14px] font-bold text-white shadow-[0_4px_16px_rgba(224,90,61,0.25)] transition-all duration-200 active:scale-[0.98]"
+        >
+          Open Google again
+        </button>
+      </div>
     </div>
   );
 }
@@ -2019,7 +2041,7 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
     [path, data.sessionId]
   );
 
-  // Review — copy to clipboard, then route to interstitial or success
+  // Review — copy to clipboard, open Google, then route to interstitial fallback
   const handlePost = useCallback(async (text: string, voiceId: string) => {
     setFinalReview(text);
     supabase
@@ -2043,8 +2065,21 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
       }).catch(() => {}); // fire-and-forget — don't block the customer
     }
 
+    // Open Google immediately
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (data.googlePlaceId) {
+      const base = isMobile
+        ? "https://search.google.com/local/writereview/mobile"
+        : "https://search.google.com/local/writereview";
+      window.open(`${base}?placeid=${data.googlePlaceId}`, "_blank");
+    } else if (data.googleReviewUrl) {
+      window.open(data.googleReviewUrl, "_blank");
+    } else {
+      window.open("https://www.google.com/maps", "_blank");
+    }
+
     setStep("interstitial");
-  }, [data.sessionId, data.reviewLinkId, data.customerName, rating, path]);
+  }, [data.sessionId, data.reviewLinkId, data.customerName, data.googlePlaceId, data.googleReviewUrl, rating, path]);
 
   // Private feedback
   const handlePrivateSubmit = useCallback((feedback: string) => {
@@ -2277,17 +2312,33 @@ export default function ReviewFlow() {
         }
       }
 
-      // 4. Create a review_session
-      const { data: session, error: sessionError } = await supabase
+      // 4. Find or create a review_session (prevent duplicates from refreshes)
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: existingSession } = await supabase
         .from("review_sessions")
-        .insert({ review_link_id: link.id })
         .select("id")
+        .eq("review_link_id", link.id)
+        .gte("created_at", twentyFourHoursAgo)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .single();
 
-      if (sessionError || !session) {
-        setNotFound(true);
-        setLoading(false);
-        return;
+      let session: { id: string };
+      if (existingSession) {
+        session = existingSession;
+      } else {
+        const { data: newSession, error: sessionError } = await supabase
+          .from("review_sessions")
+          .insert({ review_link_id: link.id })
+          .select("id")
+          .single();
+
+        if (sessionError || !newSession) {
+          setNotFound(true);
+          setLoading(false);
+          return;
+        }
+        session = newSession;
       }
 
       const reviewData: ReviewData = {

@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { data, error } = await resend.emails.send({
-      from: "small Talk <notifications@usesmalltalk.com>",
+      from: "small Talk <hello@usesmalltalk.com>",
       to: ownerEmail,
       subject: `${customer_name} may have posted a ${star_rating}-star review`,
       html: buildEmailHtml({

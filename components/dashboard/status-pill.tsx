@@ -5,7 +5,7 @@ type StatusPillProps = {
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   posted: { bg: "bg-[#ECFDF5]", text: "text-[#059669]", label: "Posted" },
-  copied: { bg: "bg-[#ECFDF5]", text: "text-[#059669]", label: "Posted" },
+  copied: { bg: "bg-[#FFFBEB]", text: "text-[#D97706]", label: "Copied" },
   active: { bg: "bg-[#ECFDF5]", text: "text-[#059669]", label: "Active" },
   drafted: { bg: "bg-[#FFFBEB]", text: "text-[#D97706]", label: "Drafted" },
   trialing: { bg: "bg-[#FFFBEB]", text: "text-[#D97706]", label: "Trialing" },
