@@ -1017,7 +1017,7 @@ function ReviewScreen({
   topicAnswers: Record<string, TopicAnswer>;
   selectedTopics: TopicDef[];
   optionalDetail: string;
-  onPost: (finalReview: string, voiceId: string) => void;
+  onPost: (finalReview: string, voiceId: string, copyFailed: boolean) => void;
   onBack: () => void;
   data: ReviewData;
 }) {
@@ -1109,19 +1109,44 @@ function ReviewScreen({
     callApi(voiceId || undefined);
   }, [callApi, voiceId]);
 
-  const handleCopyAndOpen = useCallback(async () => {
+  const [copyFailed, setCopyFailed] = useState(false);
+
+  const handleCopyAndOpen = useCallback(() => {
+    // Step 1: Try clipboard API
+    let didCopy = false;
     try {
-      await navigator.clipboard.writeText(reviewText);
-    } catch {
+      // Use the synchronous approach first for speed
       const ta = document.createElement("textarea");
       ta.value = reviewText;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
       document.body.appendChild(ta);
       ta.select();
-      document.execCommand("copy");
+      didCopy = document.execCommand("copy");
       document.body.removeChild(ta);
+    } catch {
+      didCopy = false;
     }
+
+    if (!didCopy) {
+      // Try async clipboard API as second attempt (but can't block on it)
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(reviewText).catch(() => {});
+        // Optimistically assume it worked — we already tried execCommand
+      } else {
+        // Both methods unavailable — show manual copy fallback
+        setCopyFailed(true);
+        onPost(reviewText, voiceId || "", true);
+        return;
+      }
+    }
+
     setCopied(true);
-    onPost(reviewText, voiceId || "");
+    onPost(reviewText, voiceId || "", false);
+  }, [reviewText, voiceId, onPost]);
+
+  const handleManualCopyDone = useCallback(() => {
+    onPost(reviewText, voiceId || "", false);
   }, [reviewText, voiceId, onPost]);
 
   return (
@@ -1195,7 +1220,7 @@ function ReviewScreen({
         )}
       </div>
 
-      {!generating && !error && (
+      {!generating && !error && !copyFailed && (
         <ButtonRow>
           <button
             type="button"
@@ -1224,6 +1249,27 @@ function ReviewScreen({
             )}
           </PrimaryButton>
         </ButtonRow>
+      )}
+
+      {/* Manual copy fallback — shown when clipboard API fails */}
+      {copyFailed && (
+        <div className="mt-6 w-full animate-fade-in">
+          <p className="mb-3 text-center text-[14px] font-medium text-text">
+            Couldn&rsquo;t copy automatically &mdash; select the text below and copy it manually.
+          </p>
+          <textarea
+            readOnly
+            value={reviewText}
+            onFocus={(e) => e.target.select()}
+            className="w-full rounded-[12px] border border-accent bg-background p-4 text-[14px] leading-relaxed text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            rows={6}
+          />
+          <div className="mt-4">
+            <PrimaryButton onClick={handleManualCopyDone}>
+              I&rsquo;ve copied it &mdash; open Google
+            </PrimaryButton>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -2049,18 +2095,37 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
     [path, data.sessionId]
   );
 
-  // Review — copy to clipboard, open Google, then route to interstitial fallback
-  const handlePost = useCallback(async (text: string, voiceId: string) => {
+  // Review — open Google, copy to clipboard, then save to Supabase in background
+  // IMPORTANT: window.open must be synchronous from click — no awaits before it
+  const handlePost = useCallback((text: string, _voiceId: string, copyFailed: boolean) => {
     setFinalReview(text);
-    const { error: saveErr } = await supabase
+
+    // Step 1 (sync): Open Google — must happen before any await to avoid popup blocker
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (data.googlePlaceId) {
+      const base = isMobile
+        ? "https://search.google.com/local/writereview/mobile"
+        : "https://search.google.com/local/writereview";
+      window.open(`${base}?placeid=${data.googlePlaceId}`, "_blank");
+    } else if (data.googleReviewUrl) {
+      window.open(data.googleReviewUrl, "_blank");
+    } else {
+      window.open("https://www.google.com/maps", "_blank");
+    }
+
+    // If copy failed, don't advance — ReviewScreen handles the manual copy fallback
+    if (copyFailed) return;
+
+    setStep("interstitial");
+
+    // Step 3 (async, background): Save to Supabase — fire-and-forget
+    supabase
       .from("review_sessions")
       .update({ generated_review: text, status: "copied", updated_at: new Date().toISOString() })
-      .eq("id", data.sessionId);
-
-    if (saveErr) {
-      setToastMsg("Couldn\u2019t save your progress \u2014 please try again.");
-      return;
-    }
+      .eq("id", data.sessionId)
+      .then(({ error }) => {
+        if (error) console.error("[handlePost] Failed to save copied status:", error.message);
+      });
 
     // Notify business owner for low-rating public reviews
     if (rating <= 2 && path === "public") {
@@ -2074,23 +2139,8 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
           star_rating: rating,
           review_text: text,
         }),
-      }).catch(() => {}); // fire-and-forget — don't block the customer
+      }).catch(() => {});
     }
-
-    // Open Google immediately
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (data.googlePlaceId) {
-      const base = isMobile
-        ? "https://search.google.com/local/writereview/mobile"
-        : "https://search.google.com/local/writereview";
-      window.open(`${base}?placeid=${data.googlePlaceId}`, "_blank");
-    } else if (data.googleReviewUrl) {
-      window.open(data.googleReviewUrl, "_blank");
-    } else {
-      window.open("https://www.google.com/maps", "_blank");
-    }
-
-    setStep("interstitial");
   }, [data.sessionId, data.reviewLinkId, data.customerName, data.googlePlaceId, data.googleReviewUrl, rating, path]);
 
   // Private feedback
@@ -2353,12 +2403,21 @@ export default function ReviewFlow() {
         }
       }
 
-      // 4. Find or create a review_session (prevent duplicates from refreshes)
+      // 4. Find or create a review_session (per-device, prevents overwrites)
+      // Generate a device-specific token so two customers sharing a link get separate sessions
+      const storageKey = `st_session_${code}`;
+      let deviceToken = localStorage.getItem(storageKey);
+      if (!deviceToken) {
+        deviceToken = crypto.randomUUID();
+        localStorage.setItem(storageKey, deviceToken);
+      }
+
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data: existingSession } = await supabase
         .from("review_sessions")
         .select("id")
         .eq("review_link_id", link.id)
+        .eq("device_token", deviceToken)
         .gte("created_at", twentyFourHoursAgo)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -2370,7 +2429,7 @@ export default function ReviewFlow() {
       } else {
         const { data: newSession, error: sessionError } = await supabase
           .from("review_sessions")
-          .insert({ review_link_id: link.id })
+          .insert({ review_link_id: link.id, device_token: deviceToken })
           .select("id")
           .single();
 

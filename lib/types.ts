@@ -167,6 +167,7 @@ export type TopicSelection = {
 export type ReviewSession = {
   id: string;
   review_link_id: string;
+  device_token: string | null;
   star_rating: number | null;
   topics_selected: TopicSelection[] | null;
   optional_text: string | null;
@@ -182,6 +183,7 @@ export type ReviewSession = {
 export type ReviewSessionInsert = {
   id?: string;
   review_link_id: string;
+  device_token?: string | null;
   star_rating?: number | null;
   topics_selected?: TopicSelection[] | null;
   optional_text?: string | null;
