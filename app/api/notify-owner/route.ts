@@ -20,7 +20,7 @@ function starHtml(rating: number): string {
   return `<span style="font-size:24px;color:#E05A3D;letter-spacing:2px;">${filled.repeat(rating)}${empty.repeat(5 - rating)}</span>`;
 }
 
-function buildEmailHtml({
+function buildPublicEmailHtml({
   customerName,
   starRating,
   reviewText,
@@ -100,6 +100,79 @@ function buildEmailHtml({
 </html>`;
 }
 
+function buildPrivateEmailHtml({
+  customerName,
+  starRating,
+  feedbackText,
+  dashboardUrl,
+}: {
+  customerName: string;
+  starRating: number;
+  feedbackText: string;
+  dashboardUrl: string;
+}): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#F9F6F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F9F6F0;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(26,46,37,0.08);">
+
+        <!-- Header -->
+        <tr><td style="padding:32px 32px 24px;border-bottom:1px solid #EDE8DE;">
+          <p style="margin:0 0 12px;font-size:13px;color:#5E7268;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Private Feedback</p>
+          <h1 style="margin:0;font-size:20px;color:#1A2E25;font-weight:700;line-height:1.3;">
+            ${escapeHtml(customerName)} sent you private feedback
+          </h1>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="padding:24px 32px;">
+          <p style="margin:0 0 16px;font-size:15px;color:#1A2E25;line-height:1.5;">
+            ${escapeHtml(customerName)} rated their experience <strong>${starRating} star${starRating !== 1 ? "s" : ""}</strong> and chose to send you feedback directly instead of posting publicly. This is your chance to make it right.
+          </p>
+
+          <!-- Stars -->
+          <div style="margin:0 0 16px;">
+            ${starHtml(starRating)}
+          </div>
+
+          <!-- Feedback text -->
+          <div style="background-color:#F9F6F0;border-radius:12px;padding:20px;margin:0 0 24px;">
+            <p style="margin:0;font-size:14px;color:#1A2E25;line-height:1.6;white-space:pre-wrap;">${feedbackText.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+          </div>
+
+          <p style="margin:0 0 24px;font-size:14px;color:#5E7268;line-height:1.5;">
+            Reaching out quickly can turn this experience around. You can view this feedback and respond from your dashboard.
+          </p>
+
+          <!-- Button -->
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center">
+                <a href="${dashboardUrl}" target="_blank" style="display:inline-block;text-align:center;background-color:#E05A3D;color:#FFFFFF;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:99px;">
+                  View in Dashboard
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="padding:20px 32px;border-top:1px solid #EDE8DE;">
+          <p style="margin:0;font-size:12px;color:#5E7268;text-align:center;">
+            Sent by <strong>small Talk</strong> — helping you stay on top of customer feedback.
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 export async function POST(req: NextRequest) {
   const { RESEND_API_KEY } = process.env;
 
@@ -113,6 +186,7 @@ export async function POST(req: NextRequest) {
     customer_name?: string;
     star_rating?: number;
     review_text?: string;
+    is_private?: boolean;
   };
 
   try {
@@ -121,7 +195,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { session_id, review_link_id, customer_name, star_rating, review_text } = body;
+  const { session_id, review_link_id, customer_name, star_rating, review_text, is_private } = body;
 
   if (!session_id || !review_link_id || !customer_name || !star_rating || !review_text) {
     return NextResponse.json(
@@ -157,18 +231,31 @@ export async function POST(req: NextRequest) {
 
   const resend = new Resend(RESEND_API_KEY);
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: "small Talk <hello@usesmalltalk.com>",
-      to: ownerEmail,
-      subject: `${customer_name} may have posted a ${star_rating}-star review`,
-      html: buildEmailHtml({
+  const subject = is_private
+    ? `${customer_name} sent you private feedback`
+    : `${customer_name} may have posted a ${star_rating}-star review`;
+
+  const html = is_private
+    ? buildPrivateEmailHtml({
+        customerName: customer_name,
+        starRating: star_rating,
+        feedbackText: review_text,
+        dashboardUrl,
+      })
+    : buildPublicEmailHtml({
         customerName: customer_name,
         starRating: star_rating,
         reviewText: review_text,
         googleReviewUrl: googleUrl,
         dashboardUrl,
-      }),
+      });
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: "small Talk <hello@usesmalltalk.com>",
+      to: ownerEmail,
+      subject,
+      html,
     });
 
     if (error) {

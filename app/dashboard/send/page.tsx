@@ -251,7 +251,7 @@ function SingleForm({
   employees: EmployeeRow[];
   businessId: string;
   businessName: string;
-  onSend: (name: string, code: string, smsStatus?: string) => void;
+  onSend: (name: string, code: string, smsStatus?: string) => void | Promise<void>;
   onServiceCreated: (s: ServiceRow) => void;
   onEmployeeCreated: (e: EmployeeRow) => void;
 }) {
@@ -339,7 +339,7 @@ function SingleForm({
       deliveryStatus = emailResult.ok ? "sent" : emailResult.error;
     }
 
-    onSend(firstName.trim(), code, deliveryStatus);
+    await onSend(firstName.trim(), code, deliveryStatus);
     setFirstName("");
     setContact("");
     setServiceText("");
@@ -740,15 +740,21 @@ export default function SendPage() {
     fetchData();
   }, [business]);
 
-  function handleSingleSend(name: string, code: string, smsStatus?: string) {
-    if (tier === "trial" && business) {
-      const newRemaining = Math.max(0, trialRemaining - 1);
-      setTrialRemaining(newRemaining);
-      supabase
-        .from("businesses")
-        .update({ trial_requests_remaining: newRemaining })
-        .eq("id", business.id)
-        .then();
+  async function handleSingleSend(name: string, code: string, smsStatus?: string) {
+    if (effectiveTier === "trial" && business) {
+      try {
+        const res = await fetchWithAuth("/api/decrement-trial", { method: "POST" });
+        const result = await res.json();
+        if (result.exhausted) {
+          setTrialRemaining(0);
+          addToast("Your free trial has been used up. Subscribe to keep sending.", "error");
+          return;
+        }
+        setTrialRemaining(result.remaining);
+      } catch {
+        addToast("Couldn\u2019t update your trial usage \u2014 please try again.", "error");
+        return;
+      }
     }
 
     const link = `usesmalltalk.com/r/${code}`;

@@ -1071,15 +1071,18 @@ function ReviewScreen({
         setVoiceId(result.voice_id);
 
         // Save to session
-        supabase
+        const { error: saveErr } = await supabase
           .from("review_sessions")
           .update({
             generated_review: result.review_text,
             voice_id: result.voice_id,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", data.sessionId)
-          .then();
+          .eq("id", data.sessionId);
+
+        if (saveErr) {
+          setError("Couldn\u2019t save your review \u2014 tap to try again.");
+        }
       } catch {
         setError("Something went wrong — tap to try again");
       } finally {
@@ -1882,6 +1885,7 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
   >({});
   const [optionalDetail, setOptionalDetail] = useState("");
   const [finalReview, setFinalReview] = useState("");
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // Check if browser supports Web Speech API
   const hasSpeechSupport = useMemo(() => {
@@ -1912,14 +1916,18 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
   );
 
   // Star rating handler
-  const handleRate = useCallback((r: number) => {
+  const handleRate = useCallback(async (r: number) => {
     setRating(r);
-    // Update session with rating
-    supabase
+    const { error } = await supabase
       .from("review_sessions")
       .update({ star_rating: r, status: "in_progress", updated_at: new Date().toISOString() })
-      .eq("id", data.sessionId)
-      .then();
+      .eq("id", data.sessionId);
+
+    if (error) {
+      setToastMsg("Couldn\u2019t save your progress \u2014 please try again.");
+      setRating(0);
+      return;
+    }
     if (r <= 2) {
       setStep("low-rating-choice");
     } else {
@@ -2044,11 +2052,15 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
   // Review — copy to clipboard, open Google, then route to interstitial fallback
   const handlePost = useCallback(async (text: string, voiceId: string) => {
     setFinalReview(text);
-    supabase
+    const { error: saveErr } = await supabase
       .from("review_sessions")
       .update({ generated_review: text, status: "copied", updated_at: new Date().toISOString() })
-      .eq("id", data.sessionId)
-      .then();
+      .eq("id", data.sessionId);
+
+    if (saveErr) {
+      setToastMsg("Couldn\u2019t save your progress \u2014 please try again.");
+      return;
+    }
 
     // Notify business owner for low-rating public reviews
     if (rating <= 2 && path === "public") {
@@ -2082,14 +2094,33 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
   }, [data.sessionId, data.reviewLinkId, data.customerName, data.googlePlaceId, data.googleReviewUrl, rating, path]);
 
   // Private feedback
-  const handlePrivateSubmit = useCallback((feedback: string) => {
-    supabase
+  const handlePrivateSubmit = useCallback(async (feedback: string) => {
+    const { error } = await supabase
       .from("review_sessions")
       .update({ optional_text: feedback, status: "drafted", updated_at: new Date().toISOString() })
-      .eq("id", data.sessionId)
-      .then();
+      .eq("id", data.sessionId);
+
+    if (error) {
+      setToastMsg("Couldn\u2019t save your feedback \u2014 please try again.");
+      return;
+    }
+
+    // Notify business owner of private feedback
+    fetch("/api/notify-owner", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: data.sessionId,
+        review_link_id: data.reviewLinkId,
+        customer_name: data.customerName,
+        star_rating: rating,
+        review_text: feedback,
+        is_private: true,
+      }),
+    }).catch(() => {}); // fire-and-forget — don't block the customer
+
     setStep("private-success");
-  }, [data.sessionId]);
+  }, [data.sessionId, data.reviewLinkId, data.customerName, rating]);
 
   // Back handlers
   const handleBackToStars = useCallback(() => {
@@ -2222,6 +2253,16 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
           {step === "private-success" && <PrivateSuccessScreen data={data} />}
         </div>
       </div>
+
+      {/* Toast for save errors */}
+      {toastMsg && (
+        <div
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-[#1A2E25] px-5 py-3 text-[14px] font-medium text-white shadow-lg animate-fade-in"
+          onAnimationEnd={() => setTimeout(() => setToastMsg(null), 3000)}
+        >
+          {toastMsg}
+        </div>
+      )}
     </main>
   );
 }
