@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
   // Look up business via review_link → business
   const { data: link, error: linkErr } = await supabaseAdmin
     .from("review_links")
-    .select("business_id, businesses!inner(owner_id, name, google_review_url)")
+    .select("business_id, businesses!inner(owner_email, name, google_review_url)")
     .eq("id", review_link_id)
     .single();
 
@@ -142,19 +142,16 @@ export async function POST(req: NextRequest) {
   }
 
   const biz = link.businesses as unknown as {
-    owner_id: string;
+    owner_email: string | null;
     name: string;
     google_review_url: string | null;
   };
 
-  // Look up owner email from Supabase auth
-  const { data: userData, error: userErr } = await supabaseAdmin.auth.admin.getUserById(biz.owner_id);
-
-  if (userErr || !userData?.user?.email) {
-    return NextResponse.json({ error: "Could not resolve owner email" }, { status: 404 });
+  if (!biz.owner_email) {
+    return NextResponse.json({ error: "Business has no owner email configured" }, { status: 404 });
   }
 
-  const ownerEmail = userData.user.email;
+  const ownerEmail = biz.owner_email;
   const googleUrl = biz.google_review_url || "https://business.google.com";
   const dashboardUrl = "https://usesmalltalk.com/dashboard";
 

@@ -48,51 +48,50 @@ export default function SignupPage() {
         return;
       }
 
-      // 2. Insert business row with auth user's UUID + 7-day trial
-      const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const { error: bizError } = await supabase.from("businesses").insert({
-        id: userId,
-        name: businessName,
-        trial_ends_at: trialEndsAt,
-      });
+      // 2. Insert business row + seed topics (wrapped so orphan auth is handled)
+      try {
+        const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { error: bizError } = await supabase.from("businesses").insert({
+          id: userId,
+          name: businessName,
+          owner_email: email,
+          subscription_status: "trialing",
+          trial_ends_at: trialEndsAt,
+          trial_requests_remaining: 10,
+        });
 
-      if (bizError) {
-        setError(friendlyError(bizError.message));
-        setLoading(false);
-        return;
-      }
+        if (bizError) throw bizError;
 
-      // 3. Copy global default topics for this business
-      const { data: defaultTopics, error: topicsReadError } = await supabase
-        .from("topics")
-        .select("label, tier, follow_up_question, follow_up_options, sort_order")
-        .is("business_id", null);
-
-      if (topicsReadError) {
-        setError("Something went wrong. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      if (defaultTopics && defaultTopics.length > 0) {
-        const seededTopics = defaultTopics.map((t) => ({
-          business_id: userId,
-          label: t.label,
-          tier: t.tier,
-          follow_up_question: t.follow_up_question,
-          follow_up_options: t.follow_up_options,
-          sort_order: t.sort_order,
-        }));
-
-        const { error: topicsWriteError } = await supabase
+        // 3. Copy global default topics for this business
+        const { data: defaultTopics, error: topicsReadError } = await supabase
           .from("topics")
-          .insert(seededTopics);
+          .select("label, tier, follow_up_question, follow_up_options, sort_order")
+          .is("business_id", null);
 
-        if (topicsWriteError) {
-          setError("Something went wrong. Please try again.");
-          setLoading(false);
-          return;
+        if (topicsReadError) throw topicsReadError;
+
+        if (defaultTopics && defaultTopics.length > 0) {
+          const seededTopics = defaultTopics.map((t) => ({
+            business_id: userId,
+            label: t.label,
+            tier: t.tier,
+            follow_up_question: t.follow_up_question,
+            follow_up_options: t.follow_up_options,
+            sort_order: t.sort_order,
+          }));
+
+          const { error: topicsWriteError } = await supabase
+            .from("topics")
+            .insert(seededTopics);
+
+          if (topicsWriteError) throw topicsWriteError;
         }
+      } catch {
+        setError(
+          "Account created but we hit a snag setting up your business. Please try logging in — we'll retry the setup."
+        );
+        setLoading(false);
+        return;
       }
 
       // 4. Redirect to onboarding

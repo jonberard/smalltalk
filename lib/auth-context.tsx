@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
+  const [noBusiness, setNoBusiness] = useState(false);
 
   useEffect(() => {
     // Get initial session — use getUser() for server-verified auth
@@ -65,14 +66,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function fetchBusiness(userId: string) {
     const { data, error } = await supabase
       .from("businesses")
-      .select("id, name, logo_url, google_review_url, google_place_id, business_city, neighborhoods, subscription_status, trial_requests_remaining, trial_ends_at, reply_voice_id, custom_reply_voice, connected_crms, created_at, stripe_customer_id, stripe_subscription_id, onboarding_completed")
+      .select("id, name, owner_email, logo_url, google_review_url, google_place_id, business_city, neighborhoods, subscription_status, trial_requests_remaining, trial_ends_at, reply_voice_id, custom_reply_voice, connected_crms, created_at, stripe_customer_id, stripe_subscription_id, onboarding_completed")
       .eq("id", userId)
       .single();
 
     if (error || !data) {
+      // Orphaned auth account — no business record exists
+      setNoBusiness(true);
       setBusiness(null);
     } else {
       const biz = data as Business;
+      setNoBusiness(false);
       setBusiness(biz);
 
       // Redirect to onboarding if not completed (unless already there)
@@ -121,6 +125,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   if (!session) {
     return null;
+  }
+
+  if (noBusiness && !loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-[#F8F9FA] px-4 font-dashboard">
+        <div className="w-full max-w-[420px] text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#FEF7ED]">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <h2 className="text-[18px] font-bold text-[#1A1D20]">
+            We hit a snag setting up your business
+          </h2>
+          <p className="mt-2 text-[14px] leading-relaxed text-[#6B7280]">
+            Your account was created but we couldn&apos;t finish setting up your business profile. Try signing out and back in, or contact us for help.
+          </p>
+          <div className="mt-6 flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                setLoading(true);
+                setNoBusiness(false);
+                if (session?.user?.id) {
+                  await fetchBusiness(session.user.id);
+                } else {
+                  setLoading(false);
+                }
+              }}
+              className="w-full rounded-[8px] bg-[#E05A3D] py-2.5 text-[14px] font-semibold text-white transition-colors hover:brightness-95"
+            >
+              Retry Setup
+            </button>
+            <button
+              type="button"
+              onClick={signOut}
+              className="w-full rounded-[8px] border border-[#E8E5E0] bg-white py-2.5 text-[14px] font-semibold text-[#1A1D20] transition-colors hover:bg-[#F8F9FA]"
+            >
+              Sign Out
+            </button>
+            <a
+              href="mailto:hello@usesmalltalk.com"
+              className="text-[13px] font-medium text-[#E05A3D] hover:underline"
+            >
+              Contact Support
+            </a>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

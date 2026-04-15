@@ -80,6 +80,34 @@ async function sendSms(
   }
 }
 
+async function sendEmail(
+  customerName: string,
+  customerEmail: string,
+  reviewLinkUrl: string,
+  businessName: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { fetchWithAuth } = await import("@/lib/supabase");
+    const res = await fetchWithAuth("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer_name: customerName,
+        customer_email: customerEmail,
+        review_link_url: reviewLinkUrl,
+        business_name: businessName,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { ok: false, error: data.error || `Email failed (${res.status})` };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Network error sending email" };
+  }
+}
+
 function maskContact(contact: string): string {
   if (contact.includes("@")) {
     const [local, domain] = contact.split("@");
@@ -291,7 +319,7 @@ function SingleForm({
     }
 
     const linkUrl = `https://usesmalltalk.com/r/${code}`;
-    let smsStatus: string | undefined;
+    let deliveryStatus: string | undefined;
 
     if (isPhone(contact.trim())) {
       const smsResult = await sendSms(
@@ -300,10 +328,18 @@ function SingleForm({
         linkUrl,
         businessName,
       );
-      smsStatus = smsResult.ok ? "sent" : smsResult.error;
+      deliveryStatus = smsResult.ok ? "sent" : smsResult.error;
+    } else if (contact.trim().includes("@")) {
+      const emailResult = await sendEmail(
+        firstName.trim(),
+        contact.trim(),
+        linkUrl,
+        businessName,
+      );
+      deliveryStatus = emailResult.ok ? "sent" : emailResult.error;
     }
 
-    onSend(firstName.trim(), code, smsStatus);
+    onSend(firstName.trim(), code, deliveryStatus);
     setFirstName("");
     setContact("");
     setServiceText("");
@@ -454,12 +490,64 @@ function SingleForm({
    QR CODE (SVG placeholder — deterministic pattern)
    ═══════════════════════════════════════════════════ */
 
-function QRBlock({ businessName }: { businessName: string }) {
-  const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  const link = `usesmalltalk.com/r/${slug}`;
+function QRBlock({ businessId, businessName }: { businessId: string; businessName: string }) {
+  const [genericCode, setGenericCode] = useState<string | null>(null);
+  const [loadingLink, setLoadingLink] = useState(true);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    async function loadOrCreateGenericLink() {
+      // Check for an existing generic link for this business
+      const { data: existing } = await supabase
+        .from("review_links")
+        .select("unique_code")
+        .eq("business_id", businessId)
+        .eq("is_generic", true)
+        .limit(1)
+        .single();
+
+      if (existing) {
+        setGenericCode(existing.unique_code);
+        setLoadingLink(false);
+        return;
+      }
+
+      // Create a new generic link (no customer name/contact, needs a service)
+      const { data: defaultService } = await supabase
+        .from("services")
+        .select("id")
+        .eq("business_id", businessId)
+        .limit(1)
+        .single();
+
+      if (!defaultService) {
+        setLoadingLink(false);
+        return;
+      }
+
+      const code = generateCode();
+      const { error } = await supabase.from("review_links").insert({
+        business_id: businessId,
+        service_id: defaultService.id,
+        customer_name: "Customer",
+        customer_contact: "",
+        unique_code: code,
+        is_generic: true,
+      });
+
+      if (!error) {
+        setGenericCode(code);
+      }
+      setLoadingLink(false);
+    }
+
+    loadOrCreateGenericLink();
+  }, [businessId]);
+
+  const link = genericCode ? `usesmalltalk.com/r/${genericCode}` : null;
+
   function handleCopy() {
+    if (!link) return;
     navigator.clipboard?.writeText(`https://${link}`).catch(() => {
       const ta = document.createElement("textarea");
       ta.value = `https://${link}`;
@@ -471,6 +559,17 @@ function QRBlock({ businessName }: { businessName: string }) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  if (loadingLink) {
+    return (
+      <div className="mt-8">
+        <h3 className="mb-3 px-1 text-[12px] font-semibold uppercase tracking-wider text-[var(--dash-muted)]">Or share a link</h3>
+        <div className="h-[140px] animate-pulse rounded-[var(--dash-radius)] bg-[#F4F4F5]" />
+      </div>
+    );
+  }
+
+  if (!link) return null;
 
   return (
     <div className="mt-8">
@@ -728,7 +827,7 @@ export default function SendPage() {
         </div>
 
         {/* QR / Link section */}
-        {business && <QRBlock businessName={business.name} />}
+        {business && <QRBlock businessId={business.id} businessName={business.name} />}
 
         {/* Recent sends */}
         <div className="mt-6">

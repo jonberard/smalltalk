@@ -5,6 +5,7 @@
 export type Business = {
   id: string;
   name: string;
+  owner_email: string | null;
   logo_url: string | null;
   google_review_url: string;
   google_place_id: string | null;
@@ -26,8 +27,9 @@ export type Business = {
 export type BusinessInsert = {
   id: string;
   name: string;
+  owner_email?: string | null;
   logo_url?: string | null;
-  google_review_url: string;
+  google_review_url?: string;
   google_place_id?: string | null;
   business_city?: string | null;
   neighborhoods?: string[] | null;
@@ -129,6 +131,7 @@ export type ReviewLink = {
   customer_contact: string;
   unique_code: string;
   source: string;
+  is_generic: boolean;
   created_at: string;
 };
 
@@ -141,6 +144,7 @@ export type ReviewLinkInsert = {
   customer_contact: string;
   unique_code: string;
   source?: string;
+  is_generic?: boolean;
   created_at?: string;
 };
 
