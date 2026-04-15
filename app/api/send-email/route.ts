@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for this operation");
+}
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
+
 export async function POST(req: NextRequest) {
   // Authenticate the request
   const supabase = createClient(
@@ -12,6 +20,31 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser(authHeader);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Verify business ownership and active subscription/trial
+  const { data: biz, error: bizErr } = await supabaseAdmin
+    .from("businesses")
+    .select("id, subscription_status, trial_requests_remaining, trial_ends_at")
+    .eq("id", user.id)
+    .single();
+
+  if (bizErr || !biz) {
+    return NextResponse.json({ error: "Business not found" }, { status: 404 });
+  }
+
+  const status = biz.subscription_status;
+  const isActive = status === "active" || status === "trialing";
+  const isTrialValid =
+    status === "trial" &&
+    biz.trial_requests_remaining > 0 &&
+    (!biz.trial_ends_at || new Date(biz.trial_ends_at) > new Date());
+
+  if (!isActive && !isTrialValid) {
+    return NextResponse.json(
+      { error: "Your subscription is inactive. Please subscribe to send review links." },
+      { status: 403 },
+    );
   }
 
   const { RESEND_API_KEY } = process.env;

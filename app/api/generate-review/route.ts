@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     const { data: session, error: sessionErr } = await supabaseAdmin
       .from("review_sessions")
-      .select("id")
+      .select("id, generation_count")
       .eq("id", session_id)
       .single();
 
@@ -48,6 +48,21 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
+
+    // Cap review generations at 5 per session
+    const genCount = session.generation_count ?? 0;
+    if (genCount >= 5) {
+      return NextResponse.json(
+        { error: "You've reached the limit for this review. Please use your current draft or start fresh." },
+        { status: 429 },
+      );
+    }
+
+    // Increment generation count
+    await supabaseAdmin
+      .from("review_sessions")
+      .update({ generation_count: genCount + 1 })
+      .eq("id", session_id);
 
     // Validate required fields
     if (!star_rating || !business_name || !service_type) {

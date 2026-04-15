@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import twilio from "twilio";
 
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for this operation");
+}
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
+
 function normalizePhone(raw: string): string {
   if (raw.startsWith("+")) {
     return "+" + raw.replace(/\D/g, "");
@@ -22,6 +30,31 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser(authHeader);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Verify business ownership and active subscription/trial
+  const { data: biz, error: bizErr } = await supabaseAdmin
+    .from("businesses")
+    .select("id, subscription_status, trial_requests_remaining, trial_ends_at")
+    .eq("id", user.id)
+    .single();
+
+  if (bizErr || !biz) {
+    return NextResponse.json({ error: "Business not found" }, { status: 404 });
+  }
+
+  const status = biz.subscription_status;
+  const isActive = status === "active" || status === "trialing";
+  const isTrialValid =
+    status === "trial" &&
+    biz.trial_requests_remaining > 0 &&
+    (!biz.trial_ends_at || new Date(biz.trial_ends_at) > new Date());
+
+  if (!isActive && !isTrialValid) {
+    return NextResponse.json(
+      { error: "Your subscription is inactive. Please subscribe to send review links." },
+      { status: 403 },
+    );
   }
 
   const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER } =
@@ -74,7 +107,7 @@ export async function POST(req: NextRequest) {
 
   const message =
     `Hi ${customer_name}! How was your experience with ${business_name}? ` +
-    `Tap to share — takes 30 seconds, no writing required: ${review_link_url}`;
+    `Tap to share - takes 30 seconds, no writing required: ${review_link_url}`;
 
   try {
     const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);

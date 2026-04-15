@@ -174,6 +174,8 @@ export type ReviewSession = {
   generated_review: string | null;
   status: ReviewSessionStatus;
   feedback_type: FeedbackType;
+  generation_count: number;
+  reply_generation_count: number;
   reply_text: string | null;
   replied_at: string | null;
   created_at: string;

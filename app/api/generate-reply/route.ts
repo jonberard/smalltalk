@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { generateReply, type GenerateReplyInput } from "@/lib/reply-generator";
 
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for this operation");
+}
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
+
 export async function POST(req: NextRequest) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,6 +29,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     const {
+      sessionId,
       businessName,
       reviewText,
       starRating,
@@ -30,13 +39,46 @@ export async function POST(req: NextRequest) {
       replyVoiceId,
       customReplyVoice,
       reviewSource,
-    } = body as GenerateReplyInput;
+    } = body as GenerateReplyInput & { sessionId?: string };
 
     if (!businessName || !starRating || !replyVoiceId || !reviewSource) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 },
       );
+    }
+
+    // Ownership check: verify the session belongs to the user's business
+    if (sessionId) {
+      const { data: session, error: sessionErr } = await supabaseAdmin
+        .from("review_sessions")
+        .select("id, reply_generation_count, review_links!inner(business_id)")
+        .eq("id", sessionId)
+        .single();
+
+      if (sessionErr || !session) {
+        return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      }
+
+      const link = session.review_links as unknown as { business_id: string };
+      if (link.business_id !== user.id) {
+        return NextResponse.json({ error: "Not authorized to reply to this review" }, { status: 403 });
+      }
+
+      // Cap reply generations at 5 per review
+      const replyCount = session.reply_generation_count ?? 0;
+      if (replyCount >= 5) {
+        return NextResponse.json(
+          { error: "You've reached the reply generation limit for this review." },
+          { status: 429 },
+        );
+      }
+
+      // Increment reply generation count
+      await supabaseAdmin
+        .from("review_sessions")
+        .update({ reply_generation_count: replyCount + 1 })
+        .eq("id", sessionId);
     }
 
     const result = await generateReply({

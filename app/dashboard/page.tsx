@@ -389,6 +389,7 @@ export default function Dashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          sessionId: item.sessionId,
           businessName: business?.name ?? "",
           reviewText: item.snippet ?? "",
           starRating: item.stars ?? 5,
