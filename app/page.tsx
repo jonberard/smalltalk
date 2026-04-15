@@ -194,6 +194,13 @@ const JSON_LD = {
 export default function LandingPage() {
   return (
     <FadeWrapper className="min-h-dvh bg-background font-body text-text">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-white"
+      >
+        Skip to main content
+      </a>
+
       {/* Structured data — server-rendered in initial HTML */}
       <script
         type="application/ld+json"
@@ -202,6 +209,8 @@ export default function LandingPage() {
 
       {/* ─── Nav ─── */}
       <LandingNav />
+
+      <main id="main-content">
 
       {/* ════════════════════════════════════════════
          SECTION 1: HERO
@@ -272,7 +281,7 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════
          SECTION 3: HOW IT WORKS
          ════════════════════════════════════════════ */}
-      <section data-fade className="mx-auto max-w-[1080px] px-6 pb-[160px]">
+      <section id="how-it-works" data-fade className="mx-auto max-w-[1080px] px-6 pb-[160px] scroll-mt-16">
         <div className="mb-16 text-center">
           <SectionLabel>How it works</SectionLabel>
           <Heading>How It Works: Google Reviews in 30 Seconds</Heading>
@@ -586,7 +595,7 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════
          SECTION 9: PRICING
          ════════════════════════════════════════════ */}
-      <section data-fade className="mx-auto max-w-[960px] px-6 pb-[160px]">
+      <section id="pricing" data-fade className="mx-auto max-w-[960px] px-6 pb-[160px] scroll-mt-16">
         <div className="mb-20 text-center">
           <SectionLabel>Pricing</SectionLabel>
           <Heading>Google Review Software Pricing</Heading>
@@ -612,13 +621,13 @@ export default function LandingPage() {
             <ul className="mb-10 flex flex-col gap-4">
               {[
                 "Unlimited review requests",
-                "AI-powered review generation with 15 writing styles",
+                "Detailed, genuine reviews that sound different every time",
                 "Unlimited AI reply drafting for every review",
-                "SEO-optimized reviews (business name, service, city keywords)",
+                "Reviews that help you rank higher on Google Maps",
                 "Honest negative review handling with private feedback option",
-                "Real-time alerts when negative reviews are posted",
-                "Conversion funnel analytics",
-                "Google Maps app deep link handoff",
+                "Real-time alerts when negative reviews are submitted",
+                "See exactly who opened, started, and finished",
+                "One-tap handoff to Google \u2014 no extra steps",
               ].map((f) => (
                 <li key={f} className="flex items-start gap-3 text-[14px] text-text">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
@@ -639,7 +648,7 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════
          SECTION 10: FAQ
          ════════════════════════════════════════════ */}
-      <section data-fade className="mx-auto max-w-[800px] px-6 pb-[160px]">
+      <section id="faq" data-fade className="mx-auto max-w-[800px] px-6 pb-[160px] scroll-mt-16">
         <div className="mb-12 text-center">
           <SectionLabel>FAQ</SectionLabel>
           <Heading>Google Review Management FAQ</Heading>
@@ -706,6 +715,7 @@ export default function LandingPage() {
           </p>
         </div>
       </footer>
+      </main>
     </FadeWrapper>
   );
 }

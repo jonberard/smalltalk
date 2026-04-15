@@ -19,6 +19,24 @@ export default function LandingNav() {
     <nav className="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5 lg:px-12">
       <span className="font-heading text-[20px] font-semibold text-text">small Talk</span>
       <div className="flex items-center gap-4">
+        <a
+          href="#how-it-works"
+          className="hidden text-[14px] font-medium text-muted transition-colors duration-300 hover:text-text sm:inline"
+        >
+          How it works
+        </a>
+        <a
+          href="#pricing"
+          className="hidden text-[14px] font-medium text-muted transition-colors duration-300 hover:text-text sm:inline"
+        >
+          Pricing
+        </a>
+        <a
+          href="#faq"
+          className="hidden text-[14px] font-medium text-muted transition-colors duration-300 hover:text-text sm:inline"
+        >
+          FAQ
+        </a>
         {!loggedIn && (
           <Link
             href="/login"

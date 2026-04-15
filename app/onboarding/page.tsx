@@ -719,17 +719,17 @@ function StepReady({
       <div className="mt-8 flex flex-col gap-3">
         <button
           type="button"
-          onClick={() => handleFinish("/dashboard")}
+          onClick={() => handleFinish("/dashboard/send")}
           className="w-full rounded-pill bg-primary py-3.5 text-[15px] font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98]"
         >
-          Go to Dashboard &rarr;
+          Send your first review link now &rarr;
         </button>
         <button
           type="button"
-          onClick={() => handleFinish("/dashboard/send")}
+          onClick={() => handleFinish("/dashboard")}
           className="w-full rounded-pill border border-accent bg-white py-3.5 text-[15px] font-semibold text-text transition-all hover:border-primary hover:text-primary active:scale-[0.98]"
         >
-          Send your first review link now &rarr;
+          Go to Dashboard
         </button>
       </div>
     </div>
