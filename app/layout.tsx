@@ -25,22 +25,22 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://usesmalltalk.com"),
-  title: "Get More Detailed Google Reviews for Your Business | small Talk",
+  title: "small Talk — The No-Blank-Box Google Review Tool for Home Service Businesses",
   description:
-    "Get more detailed Google reviews for your home service business. AI guides customers through a 30-second conversation — they approve and post. Start free, no credit card required.",
+    "Stop sending customers to a blank Google review box. small Talk guides customers through a 30-second conversation and drafts a detailed Google review from their real answers. No review gating. No fake reviews.",
   openGraph: {
-    title: "Get More Detailed Google Reviews for Your Business | small Talk",
+    title: "small Talk — The No-Blank-Box Google Review Tool for Home Service Businesses",
     description:
-      "Get more detailed Google reviews for your home service business. AI guides customers through a 30-second conversation — they approve and post.",
+      "Stop sending customers to a blank Google review box. small Talk guides customers through a 30-second conversation and drafts a detailed Google review from their real answers.",
     type: "website",
     url: "https://usesmalltalk.com",
     siteName: "small Talk",
-    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "small Talk — Get more detailed Google reviews" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "small Talk — The no-blank-box Google review tool" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "small Talk",
-    description: "Get more detailed Google reviews for your home service business. AI-guided, 30 seconds, no blank box.",
+    description: "Stop sending customers to a blank Google review box. small Talk guides them through a 30-second conversation and drafts a detailed review from their real answers.",
     images: ["/opengraph-image"],
   },
   other: {

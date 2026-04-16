@@ -295,7 +295,7 @@ export default function LandingPage() {
           {/* Step 1 — Text the link */}
           <div className="flex flex-col items-center">
             <h3 className="font-heading text-[22px] font-semibold text-text">
-              1. Text the link.
+              1. Send a guided review link.
             </h3>
             <p className="mb-8 mt-2 min-h-[72px] text-center text-[15px] leading-relaxed text-muted">
               You finish the job. You tap send. That&rsquo;s your part done.
@@ -338,7 +338,7 @@ export default function LandingPage() {
           {/* Step 2 — They tap, no typing */}
           <div className="flex flex-col items-center">
             <h3 className="font-heading text-[22px] font-semibold text-text">
-              2. They tap, no typing.
+              2. Customer taps through what actually happened.
             </h3>
             <p className="mb-8 mt-2 min-h-[72px] text-center text-[15px] leading-relaxed text-muted">
               Your customer picks what stood out in a few quick taps. No blank page, no writer&rsquo;s block. No more hoping they&rsquo;ll get around to it.
@@ -390,10 +390,10 @@ export default function LandingPage() {
           {/* Step 3 — AI drafts, they post */}
           <div className="flex flex-col items-center">
             <h3 className="font-heading text-[22px] font-semibold text-text">
-              3. AI drafts, they post.
+              3. small Talk drafts. Customer posts.
             </h3>
             <p className="mb-8 mt-2 min-h-[72px] text-center text-[15px] leading-relaxed text-muted">
-              AI turns their taps into a review that sounds like they spent ten minutes writing it. They approve it and post to Google.
+              small Talk drafts a review from their answers. Customer edits, copies, and posts to Google.
             </p>
             <div className="relative mx-auto h-[480px] w-[232px] rounded-[40px] border border-muted/20 bg-text p-[3px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] sm:w-[250px]">
               <div className="absolute inset-x-0 top-[4px] z-20 flex justify-center">
