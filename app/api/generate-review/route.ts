@@ -36,33 +36,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: session, error: sessionErr } = await supabaseAdmin
-      .from("review_sessions")
-      .select("id, generation_count")
-      .eq("id", session_id)
-      .single();
+    // Atomically increment generation count (cap at 5)
+    const { data: newCount, error: rpcErr } = await supabaseAdmin
+      .rpc("increment_generation_count", { p_session_id: session_id, p_max_count: 5 });
 
-    if (sessionErr || !session) {
-      return NextResponse.json(
-        { error: "Invalid session" },
-        { status: 403 }
-      );
+    if (rpcErr) {
+      // RPC error likely means session doesn't exist
+      return NextResponse.json({ error: "Invalid session" }, { status: 403 });
     }
 
-    // Cap review generations at 5 per session
-    const genCount = session.generation_count ?? 0;
-    if (genCount >= 5) {
+    if (newCount === -1) {
       return NextResponse.json(
         { error: "You've reached the limit for this review. Please use your current draft or start fresh." },
         { status: 429 },
       );
     }
-
-    // Increment generation count
-    await supabaseAdmin
-      .from("review_sessions")
-      .update({ generation_count: genCount + 1 })
-      .eq("id", session_id);
 
     // Validate required fields
     if (!star_rating || !business_name || !service_type) {

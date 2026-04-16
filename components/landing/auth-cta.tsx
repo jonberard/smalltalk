@@ -24,7 +24,7 @@ export function HeroCTA() {
         href={ctaHref}
         className="flex w-full items-center justify-center gap-2 rounded-pill bg-primary px-8 py-4 text-[17px] font-semibold text-white shadow-sm transition-all duration-300 hover:brightness-95 active:scale-[0.98] sm:w-auto"
       >
-        {loggedIn ? "Go to Dashboard" : "Start Free Trial"}
+        {loggedIn ? "Go to Dashboard" : "Send your first guided review link"}
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M5 12h14" />
           <path d="m12 5 7 7-7 7" />
@@ -51,7 +51,7 @@ export function FinalCTA() {
         href={ctaHref}
         className="rounded-pill bg-primary px-8 py-4 text-[16px] font-medium text-white shadow-sm transition-all duration-300 hover:brightness-95 active:scale-[0.98]"
       >
-        {loggedIn ? "Go to Dashboard" : "Start Free Trial"}
+        {loggedIn ? "Go to Dashboard" : "Send your first guided review link"}
       </Link>
       <span className="text-[12px] italic uppercase tracking-widest text-muted">
         No credit card required

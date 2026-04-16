@@ -34,7 +34,7 @@ export default function PricingButton() {
       onClick={handleClick}
       className="block w-full rounded-pill bg-primary py-3.5 text-center text-[14px] font-semibold text-white transition-all duration-300 hover:opacity-90 active:scale-[0.98]"
     >
-      Start your 7-day free trial
+      Send your first guided review link
     </button>
   );
 }

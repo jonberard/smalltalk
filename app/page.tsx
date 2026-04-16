@@ -134,7 +134,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "What is review gating?",
-    a: "Review gating is when a tool filters out negative reviews by only sending happy customers to Google. It violates Google\u2019s policies. small Talk gives every customer \u2014 whether they rate you 5 stars or 1 star \u2014 an equal choice to post publicly or send private feedback.",
+    a: "Review gating is when a tool filters out negative reviews by only sending satisfied customers to Google. It violates Google\u2019s policies. small Talk gives every customer \u2014 whether they rate you 5 stars or 1 star \u2014 an equal choice to post publicly or send private feedback.",
   },
   {
     q: "How do I respond to a negative Google review?",
@@ -143,6 +143,10 @@ const FAQ_ITEMS = [
   {
     q: "How many Google reviews does my business need?",
     a: "There\u2019s no magic number, but businesses with 20+ recent reviews consistently outrank competitors with fewer. What matters more than quantity is detail and recency. small Talk helps every customer leave a detailed review, not just a star rating.",
+  },
+  {
+    q: "Can small Talk automatically post reviews to Google?",
+    a: "No, and neither can any legitimate review tool. Google requires the customer to post from their own account. small Talk makes that final step easier by drafting the review, copying it to their clipboard, and opening the right Google review page. Then the customer taps stars, pastes, and submits from their own Google account.",
   },
   {
     q: "Can I send review requests via text message?",
@@ -219,13 +223,13 @@ export default function LandingPage() {
         <div className="flex flex-col items-center gap-16 lg:flex-row lg:items-center lg:justify-between lg:gap-24">
           <div className="w-full text-center lg:w-[55%] lg:text-left">
             <h1 className="font-heading text-[40px] font-bold leading-[1.1] tracking-tight text-text sm:text-[52px] lg:text-[64px]">
-              Your customers love you. They just{" "}
-              <em className="font-medium text-primary">hate</em> writing Google reviews.
+              Your customers love you. So stop sending them a{" "}
+              <em className="font-medium text-primary">blank</em> Google review box.
             </h1>
             <p className="mx-auto mt-6 max-w-[540px] text-[17px] leading-relaxed text-muted sm:text-[19px] lg:mx-0">
-              Turn happy clients into detailed Google reviews with an
-              AI-guided flow that takes 30 seconds. No more blank-box
-              paralysis.
+              small Talk guides customers through a 30-second conversation,
+              turns their real answers into a detailed Google review, and
+              hands it back for them to approve and post.
             </p>
             <HeroCTA />
             <div className="mt-10 border-t border-accent pt-8 lg:text-left">
@@ -246,7 +250,7 @@ export default function LandingPage() {
       <section data-fade className="mx-auto max-w-[800px] px-6 pb-[160px]">
         <div className="text-center">
           <Heading>
-            You know the drill. Great job. Happy customer.{" "}
+            You know the drill. Great job. Grateful customer.{" "}
             <span className="italic text-muted/60">&ldquo;I&rsquo;ll definitely leave you a review!&rdquo;</span>{" "}
             ...Nothing.
           </Heading>
@@ -444,10 +448,24 @@ export default function LandingPage() {
         <div className="relative overflow-hidden rounded-[16px] bg-primary px-6 py-12 text-center text-white sm:px-12 sm:py-16">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent_50%)]" />
           <h3 className="relative z-10 font-heading text-[28px] font-bold leading-tight sm:text-[40px] lg:text-[48px]">
-            Average review length increased from{" "}
-            <span className="opacity-70 line-through decoration-2">12 words</span>{" "}
-            to <em className="underline decoration-accent/50 underline-offset-8">85 words.</em>
+            In our sample flow, guided reviews are{" "}
+            <em className="underline decoration-accent/50 underline-offset-8">7x more detailed</em>{" "}
+            than blank-box reviews.
           </h3>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════
+         SECTION 4B: CATEGORY WEDGE
+         ════════════════════════════════════════════ */}
+      <section data-fade className="mx-auto max-w-[800px] px-6 pb-[160px]">
+        <div className="text-center">
+          <Heading>
+            Review links are easy to send. Reviews are hard to write.
+          </Heading>
+          <p className="mx-auto mt-8 max-w-[580px] text-[17px] leading-[1.7] text-muted">
+            Most review tools stop at the link. small Talk keeps going. We guide customers through what actually happened, draft a review from their real answers, and make posting feel easy instead of awkward.
+          </p>
         </div>
       </section>
 
@@ -514,10 +532,10 @@ export default function LandingPage() {
         <div className="text-center">
           <SectionLabel>Honest reviews</SectionLabel>
           <Heading>
-            Honest Review Handling &mdash; Not Review Gating
+            Built to avoid review gating.
           </Heading>
           <p className="mx-auto mt-6 max-w-[580px] text-[17px] leading-[1.7] text-muted">
-            For 1&ndash;2 star ratings, your customer gets a genuine choice:
+            Low rating? The customer still gets a real choice: post publicly or send private feedback. We don&rsquo;t hide unhappy customers. We help you hear them.
           </p>
         </div>
 
@@ -564,6 +582,20 @@ export default function LandingPage() {
           </p>
         </div>
         <LandingDemo />
+      </section>
+
+      {/* ════════════════════════════════════════════
+         SECTION 7B: AI TRUST BLOCK
+         ════════════════════════════════════════════ */}
+      <section data-fade className="mx-auto max-w-[800px] px-6 pb-[160px]">
+        <div className="text-center">
+          <Heading>
+            The AI doesn&rsquo;t invent the experience.
+          </Heading>
+          <p className="mx-auto mt-8 max-w-[580px] text-[17px] leading-[1.7] text-muted">
+            small Talk only uses what the customer tells us &mdash; their rating, selected topics, follow-up answers, and any notes they add. Customers can edit anything before posting. No fake reviews. No invented details.
+          </p>
+        </div>
       </section>
 
       {/* ════════════════════════════════════════════
@@ -639,7 +671,7 @@ export default function LandingPage() {
             </ul>
             <PricingButton />
             <p className="mt-4 text-center text-[13px] text-muted">
-              No credit card required. 10 review requests included in trial.
+              No annual contract. No setup fee. No review gating. Send unlimited guided review links for $79/month.
             </p>
           </div>
         </div>
