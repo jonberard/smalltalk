@@ -738,6 +738,7 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-[1200px] flex-col items-center gap-8 sm:flex-row sm:items-center sm:justify-between">
           <span className="font-heading text-[18px] font-bold text-text">small Talk</span>
           <div className="flex flex-wrap justify-center gap-6 text-[11px] uppercase tracking-widest text-muted">
+            <Link href="/not-review-gating" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Honest Reviews</Link>
             <Link href="/privacy" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Privacy Policy</Link>
             <Link href="/terms" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Terms of Service</Link>
             <Link href="/contact" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Contact</Link>
