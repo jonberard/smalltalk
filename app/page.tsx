@@ -739,6 +739,11 @@ export default function LandingPage() {
           <span className="font-heading text-[18px] font-bold text-text">small Talk</span>
           <div className="flex flex-wrap justify-center gap-6 text-[11px] uppercase tracking-widest text-muted">
             <Link href="/not-review-gating" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Honest Reviews</Link>
+            <Link href="/for/pool-companies" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Pool Companies</Link>
+            <Link href="/for/hvac" className="underline-offset-4 transition-colors hover:text-primary hover:underline">HVAC</Link>
+            <Link href="/for/landscapers" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Landscapers</Link>
+            <Link href="/for/plumbers" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Plumbers</Link>
+            <Link href="/for/contractors" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Contractors</Link>
             <Link href="/privacy" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Privacy Policy</Link>
             <Link href="/terms" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Terms of Service</Link>
             <Link href="/contact" className="underline-offset-4 transition-colors hover:text-primary hover:underline">Contact</Link>
