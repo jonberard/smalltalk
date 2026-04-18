@@ -23,6 +23,23 @@ type TopicRow = {
   business_id: string | null;
 };
 
+const REMINDER_TIMEZONE_OPTIONS = [
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Phoenix",
+  "America/Anchorage",
+  "Pacific/Honolulu",
+];
+
+function formatHourLabel(hour: number) {
+  if (hour === 0) return "12:00 AM";
+  if (hour < 12) return `${hour}:00 AM`;
+  if (hour === 12) return "12:00 PM";
+  return `${hour - 12}:00 PM`;
+}
+
 /* ═══════════════════════════════════════════════════
    BUSINESS PROFILE
    ═══════════════════════════════════════════════════ */
@@ -988,6 +1005,189 @@ function TopicSection({ topics: initial, businessId, isCustomized }: {
   );
 }
 
+function AutomatedRemindersSection({
+  businessId,
+  initialEnabled,
+  initialQuietStart,
+  initialQuietEnd,
+  initialTimezone,
+}: {
+  businessId: string;
+  initialEnabled: boolean;
+  initialQuietStart: number;
+  initialQuietEnd: number;
+  initialTimezone: string;
+}) {
+  const { toast } = useToast();
+  const [enabled, setEnabled] = useState(initialEnabled);
+  const [quietStart, setQuietStart] = useState(initialQuietStart);
+  const [quietEnd, setQuietEnd] = useState(initialQuietEnd);
+  const [timeZone, setTimeZone] = useState(initialTimezone);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const timezones = REMINDER_TIMEZONE_OPTIONS.includes(timeZone)
+    ? REMINDER_TIMEZONE_OPTIONS
+    : [timeZone, ...REMINDER_TIMEZONE_OPTIONS];
+
+  async function save(next: {
+    reminder_sequence_enabled?: boolean;
+    quiet_hours_start?: number;
+    quiet_hours_end?: number;
+    business_timezone?: string;
+  }) {
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("businesses")
+      .update(next)
+      .eq("id", businessId);
+
+    setSaving(false);
+
+    if (error) {
+      toast(`Couldn’t save reminder settings: ${error.message}`, "error");
+      return;
+    }
+
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return (
+    <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-[16px] font-semibold text-[var(--dash-text)]">Automated reminders</h2>
+          <p className="mt-1 text-[13px] text-[var(--dash-muted)]">
+            Follow up automatically when a customer doesn&apos;t finish their review.
+          </p>
+        </div>
+        {(saving || saved) && (
+          <p className="text-[12px] text-[#10B981]">{saving ? "Saving..." : "Saved"}</p>
+        )}
+      </div>
+
+      <div className="mt-5 rounded-[12px] border border-[var(--dash-border)] bg-[var(--dash-bg)] p-4">
+        <label className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[14px] font-semibold text-[var(--dash-text)]">
+              Send automatic reminders to customers who don&apos;t complete their review
+            </p>
+            <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+              Initial message sends right away. Then small Talk can send up to two follow-ups, and stops as soon as the customer completes the flow or texts STOP.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            onClick={() => {
+              const next = !enabled;
+              setEnabled(next);
+              void save({ reminder_sequence_enabled: next });
+            }}
+            className={`relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ${
+              enabled ? "bg-[#E05A3D]" : "bg-[#D1D5DB]"
+            }`}
+          >
+            <span
+              className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-transform duration-200 ${
+                enabled ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </label>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr,0.8fr]">
+        <div className="rounded-[12px] border border-[var(--dash-border)] bg-white p-4">
+          <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--dash-muted)]">Sequence</p>
+          <div className="mt-3 space-y-3">
+            <div className="rounded-[10px] bg-[var(--dash-bg)] px-3.5 py-3">
+              <p className="text-[13px] font-medium text-[var(--dash-text)]">1. Initial message</p>
+              <p className="mt-1 text-[12px] text-[var(--dash-muted)]">Sent immediately when you send the review request.</p>
+            </div>
+            <div className="rounded-[10px] bg-[var(--dash-bg)] px-3.5 py-3">
+              <p className="text-[13px] font-medium text-[var(--dash-text)]">2. First reminder</p>
+              <p className="mt-1 text-[12px] text-[var(--dash-muted)]">Sent 24 hours later if the customer still hasn&apos;t completed the flow.</p>
+            </div>
+            <div className="rounded-[10px] bg-[var(--dash-bg)] px-3.5 py-3">
+              <p className="text-[13px] font-medium text-[var(--dash-text)]">3. Final reminder</p>
+              <p className="mt-1 text-[12px] text-[var(--dash-muted)]">Sent 72 hours after the initial request. That&apos;s the last message.</p>
+            </div>
+          </div>
+          <p className="mt-4 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+            All SMS reminders include “Reply STOP to opt out” to stay compliant.
+          </p>
+        </div>
+
+        <div className="rounded-[12px] border border-[var(--dash-border)] bg-white p-4">
+          <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--dash-muted)]">Quiet hours</p>
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="mb-1.5 block text-[12px] font-medium text-[var(--dash-muted)]">Start</label>
+              <select
+                value={quietStart}
+                onChange={(event) => {
+                  const next = Number(event.target.value);
+                  setQuietStart(next);
+                  void save({ quiet_hours_start: next });
+                }}
+                className="w-full rounded-[10px] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-2.5 text-[14px] text-[var(--dash-text)] outline-none transition-colors focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
+              >
+                {Array.from({ length: 24 }).map((_, hour) => (
+                  <option key={hour} value={hour}>
+                    {formatHourLabel(hour)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-[12px] font-medium text-[var(--dash-muted)]">End</label>
+              <select
+                value={quietEnd}
+                onChange={(event) => {
+                  const next = Number(event.target.value);
+                  setQuietEnd(next);
+                  void save({ quiet_hours_end: next });
+                }}
+                className="w-full rounded-[10px] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-2.5 text-[14px] text-[var(--dash-text)] outline-none transition-colors focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
+              >
+                {Array.from({ length: 24 }).map((_, hour) => (
+                  <option key={hour} value={hour}>
+                    {formatHourLabel(hour)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-[12px] font-medium text-[var(--dash-muted)]">Timezone</label>
+              <select
+                value={timeZone}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setTimeZone(next);
+                  void save({ business_timezone: next });
+                }}
+                className="w-full rounded-[10px] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-2.5 text-[14px] text-[var(--dash-text)] outline-none transition-colors focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
+              >
+                {timezones.map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zone}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════
    PAGE
    ═══════════════════════════════════════════════════ */
@@ -1072,6 +1272,14 @@ export default function SettingsPage() {
 
             {/* Integrations */}
             <IntegrationsSection />
+
+            <AutomatedRemindersSection
+              businessId={business.id}
+              initialEnabled={business.reminder_sequence_enabled ?? true}
+              initialQuietStart={business.quiet_hours_start ?? 21}
+              initialQuietEnd={business.quiet_hours_end ?? 9}
+              initialTimezone={business.business_timezone ?? "America/Chicago"}
+            />
 
             {/* Account */}
             <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">

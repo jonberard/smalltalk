@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { SkeletonRow } from "@/components/dashboard/skeleton";
 import { useToast } from "@/components/dashboard/toast";
+import { getReminderBadgeState, type ReminderBadgeState, type ReminderDeliverySummary } from "@/lib/reminder-status";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -14,6 +14,39 @@ import { useToast } from "@/components/dashboard/toast";
 
 type ServiceRow = { id: string; name: string };
 type EmployeeRow = { id: string; name: string };
+type ReviewSessionRow = {
+  status: string;
+  feedback_type: string;
+  optional_text: string | null;
+  updated_at: string;
+};
+type RecentLinkRow = {
+  id: string;
+  customer_name: string;
+  customer_contact: string;
+  created_at: string;
+  sequence_completed: boolean;
+  services: { name: string } | null;
+  review_sessions: ReviewSessionRow[] | null;
+  review_message_deliveries: ReminderDeliverySummary[] | null;
+};
+type RecentLinkItem = {
+  id: string;
+  customer_name: string;
+  customer_contact: string;
+  service_name: string;
+  status: string;
+  created_at: string;
+  reminder_badge: ReminderBadgeState | null;
+};
+type SendReviewRequestResult = {
+  name: string;
+  code: string;
+  channel: "sms" | "email";
+  deliveryStatus: "sent" | "failed" | "skipped";
+  deliveryError?: string;
+  remainingTrialRequests?: number;
+};
 
 /* ═══════════════════════════════════════════════════
    HELPERS
@@ -44,70 +77,6 @@ function getSubTier(business: {
   return "expired"; // none, canceled, paused, past_due, etc.
 }
 
-function isPhone(contact: string): boolean {
-  return !contact.includes("@") && /\d{7,}/.test(contact.replace(/\D/g, ""));
-}
-
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function sendSms(
-  customerName: string,
-  customerContact: string,
-  reviewLinkUrl: string,
-  businessName: string,
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const { fetchWithAuth } = await import("@/lib/supabase");
-    const res = await fetchWithAuth("/api/send-sms", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        customer_name: customerName,
-        customer_contact: customerContact,
-        review_link_url: reviewLinkUrl,
-        business_name: businessName,
-      }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      return { ok: false, error: data.error || `SMS failed (${res.status})` };
-    }
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Network error sending SMS" };
-  }
-}
-
-async function sendEmail(
-  customerName: string,
-  customerEmail: string,
-  reviewLinkUrl: string,
-  businessName: string,
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const { fetchWithAuth } = await import("@/lib/supabase");
-    const res = await fetchWithAuth("/api/send-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        customer_name: customerName,
-        customer_email: customerEmail,
-        review_link_url: reviewLinkUrl,
-        business_name: businessName,
-      }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      return { ok: false, error: data.error || `Email failed (${res.status})` };
-    }
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Network error sending email" };
-  }
-}
-
 function maskContact(contact: string): string {
   if (contact.includes("@")) {
     const [local, domain] = contact.split("@");
@@ -126,6 +95,56 @@ function timeAgo(dateStr: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+function getPrimaryStatus(link: RecentLinkRow): string {
+  const deliveries = link.review_message_deliveries ?? [];
+  const sessions = [...(link.review_sessions ?? [])].sort(
+    (left, right) => new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime(),
+  );
+  const initialDelivery = deliveries.find((delivery) => delivery.kind === "initial");
+
+  if (initialDelivery?.status === "failed") {
+    return "delivery_failed";
+  }
+
+  if (initialDelivery?.status === "skipped" && initialDelivery.skipped_reason === "opted_out") {
+    return "opted_out";
+  }
+
+  if (sessions.some((session) => session.feedback_type === "private" && !!session.optional_text?.trim())) {
+    return "private_feedback";
+  }
+
+  if (sessions.some((session) => session.status === "copied")) {
+    return "copied";
+  }
+
+  if (sessions.some((session) => session.status === "drafted")) {
+    return "drafted";
+  }
+
+  if (sessions.some((session) => session.status === "in_progress")) {
+    return "in_progress";
+  }
+
+  if (sessions.some((session) => session.status === "created")) {
+    return "created";
+  }
+
+  return "sent";
+}
+
+function mapRecentLink(link: RecentLinkRow): RecentLinkItem {
+  return {
+    id: link.id,
+    customer_name: link.customer_name,
+    customer_contact: link.customer_contact,
+    service_name: link.services?.name ?? "\u2014",
+    status: getPrimaryStatus(link),
+    created_at: link.created_at,
+    reminder_badge: getReminderBadgeState(link.review_message_deliveries ?? [], link.sequence_completed),
+  };
 }
 
 /* ═══════════════════════════════════════════════════
@@ -242,7 +261,6 @@ function SingleForm({
   services,
   employees,
   businessId,
-  businessName,
   onSend,
   onServiceCreated,
   onEmployeeCreated,
@@ -250,8 +268,7 @@ function SingleForm({
   services: ServiceRow[];
   employees: EmployeeRow[];
   businessId: string;
-  businessName: string;
-  onSend: (name: string, code: string, smsStatus?: string) => void | Promise<void>;
+  onSend: (result: SendReviewRequestResult) => void | Promise<void>;
   onServiceCreated: (s: ServiceRow) => void;
   onEmployeeCreated: (e: EmployeeRow) => void;
 }) {
@@ -299,54 +316,45 @@ function SingleForm({
     setSending(true);
     setError("");
 
-    const code = generateCode();
-
-    const { error: linkErr } = await supabase
-      .from("review_links")
-      .insert({
-        business_id: businessId,
-        service_id: serviceId,
-        employee_id: employeeId,
-        customer_name: firstName.trim(),
-        customer_contact: contact.trim(),
-        unique_code: code,
+    try {
+      const res = await fetchWithAuth("/api/send-review-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_name: firstName.trim(),
+          customer_contact: contact.trim(),
+          service_id: serviceId,
+          employee_id: employeeId,
+        }),
       });
 
-    if (linkErr) {
-      setError(`Failed to create link: ${linkErr.message}`);
+      const result = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(result.error || `Failed to send review link (${res.status})`);
+        return;
+      }
+
+      await onSend({
+        name: firstName.trim(),
+        code: result.unique_code,
+        channel: result.channel,
+        deliveryStatus: result.delivery_status,
+        deliveryError: result.delivery_error,
+        remainingTrialRequests: result.remaining_trial_requests,
+      });
+
+      setFirstName("");
+      setContact("");
+      setServiceText("");
+      setServiceId(null);
+      setEmployeeText("");
+      setEmployeeId(null);
+    } catch {
+      setError("Network error sending review link");
+    } finally {
       setSending(false);
-      return;
     }
-
-    const linkUrl = `https://usesmalltalk.com/r/${code}`;
-    let deliveryStatus: string | undefined;
-
-    if (isPhone(contact.trim())) {
-      const smsResult = await sendSms(
-        firstName.trim(),
-        contact.trim(),
-        linkUrl,
-        businessName,
-      );
-      deliveryStatus = smsResult.ok ? "sent" : smsResult.error;
-    } else if (contact.trim().includes("@")) {
-      const emailResult = await sendEmail(
-        firstName.trim(),
-        contact.trim(),
-        linkUrl,
-        businessName,
-      );
-      deliveryStatus = emailResult.ok ? "sent" : emailResult.error;
-    }
-
-    await onSend(firstName.trim(), code, deliveryStatus);
-    setFirstName("");
-    setContact("");
-    setServiceText("");
-    setServiceId(null);
-    setEmployeeText("");
-    setEmployeeId(null);
-    setSending(false);
   }
 
   if (services.length === 0) {
@@ -533,6 +541,7 @@ function QRBlock({ businessId, businessName }: { businessId: string; businessNam
         customer_contact: "",
         unique_code: code,
         is_generic: true,
+        reminder_sequence_enabled: false,
       });
 
       if (!error) {
@@ -701,72 +710,63 @@ export default function SendPage() {
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [trialRemaining, setTrialRemaining] = useState<number>(10);
-  const [recentLinks, setRecentLinks] = useState<{ customer_name: string; customer_contact: string; service_name: string; status: string; created_at: string }[]>([]);
+  const [recentLinks, setRecentLinks] = useState<RecentLinkItem[]>([]);
   const { business } = useAuth();
 
   const tier: SubTier = business ? getSubTier(business) : "trial";
 
+  const loadRecentLinks = useCallback(async (businessId: string) => {
+    const { data: links } = await supabase
+      .from("review_links")
+      .select("id, customer_name, customer_contact, created_at, sequence_completed, services(name), review_sessions(status, feedback_type, optional_text, updated_at), review_message_deliveries(kind, status, skipped_reason)")
+      .eq("business_id", businessId)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    setRecentLinks(((links as RecentLinkRow[] | null) ?? []).map(mapRecentLink));
+  }, []);
+
   useEffect(() => {
     if (!business) return;
     setTrialRemaining(business.trial_requests_remaining);
+    const businessId = business.id;
 
     async function fetchData() {
       const [svcRes, empRes] = await Promise.all([
-        supabase.from("services").select("id, name").eq("business_id", business!.id).order("name"),
-        supabase.from("employees").select("id, name").eq("business_id", business!.id).order("name"),
+        supabase.from("services").select("id, name").eq("business_id", businessId).order("name"),
+        supabase.from("employees").select("id, name").eq("business_id", businessId).order("name"),
       ]);
       setServices(svcRes.data || []);
       setEmployees(empRes.data || []);
-
-      const { data: links } = await supabase
-        .from("review_links")
-        .select("customer_name, customer_contact, created_at, services(name), review_sessions(status)")
-        .eq("business_id", business!.id)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (links) {
-        setRecentLinks(links.map((l: any) => ({
-          customer_name: l.customer_name,
-          customer_contact: l.customer_contact,
-          service_name: (l.services as any)?.name ?? "\u2014",
-          status: (l.review_sessions as any)?.[0]?.status ?? "sent",
-          created_at: l.created_at,
-        })));
-      }
-
+      await loadRecentLinks(businessId);
       setLoading(false);
     }
 
     fetchData();
-  }, [business]);
+  }, [business, loadRecentLinks]);
 
-  async function handleSingleSend(name: string, code: string, smsStatus?: string) {
-    if (effectiveTier === "trial" && business) {
-      try {
-        const res = await fetchWithAuth("/api/decrement-trial", { method: "POST" });
-        const result = await res.json();
-        if (result.exhausted) {
-          setTrialRemaining(0);
-          addToast("Your free trial has been used up. Subscribe to keep sending.", "error");
-          return;
-        }
-        setTrialRemaining(result.remaining);
-      } catch {
-        addToast("Couldn\u2019t update your trial usage \u2014 please try again.", "error");
-        return;
-      }
+  async function handleSingleSend(result: SendReviewRequestResult) {
+    if (typeof result.remainingTrialRequests === "number") {
+      setTrialRemaining(result.remainingTrialRequests);
     }
 
-    const link = `usesmalltalk.com/r/${code}`;
-    let msg: string;
-    if (smsStatus === "sent") {
-      msg = `SMS sent to ${name}! ${link}`;
-    } else if (smsStatus) {
-      msg = `Link created for ${name} (SMS failed: ${smsStatus}) \u2014 ${link}`;
+    const link = `usesmalltalk.com/r/${result.code}`;
+
+    if (result.deliveryStatus === "sent") {
+      addToast(
+        `${result.channel === "email" ? "Email" : "SMS"} sent to ${result.name}! ${link}`,
+        "success",
+      );
     } else {
-      msg = `Link created for ${name}! ${link}`;
+      addToast(
+        `Link created for ${result.name} (${result.channel === "email" ? "email" : "SMS"} not sent: ${result.deliveryError || "unknown error"}) - ${link}`,
+        "info",
+      );
     }
-    addToast(msg, "success");
+
+    if (business) {
+      await loadRecentLinks(business.id);
+    }
   }
 
   // Re-check tier with live trialRemaining (business object may be stale)
@@ -824,7 +824,6 @@ export default function SendPage() {
               services={services}
               employees={employees}
               businessId={business!.id}
-              businessName={business!.name}
               onSend={handleSingleSend}
               onServiceCreated={(s) => setServices((prev) => [...prev, s])}
               onEmployeeCreated={(e) => setEmployees((prev) => [...prev, e])}
@@ -847,12 +846,25 @@ export default function SendPage() {
           ) : (
             <div className="overflow-hidden rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)]">
               {recentLinks.map((link, i) => (
-                <div key={i} className={`flex items-center gap-3 px-4 py-3 ${i < recentLinks.length - 1 ? "border-b border-[var(--dash-border)]" : ""}`}>
+                <div key={link.id} className={`flex items-center gap-3 px-4 py-3 ${i < recentLinks.length - 1 ? "border-b border-[var(--dash-border)]" : ""}`}>
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-medium text-[var(--dash-text)]">{link.customer_name}</p>
                     <p className="text-[12px] text-[var(--dash-muted)]">{maskContact(link.customer_contact)} · {link.service_name}</p>
                   </div>
-                  <StatusPill status={link.status} />
+                  <div className="flex shrink-0 items-center gap-2">
+                    {link.reminder_badge && (
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+                          link.reminder_badge.tone === "warning"
+                            ? "bg-[#FFF7ED] text-[#C2410C]"
+                            : "bg-[#F3F4F6] text-[#6B7280]"
+                        }`}
+                      >
+                        {link.reminder_badge.label}
+                      </span>
+                    )}
+                    <StatusPill status={link.status} />
+                  </div>
                   <span className="shrink-0 text-[11px] text-[var(--dash-muted)]">{timeAgo(link.created_at)}</span>
                 </div>
               ))}

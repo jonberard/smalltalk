@@ -21,6 +21,10 @@ export type Business = {
   reply_voice_id: string;
   custom_reply_voice: string | null;
   onboarding_completed: boolean;
+  reminder_sequence_enabled: boolean;
+  quiet_hours_start: number;
+  quiet_hours_end: number;
+  business_timezone: string;
   created_at: string;
 };
 
@@ -43,6 +47,10 @@ export type BusinessInsert = {
   reply_voice_id?: string;
   custom_reply_voice?: string | null;
   onboarding_completed?: boolean;
+  reminder_sequence_enabled?: boolean;
+  quiet_hours_start?: number;
+  quiet_hours_end?: number;
+  business_timezone?: string;
   created_at?: string;
 };
 
@@ -132,6 +140,9 @@ export type ReviewLink = {
   unique_code: string;
   source: string;
   is_generic: boolean;
+  reminder_sequence_enabled: boolean;
+  sequence_completed: boolean;
+  initial_sent_at: string | null;
   created_at: string;
 };
 
@@ -145,6 +156,9 @@ export type ReviewLinkInsert = {
   unique_code: string;
   source?: string;
   is_generic?: boolean;
+  reminder_sequence_enabled?: boolean;
+  sequence_completed?: boolean;
+  initial_sent_at?: string | null;
   created_at?: string;
 };
 
@@ -199,3 +213,31 @@ export type ReviewSessionInsert = {
 };
 
 export type ReviewSessionUpdate = Partial<Omit<ReviewSessionInsert, "id" | "review_link_id">>;
+
+// ═══════════════════════════════════════════
+// REVIEW MESSAGE DELIVERIES
+// ═══════════════════════════════════════════
+
+export type ReviewMessageDeliveryKind = "initial" | "reminder_1" | "reminder_2";
+export type ReviewMessageDeliveryStatus = "pending" | "sent" | "failed" | "skipped";
+
+export type ReviewMessageDelivery = {
+  id: string;
+  review_link_id: string;
+  business_id: string;
+  channel: "sms" | "email";
+  kind: ReviewMessageDeliveryKind;
+  status: ReviewMessageDeliveryStatus;
+  scheduled_for: string;
+  sent_at: string | null;
+  claimed_at: string | null;
+  attempt_count: number;
+  provider_sid: string | null;
+  last_error: string | null;
+  skipped_reason: string | null;
+  to_address: string;
+  normalized_phone: string | null;
+  message_body: string | null;
+  created_at: string;
+  updated_at: string;
+};
