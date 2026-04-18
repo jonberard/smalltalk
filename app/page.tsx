@@ -715,6 +715,39 @@ export default function LandingPage() {
             </details>
           ))}
         </div>
+
+        <div className="mt-12 rounded-card border border-[#E8E5E0] bg-surface p-8 sm:p-10">
+          <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
+            <div className="md:max-w-[60%]">
+              <p className="mb-3 text-[12px] font-medium uppercase tracking-[0.15em] text-muted">
+                Still have questions?
+              </p>
+              <h3 className="font-heading text-[22px] font-semibold text-text">
+                We&rsquo;re happy to walk you through it.
+              </h3>
+              <p className="mt-3 text-[15px] leading-[1.7] text-muted">
+                Whether you&rsquo;re comparing tools, worried about review compliance, or just want to see it in action&nbsp;&mdash; reach out. We answer everything ourselves.
+              </p>
+            </div>
+            <div className="flex flex-col gap-4">
+              <a
+                href="mailto:hello@usesmalltalk.com"
+                className="text-[15px] font-medium text-primary underline underline-offset-4 transition-colors hover:text-text"
+              >
+                Email us at hello@usesmalltalk.com
+              </a>
+              <Link
+                href="/not-review-gating"
+                className="inline-flex items-center gap-1.5 text-[15px] font-medium text-muted underline underline-offset-4 transition-colors hover:text-primary"
+              >
+                Read our take on review gating
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* ════════════════════════════════════════════
