@@ -227,16 +227,20 @@ export default function LandingPage() {
               <em className="font-medium text-primary">blank</em> Google review box.
             </h1>
             <p className="mx-auto mt-6 max-w-[540px] text-[17px] leading-relaxed text-muted sm:text-[19px] lg:mx-0">
-              small Talk guides customers through a 30-second conversation,
-              turns their real answers into a detailed Google review, and
-              hands it back for them to approve and post.
+              small Talk replaces the blank box with a 30-second guided conversation. Your customer taps through what actually happened. We draft a detailed review from their real answers. They edit it if they want, copy it, and post it to Google themselves.
             </p>
             <HeroCTA />
-            <div className="mt-10 border-t border-accent pt-8 lg:text-left">
-              <p className="text-[14px] text-muted">
-                Built for pool companies, landscapers, contractors, and local pros.
-              </p>
+            <div className="mt-8 text-center lg:text-left">
+              <Link
+                href="#how-it-works"
+                className="text-[14px] font-medium text-muted underline underline-offset-4 transition-colors hover:text-primary"
+              >
+                See how it works
+              </Link>
             </div>
+            <p className="mt-6 text-[13px] text-muted">
+              7-day free trial. No credit card. 10 review requests included.
+            </p>
           </div>
           <div className="w-full lg:w-[45%] flex justify-center lg:justify-end">
             <HeroPhone />
@@ -288,7 +292,7 @@ export default function LandingPage() {
       <section id="how-it-works" data-fade className="mx-auto max-w-[1080px] px-6 pb-[160px] scroll-mt-16">
         <div className="mb-16 text-center">
           <SectionLabel>How it works</SectionLabel>
-          <Heading>How It Works: Google Reviews in 30 Seconds</Heading>
+          <Heading>Three steps. Thirty seconds.</Heading>
         </div>
 
         <div className="grid grid-cols-1 gap-12 md:grid-cols-3 md:gap-8">
@@ -341,7 +345,7 @@ export default function LandingPage() {
               2. Customer taps through what actually happened.
             </h3>
             <p className="mb-8 mt-2 min-h-[72px] text-center text-[15px] leading-relaxed text-muted">
-              Your customer picks what stood out in a few quick taps. No blank page, no writer&rsquo;s block. No more hoping they&rsquo;ll get around to it.
+              Your customer picks what stood out in a few quick taps. No blank page. No writer&rsquo;s block.
             </p>
             <div className="relative mx-auto h-[480px] w-[232px] rounded-[40px] border border-muted/20 bg-text p-[3px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] sm:w-[250px]">
               <div className="absolute inset-x-0 top-[4px] z-20 flex justify-center">
@@ -393,7 +397,7 @@ export default function LandingPage() {
               3. small Talk drafts. Customer posts.
             </h3>
             <p className="mb-8 mt-2 min-h-[72px] text-center text-[15px] leading-relaxed text-muted">
-              small Talk drafts a review from their answers. Customer edits, copies, and posts to Google.
+              small Talk drafts a review from their answers. They edit if they want, copy, and post to Google.
             </p>
             <div className="relative mx-auto h-[480px] w-[232px] rounded-[40px] border border-muted/20 bg-text p-[3px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] sm:w-[250px]">
               <div className="absolute inset-x-0 top-[4px] z-20 flex justify-center">
@@ -464,7 +468,7 @@ export default function LandingPage() {
             Review links are easy to send. Reviews are hard to write.
           </Heading>
           <p className="mx-auto mt-8 max-w-[580px] text-[17px] leading-[1.7] text-muted">
-            Most review tools stop at the link. small Talk keeps going. We guide customers through what actually happened, draft a review from their real answers, and make posting feel easy instead of awkward.
+            Most review tools stop at the link. small Talk keeps going &mdash; guiding your customer through a 30-second conversation, drafting a review from their real answers, and making the Google handoff feel easy instead of awkward.
           </p>
         </div>
       </section>
@@ -475,7 +479,7 @@ export default function LandingPage() {
       <section data-fade className="mx-auto max-w-[960px] px-6 pb-[160px]">
         <div className="mb-16 text-center">
           <SectionLabel>The difference</SectionLabel>
-          <Heading>Same Customer. More Detailed Reviews.</Heading>
+          <Heading>Same customer. Same experience. Better review.</Heading>
         </div>
 
         <div className="grid gap-8 sm:grid-cols-2">
@@ -535,7 +539,7 @@ export default function LandingPage() {
             Built to avoid review gating.
           </Heading>
           <p className="mx-auto mt-6 max-w-[580px] text-[17px] leading-[1.7] text-muted">
-            Low rating? The customer still gets a real choice: post publicly or send private feedback. We don&rsquo;t hide unhappy customers. We help you hear them.
+            Low rating? Your customer still gets a real choice: post publicly or send private feedback directly to you. We don&rsquo;t hide unhappy customers. We help you hear them first.
           </p>
         </div>
 
@@ -566,7 +570,7 @@ export default function LandingPage() {
         </div>
 
         <p className="mt-10 text-center text-[15px] leading-[1.7] text-muted">
-          Both options get equal weight. No sneaky filtering. Just a real choice your customers have never had — and peace of mind you&rsquo;ve never had.
+          Both options get equal weight. No sneaky filtering. The customer decides.
         </p>
       </section>
 
@@ -576,9 +580,9 @@ export default function LandingPage() {
       <section data-fade className="mx-auto max-w-[960px] px-6 pb-[160px]">
         <div className="mb-16 text-center">
           <SectionLabel>Try it</SectionLabel>
-          <Heading>See How Customers Leave Google Reviews</Heading>
+          <Heading>See what your customer sees.</Heading>
           <p className="mx-auto mt-4 max-w-[520px] text-[17px] leading-[1.6] text-muted">
-            Your customers tap through a 30-second flow. You watch the reviews roll in.
+            Tap through the same 30-second flow your customers will use.
           </p>
         </div>
         <LandingDemo />
@@ -593,7 +597,7 @@ export default function LandingPage() {
             The AI doesn&rsquo;t invent the experience.
           </Heading>
           <p className="mx-auto mt-8 max-w-[580px] text-[17px] leading-[1.7] text-muted">
-            small Talk only uses what the customer tells us &mdash; their rating, selected topics, follow-up answers, and any notes they add. Customers can edit anything before posting. No fake reviews. No invented details.
+            It only uses what your customer tells us &mdash; their rating, the topics they selected, their answers, and their optional note. They can edit anything before posting. Nothing gets made up.
           </p>
         </div>
       </section>
@@ -603,23 +607,20 @@ export default function LandingPage() {
          ════════════════════════════════════════════ */}
       <section data-fade className="mx-auto max-w-[1080px] px-6 pb-[160px]">
         <div className="mb-16 text-center">
-          <Heading>AI Review Reply Assistant</Heading>
+          <Heading>Reply to every review. Without staring at the screen.</Heading>
           <p className="mx-auto mt-6 max-w-[620px] text-[17px] leading-[1.7] text-muted">
-            Most business owners see a 5-star review and think &ldquo;nice.&rdquo; Then they see a 1-star review and panic. Either way, they don&rsquo;t reply &mdash; because what do you even say?
+            Five-star review? &ldquo;Nice.&rdquo; One-star review? Panic. Either way, most owners don&rsquo;t reply &mdash; because what do you even say?
           </p>
         </div>
 
         <ReplyDemo />
 
         <div className="mt-16 text-center">
-          <p className="mx-auto max-w-[620px] text-[17px] leading-[1.7] text-muted">
-            small Talk drafts the reply. You tweak it if you want. Copy, paste, done. Every review gets a response &mdash; and you never have to wonder what to say again.
+          <p className="mx-auto max-w-[620px] text-[17px] leading-[1.7] text-text font-heading text-[18px] font-semibold">
+            Reply faster, without sounding canned.
           </p>
-          <p className="mx-auto mt-6 max-w-[580px] text-[15px] leading-[1.7] text-muted/80">
-            Works for five-star praise. Works for one-star disasters. Works for the guy who just wrote &ldquo;Good.&rdquo; and nothing else.
-          </p>
-          <p className="mt-10 font-heading text-[17px] font-semibold text-text">
-            Every plan includes unlimited AI replies.
+          <p className="mx-auto mt-4 max-w-[580px] text-[15px] leading-[1.7] text-muted">
+            small Talk drafts a thoughtful response from the review so you&rsquo;re never starting from a blank box.
           </p>
         </div>
       </section>
@@ -630,9 +631,9 @@ export default function LandingPage() {
       <section id="pricing" data-fade className="mx-auto max-w-[960px] px-6 pb-[160px] scroll-mt-16">
         <div className="mb-20 text-center">
           <SectionLabel>Pricing</SectionLabel>
-          <Heading>Google Review Software Pricing</Heading>
+          <Heading>One plan. One price.</Heading>
           <p className="mx-auto mt-4 max-w-[480px] text-[17px] leading-[1.6] text-muted">
-            One plan. Everything you need. Cancel whenever.
+            Everything included. No tiers. No add-ons.
           </p>
         </div>
 
@@ -653,13 +654,11 @@ export default function LandingPage() {
             <ul className="mb-10 flex flex-col gap-4">
               {[
                 "Unlimited review requests",
-                "Detailed, genuine reviews that sound different every time",
-                "Unlimited AI reply drafting for every review",
-                "Reviews that help you rank higher on Google Maps",
-                "Honest negative review handling with private feedback option",
-                "Real-time alerts when negative reviews are submitted",
-                "See exactly who opened, started, and finished",
-                "One-tap handoff to Google \u2014 no extra steps",
+                "Unlimited AI reply drafting",
+                "Automated SMS reminders",
+                "Honest private feedback channel",
+                "All core features included",
+                "Copy the review and open Google in one tap",
               ].map((f) => (
                 <li key={f} className="flex items-start gap-3 text-[14px] text-text">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
@@ -671,7 +670,7 @@ export default function LandingPage() {
             </ul>
             <PricingButton />
             <p className="mt-4 text-center text-[13px] text-muted">
-              No annual contract. No setup fee. No review gating. Send unlimited guided review links for $79/month.
+              No annual contract. No setup fee. No review gating.
             </p>
           </div>
         </div>
@@ -724,10 +723,10 @@ export default function LandingPage() {
       <section data-fade id="get-started" className="mx-auto max-w-[1080px] px-6 pb-[160px]">
         <div className="rounded-card border border-[#E8E5E0] bg-surface px-6 py-20 text-center shadow-[0_8px_30px_rgba(26,46,37,0.08)] sm:px-14">
           <h2 className="mx-auto max-w-[640px] font-heading text-[36px] font-bold leading-tight text-text sm:text-[48px]">
-            Get Your First Google Review in 5 Minutes
+            Send your first guided review link in five minutes.
           </h2>
           <p className="mx-auto mt-6 max-w-[520px] text-[17px] leading-[1.6] text-muted">
-            Sign up, send one link, and see what your customers actually want to say about you.
+            Sign up, send one link, and see what your customer actually wants to say about you.
           </p>
           <FinalCTA />
         </div>
