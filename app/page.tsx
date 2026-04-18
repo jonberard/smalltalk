@@ -259,7 +259,7 @@ export default function LandingPage() {
             ...Nothing.
           </Heading>
           <p className="mx-auto mt-8 max-w-[580px] text-[17px] leading-[1.7] text-muted">
-            The blank box wins 95% of the time.
+            The blank box wins almost every time.
           </p>
           <div className="mx-auto mt-12 flex max-w-md items-start rounded-[12px] border border-[#D1C4B0] bg-white p-6 shadow-[0_12px_40px_rgba(26,46,37,0.12)]">
             <div className="mr-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background">
@@ -453,7 +453,7 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent_50%)]" />
           <h3 className="relative z-10 font-heading text-[28px] font-bold leading-tight sm:text-[40px] lg:text-[48px]">
             In our sample flow, guided reviews are{" "}
-            <em className="underline decoration-accent/50 underline-offset-8">7x more detailed</em>{" "}
+            <em className="underline decoration-accent/50 underline-offset-8">7x the word count</em>{" "}
             than blank-box reviews.
           </h3>
         </div>
