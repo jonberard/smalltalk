@@ -298,7 +298,7 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 gap-12 md:grid-cols-3 md:gap-8">
           {/* Step 1 — Text the link */}
           <div className="flex flex-col items-center">
-            <h3 className="font-heading text-[22px] font-semibold text-text">
+            <h3 className="flex min-h-[72px] items-start font-heading text-[22px] font-semibold text-text text-center">
               1. Send a guided review link.
             </h3>
             <p className="mb-8 mt-2 min-h-[72px] text-center text-[15px] leading-relaxed text-muted">
@@ -341,7 +341,7 @@ export default function LandingPage() {
 
           {/* Step 2 — They tap, no typing */}
           <div className="flex flex-col items-center">
-            <h3 className="font-heading text-[22px] font-semibold text-text">
+            <h3 className="flex min-h-[72px] items-start font-heading text-[22px] font-semibold text-text text-center">
               2. Customer taps through what actually happened.
             </h3>
             <p className="mb-8 mt-2 min-h-[72px] text-center text-[15px] leading-relaxed text-muted">
@@ -393,7 +393,7 @@ export default function LandingPage() {
 
           {/* Step 3 — AI drafts, they post */}
           <div className="flex flex-col items-center">
-            <h3 className="font-heading text-[22px] font-semibold text-text">
+            <h3 className="flex min-h-[72px] items-start font-heading text-[22px] font-semibold text-text text-center">
               3. small Talk drafts. Customer posts.
             </h3>
             <p className="mb-8 mt-2 min-h-[72px] text-center text-[15px] leading-relaxed text-muted">
