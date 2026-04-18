@@ -9,6 +9,7 @@ import {
 } from "@/lib/review-request-messages";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendReviewSms } from "@/lib/twilio-send";
+import { serverCapture } from "@/lib/posthog-server";
 
 type SendRequestBody = {
   customer_name?: string;
@@ -289,8 +290,10 @@ export async function POST(req: NextRequest) {
         .update({ initial_sent_at: sentAt })
         .eq("id", reviewLink.id);
 
+      serverCapture(userId, "review_request_sent", { channel, business_id: business.id });
+
       if (reminderSequenceEnabled) {
-        await supabaseAdmin.from("review_message_deliveries").insert([
+        const { error: reminderError } = await supabaseAdmin.from("review_message_deliveries").insert([
           {
             review_link_id: reviewLink.id,
             business_id: business.id,
@@ -324,6 +327,10 @@ export async function POST(req: NextRequest) {
             }),
           },
         ]);
+
+        if (!reminderError) {
+          serverCapture(userId, "reminder_scheduled", { reminder_count: 2, business_id: business.id });
+        }
       }
 
       const remainingTrialRequests = await decrementTrialIfNeeded(business as BusinessRow);
@@ -406,6 +413,7 @@ export async function POST(req: NextRequest) {
       .update({ initial_sent_at: sentAt })
       .eq("id", reviewLink.id);
 
+    serverCapture(userId, "review_request_sent", { channel, business_id: business.id });
     const remainingTrialRequests = await decrementTrialIfNeeded(business as BusinessRow);
 
     return NextResponse.json({

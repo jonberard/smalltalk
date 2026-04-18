@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { identify as phIdentify, reset as phReset } from "@/lib/posthog";
 import type { Session } from "@supabase/supabase-js";
 import type { Business } from "@/lib/types";
 
@@ -79,6 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setNoBusiness(false);
       setBusiness(biz);
 
+      // Identify user in PostHog (no PII — just business-level traits)
+      phIdentify(userId, {
+        subscription_status: biz.subscription_status,
+        onboarding_completed: biz.onboarding_completed,
+      });
+
       // Redirect to onboarding if not completed (unless already there)
       if (!biz.onboarding_completed && !window.location.pathname.startsWith("/onboarding")) {
         router.replace("/onboarding");
@@ -88,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    phReset();
     await supabase.auth.signOut();
     router.replace("/login");
   }

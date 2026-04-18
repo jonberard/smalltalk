@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
+import { capture } from "@/lib/posthog";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -662,7 +663,10 @@ function StepReady({
   }, [businessId]);
 
   async function handleFinish(path: string) {
-    await supabase.from("businesses").update({ onboarding_completed: true }).eq("id", businessId);
+    const { error } = await supabase.from("businesses").update({ onboarding_completed: true }).eq("id", businessId);
+    if (!error) {
+      capture("onboarding_completed");
+    }
     onFinish(path);
   }
 
@@ -767,6 +771,7 @@ export default function OnboardingPage() {
 
       setUserId(user.id);
       setLoading(false);
+      capture("onboarding_started");
     });
   }, [router]);
 

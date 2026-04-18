@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
+import { capture } from "@/lib/posthog";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { useToast } from "@/components/dashboard/toast";
@@ -650,6 +651,10 @@ function QRBlock({ businessId, businessName }: { businessId: string; businessNam
 
 function Paywall({ hadTrial }: { hadTrial: boolean }) {
   const [redirecting, setRedirecting] = useState(false);
+
+  useEffect(() => {
+    capture("trial_paywall_hit", { had_trial: hadTrial });
+  }, [hadTrial]);
 
   async function handleSubscribe() {
     setRedirecting(true);

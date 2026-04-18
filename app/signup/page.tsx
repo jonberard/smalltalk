@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { capture, identify } from "@/lib/posthog";
 
 function friendlyError(message: string): string {
   if (message.includes("User already registered")) {
@@ -29,6 +30,8 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
+      capture("signup_started");
+
       // 1. Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -94,7 +97,9 @@ export default function SignupPage() {
         return;
       }
 
-      // 4. Redirect to onboarding
+      // 4. Identify and redirect to onboarding
+      identify(userId, { subscription_status: "trialing" });
+      capture("signup_completed");
       router.push("/onboarding");
     } catch {
       setError("Something went wrong. Please try again.");

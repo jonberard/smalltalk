@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getNextAllowedSendAt, isInQuietHours } from "@/lib/quiet-hours";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendReviewSms } from "@/lib/twilio-send";
+import { serverCapture } from "@/lib/posthog-server";
 
 type DeliveryRow = {
   id: string;
@@ -23,6 +24,8 @@ type ReviewLinkContext = {
   is_generic: boolean;
   reminder_sequence_enabled: boolean | null;
   sequence_completed: boolean | null;
+  initial_sent_at: string | null;
+  created_at: string;
   businesses: {
     name: string;
     reminder_sequence_enabled: boolean | null;
@@ -51,7 +54,7 @@ async function loadReviewLinkContext(reviewLinkId: string) {
   const { data } = await supabaseAdmin
     .from("review_links")
     .select(
-      "id, business_id, is_generic, reminder_sequence_enabled, sequence_completed, businesses(name, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone)",
+      "id, business_id, is_generic, reminder_sequence_enabled, sequence_completed, initial_sent_at, created_at, businesses(name, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone)",
     )
     .eq("id", reviewLinkId)
     .maybeSingle();
@@ -254,6 +257,9 @@ export async function GET(req: NextRequest) {
         })
         .eq("id", delivery.id);
 
+      const linkAnchor = evaluation.reviewLink.initial_sent_at ?? evaluation.reviewLink.created_at;
+      const linkAgeHours = Math.round(((Date.now() - new Date(linkAnchor).getTime()) / 3600000) * 10) / 10;
+      serverCapture(delivery.business_id, "reminder_sent", { kind: delivery.kind, delivery_id: delivery.id, link_age_hours: linkAgeHours });
       results.push({
         id: delivery.id,
         kind: delivery.kind,

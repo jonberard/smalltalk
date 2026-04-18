@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
+import { capture } from "@/lib/posthog";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -405,6 +406,7 @@ export default function Dashboard() {
       if (data.reply_text) {
         setReplyText(data.reply_text);
         setReplyError("");
+        capture("reply_generated", { session_id: item.sessionId, star_rating: item.stars });
       } else {
         setReplyError("Failed to generate reply. Please try again.");
       }
@@ -427,6 +429,7 @@ export default function Dashboard() {
       document.body.removeChild(ta);
     }
     setReplyCopied(true);
+    capture("reply_copied", { session_id: replyModal.sessionId, star_rating: replyModal.stars });
 
     // Mark session as replied
     await supabase

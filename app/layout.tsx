@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, DM_Sans, Inter } from "next/font/google";
+import { Suspense } from "react";
+import { PostHogProvider } from "@/components/providers/posthog-provider";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -60,7 +62,9 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" sizes="32x32" />
       </head>
       <body className="bg-background font-body text-text antialiased">
-        {children}
+        <Suspense fallback={null}>
+          <PostHogProvider>{children}</PostHogProvider>
+        </Suspense>
       </body>
     </html>
   );

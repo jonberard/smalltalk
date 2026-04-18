@@ -39,6 +39,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { capture } from "@/lib/posthog";
 
 /* ═══════════════════════════════════════════════════
    DATA TYPES
@@ -1069,6 +1070,7 @@ function ReviewScreen({
         const result = await res.json();
         setReviewText(result.review_text);
         setVoiceId(result.voice_id);
+        capture("review_generated", { star_rating: rating, word_count: result.review_text.split(/\s+/).length, session_id: data.sessionId });
 
         // Save to session
         const { error: saveErr } = await supabase
@@ -1142,12 +1144,14 @@ function ReviewScreen({
     }
 
     setCopied(true);
+    capture("review_copied", { copy_method: "auto", word_count: reviewText.split(/\s+/).length, session_id: data.sessionId });
     onPost(reviewText, voiceId || "", false);
-  }, [reviewText, voiceId, onPost]);
+  }, [reviewText, voiceId, onPost, data.sessionId]);
 
   const handleManualCopyDone = useCallback(() => {
+    capture("review_copied", { copy_method: "manual", word_count: reviewText.split(/\s+/).length, session_id: data.sessionId });
     onPost(reviewText, voiceId || "", false);
-  }, [reviewText, voiceId, onPost]);
+  }, [reviewText, voiceId, onPost, data.sessionId]);
 
   return (
     <div className="flex flex-col items-center">
@@ -1920,7 +1924,7 @@ function NotFoundScreen() {
    MAIN FLOW
    ═══════════════════════════════════════════════════ */
 
-function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Record<string, TopicDef[]> }) {
+function ReviewFlowInner({ data, allTopics, isNewSession }: { data: ReviewData; allTopics: Record<string, TopicDef[]>; isNewSession: boolean }) {
   const [step, setStep] = useState<Step>("stars");
   const [rating, setRating] = useState(0);
   const [path, setPath] = useState<"public" | "private" | null>(null);
@@ -1932,6 +1936,13 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
   const [optionalDetail, setOptionalDetail] = useState("");
   const [finalReview, setFinalReview] = useState("");
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Track link opened — only on first visit (new session), not refreshes/revisits
+  useEffect(() => {
+    if (isNewSession) {
+      capture("review_link_opened", { session_id: data.sessionId });
+    }
+  }, [data.sessionId, isNewSession]);
 
   // Check if browser supports Web Speech API
   const hasSpeechSupport = useMemo(() => {
@@ -1964,6 +1975,7 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
   // Star rating handler
   const handleRate = useCallback(async (r: number) => {
     setRating(r);
+    capture("stars_selected", { star_rating: r, session_id: data.sessionId });
     const { error } = await supabase
       .from("review_sessions")
       .update({ star_rating: r, status: "in_progress", updated_at: new Date().toISOString() })
@@ -2003,6 +2015,11 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
       const resolved = resolveTopics(labels, customTopic);
       setSelectedTopics(resolved);
       setCurrentTopicIdx(0);
+      capture("topics_selected", {
+        topic_count: resolved.length,
+        has_custom_topic: !!customTopic,
+        session_id: data.sessionId,
+      });
       if (resolved.length > 0) {
         setStep("followup");
       } else {
@@ -2079,6 +2096,11 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
   const handleDetail = useCallback(
     (text: string) => {
       setOptionalDetail(text);
+      capture("detail_provided", {
+        had_detail: !!text,
+        word_count: text ? text.trim().split(/\s+/).length : 0,
+        session_id: data.sessionId,
+      });
       if (text) {
         supabase
           .from("review_sessions")
@@ -2169,6 +2191,8 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
       }),
     }).catch(() => {}); // fire-and-forget — don't block the customer
 
+    capture("private_feedback_submitted", { star_rating: rating, session_id: data.sessionId });
+    capture("review_completed", { star_rating: rating, feedback_type: "private", session_id: data.sessionId });
     setStep("private-success");
   }, [data.sessionId, data.reviewLinkId, data.customerName, rating]);
 
@@ -2285,7 +2309,10 @@ function ReviewFlowInner({ data, allTopics }: { data: ReviewData; allTopics: Rec
               reviewText={finalReview}
               rating={rating}
               data={data}
-              onContinue={() => setStep("success")}
+              onContinue={() => {
+                capture("review_completed", { star_rating: rating, feedback_type: "public", session_id: data.sessionId });
+                setStep("success");
+              }}
             />
           )}
 
@@ -2329,6 +2356,7 @@ export default function ReviewFlow() {
   const [allTopics, setAllTopics] = useState<Record<string, TopicDef[]>>({});
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isNewSession, setIsNewSession] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -2424,6 +2452,7 @@ export default function ReviewFlow() {
         .single();
 
       let session: { id: string };
+      let sessionIsNew = false;
       if (existingSession) {
         session = existingSession;
       } else {
@@ -2439,6 +2468,7 @@ export default function ReviewFlow() {
           return;
         }
         session = newSession;
+        sessionIsNew = true;
       }
 
       const reviewData: ReviewData = {
@@ -2458,6 +2488,7 @@ export default function ReviewFlow() {
 
       setData(reviewData);
       setAllTopics(grouped);
+      setIsNewSession(sessionIsNew);
       setLoading(false);
     }
 
@@ -2466,5 +2497,5 @@ export default function ReviewFlow() {
 
   if (loading) return <LoadingSkeleton />;
   if (notFound || !data) return <NotFoundScreen />;
-  return <ReviewFlowInner data={data} allTopics={allTopics} />;
+  return <ReviewFlowInner data={data} allTopics={allTopics} isNewSession={isNewSession} />;
 }
