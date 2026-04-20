@@ -171,6 +171,7 @@ export type ReviewLinkUpdate = Partial<Omit<ReviewLinkInsert, "id" | "business_i
 export type ReviewSessionStatus = "created" | "in_progress" | "drafted" | "copied" | "posted";
 
 export type FeedbackType = "public" | "private";
+export type PrivateFeedbackStatus = "new" | "handled";
 
 export type TopicSelection = {
   topic_id: string;
@@ -188,6 +189,9 @@ export type ReviewSession = {
   generated_review: string | null;
   status: ReviewSessionStatus;
   feedback_type: FeedbackType;
+  private_feedback_status: PrivateFeedbackStatus;
+  private_feedback_handled_at: string | null;
+  parent_private_feedback_session_id: string | null;
   generation_count: number;
   reply_generation_count: number;
   reply_text: string | null;
@@ -206,6 +210,9 @@ export type ReviewSessionInsert = {
   generated_review?: string | null;
   status?: ReviewSessionStatus;
   feedback_type?: FeedbackType;
+  private_feedback_status?: PrivateFeedbackStatus;
+  private_feedback_handled_at?: string | null;
+  parent_private_feedback_session_id?: string | null;
   reply_text?: string | null;
   replied_at?: string | null;
   created_at?: string;

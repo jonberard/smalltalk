@@ -44,12 +44,30 @@ type ActivityItem = {
   action: string;
   time: string;
   status: string;
+  feedbackType: "public" | "private";
+  privateFeedbackStatus: "new" | "handled" | null;
+  privateFeedbackHandledAt: string | null;
   stars: number | null;
   snippet: string | null;
   repliedAt: string | null;
   employeeName: string | null;
   serviceType: string | null;
+  customerContact: string | null;
   topicsSelected: { label: string; follow_up_answer: string }[] | null;
+  parentPrivateFeedbackSessionId: string | null;
+};
+
+type PrivateFeedbackItem = {
+  sessionId: string;
+  name: string;
+  time: string;
+  stars: number | null;
+  message: string;
+  employeeName: string | null;
+  serviceType: string | null;
+  customerContact: string | null;
+  status: "new" | "handled";
+  handledAt: string | null;
 };
 
 /* ═══════════════════════════════════════════════════
@@ -72,7 +90,33 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
-function statusToAction(status: string, stars: number | null): string {
+function statusToAction(
+  status: string,
+  stars: number | null,
+  feedbackType: "public" | "private",
+  parentPrivateFeedbackSessionId: string | null,
+): string {
+  if (feedbackType === "private" && status === "drafted") {
+    return "sent private feedback";
+  }
+
+  if (parentPrivateFeedbackSessionId) {
+    switch (status) {
+      case "copied":
+        return stars
+          ? `posted a ${stars}-star review after private feedback`
+          : "posted a review after private feedback";
+      case "drafted":
+        return "drafted a public review after private feedback";
+      case "in_progress":
+        return "came back to post publicly";
+      case "created":
+        return "reopened the request to post publicly";
+      default:
+        return "activity recorded";
+    }
+  }
+
   switch (status) {
     case "copied":
       return stars ? `posted a ${stars}-star review` : "posted a review";
@@ -99,6 +143,22 @@ function statusToAttentionDetail(status: string, updatedAt: string): string {
     default:
       return `Last activity ${ago}`;
   }
+}
+
+function formatCustomerContact(contact: string | null) {
+  if (!contact) return null;
+
+  if (contact.includes("@")) {
+    return {
+      href: `mailto:${contact}`,
+      label: contact,
+    };
+  }
+
+  return {
+    href: `tel:${contact}`,
+    label: contact,
+  };
 }
 
 function getGreeting(): string {
@@ -207,15 +267,20 @@ export default function Dashboard() {
   const [funnelLoading, setFunnelLoading] = useState(true);
   const [attention, setAttention] = useState<AttentionItem[]>([]);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [privateFeedbackItems, setPrivateFeedbackItems] = useState<PrivateFeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [replyModal, setReplyModal] = useState<ActivityItem | null>(null);
   const [replyText, setReplyText] = useState("");
   const [replyError, setReplyError] = useState("");
   const [replyLoading, setReplyLoading] = useState(false);
   const [replyCopied, setReplyCopied] = useState(false);
+  const [privateFeedbackModal, setPrivateFeedbackModal] = useState<PrivateFeedbackItem | null>(null);
+  const [privateFeedbackActionLoading, setPrivateFeedbackActionLoading] = useState(false);
+  const [privateFeedbackActionError, setPrivateFeedbackActionError] = useState("");
   const { business } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const feedbackParam = searchParams.get("feedback");
 
   // Safety net: verify subscription with Stripe after checkout redirect
   useEffect(() => {
@@ -256,7 +321,7 @@ export default function Dashboard() {
       // 2. All sessions for this business
       const { data: allSessions } = await supabase
         .from("review_sessions")
-        .select("id, star_rating, status, generated_review, topics_selected, replied_at, created_at, updated_at, review_links!inner(business_id, customer_name, services(name), employees(name))")
+        .select("id, star_rating, status, feedback_type, optional_text, generated_review, topics_selected, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, replied_at, created_at, updated_at, review_links!inner(business_id, customer_name, customer_contact, services(name), employees(name))")
         .eq("review_links.business_id", businessId)
         .order("updated_at", { ascending: false });
 
@@ -279,10 +344,50 @@ export default function Dashboard() {
 
       setStats({ reviewsThisMonth, avgRating, completionRate, totalLinks: linkCount });
 
+      const privateFeedback = sessions
+        .filter(
+          (s) =>
+            s.feedback_type === "private" &&
+            typeof s.optional_text === "string" &&
+            s.optional_text.trim().length > 0,
+        )
+        .map((s) => {
+          const link = s.review_links as unknown as {
+            customer_name: string;
+            customer_contact: string | null;
+            services: { name: string } | null;
+            employees: { name: string } | null;
+          };
+
+          return {
+            sessionId: s.id,
+            name: link.customer_name,
+            time: timeAgo(s.updated_at),
+            stars: s.star_rating,
+            message: s.optional_text,
+            employeeName: link.employees?.name ?? null,
+            serviceType: link.services?.name ?? null,
+            customerContact: link.customer_contact ?? null,
+            status:
+              (s.private_feedback_status as "new" | "handled" | null) ?? "new",
+            handledAt: s.private_feedback_handled_at ?? null,
+          } satisfies PrivateFeedbackItem;
+        })
+        .sort((a, b) => {
+          if (a.status === b.status) return 0;
+          return a.status === "new" ? -1 : 1;
+        });
+
+      setPrivateFeedbackItems(privateFeedback);
+
       // ── Needs Attention ──
       // Sessions that are stalled: drafted but not posted, or in_progress/created but not finished
       const attentionSessions = sessions.filter(
-        (s) => s.status === "drafted" || s.status === "in_progress" || s.status === "created"
+        (s) =>
+          s.feedback_type !== "private" &&
+          (s.status === "drafted" ||
+            s.status === "in_progress" ||
+            s.status === "created")
       ).slice(0, 5);
 
       setAttention(
@@ -303,30 +408,60 @@ export default function Dashboard() {
         recentActivity.map((s) => {
           const link = s.review_links as unknown as {
             customer_name: string;
+            customer_contact: string | null;
             services: { name: string } | null;
             employees: { name: string } | null;
           };
           return {
             sessionId: s.id,
             name: link.customer_name,
-            action: statusToAction(s.status, s.star_rating),
+            action: statusToAction(
+              s.status,
+              s.star_rating,
+              s.feedback_type ?? "public",
+              s.parent_private_feedback_session_id ?? null,
+            ),
             time: timeAgo(s.updated_at),
-            status: s.status,
+            status:
+              s.feedback_type === "private" && s.status === "drafted"
+                ? "private_feedback"
+                : s.status,
+            feedbackType: s.feedback_type ?? "public",
+            privateFeedbackStatus:
+              (s.private_feedback_status as "new" | "handled" | null) ?? null,
+            privateFeedbackHandledAt: s.private_feedback_handled_at ?? null,
             stars: s.star_rating,
-            snippet: s.generated_review,
+            snippet:
+              s.feedback_type === "private"
+                ? s.optional_text
+                : s.generated_review,
             repliedAt: s.replied_at ?? null,
             employeeName: link.employees?.name ?? null,
             serviceType: link.services?.name ?? null,
+            customerContact: link.customer_contact ?? null,
             topicsSelected: s.topics_selected as { label: string; follow_up_answer: string }[] | null,
+            parentPrivateFeedbackSessionId:
+              s.parent_private_feedback_session_id ?? null,
           };
         })
       );
+
+      if (feedbackParam) {
+        const matchingFeedback = privateFeedback.find(
+          (item) => item.sessionId === feedbackParam,
+        );
+
+        if (matchingFeedback) {
+          setPrivateFeedbackModal(matchingFeedback);
+          setPrivateFeedbackActionError("");
+        }
+      }
 
       setLoading(false);
     }
 
     fetchAll();
-  }, [business]);
+  }, [business, feedbackParam]);
 
   // ── Funnel (separate effect so time filter can re-trigger) ──
   useEffect(() => {
@@ -447,6 +582,79 @@ export default function Dashboard() {
     );
 
     setTimeout(() => setReplyCopied(false), 3000);
+  }
+
+  function closePrivateFeedbackModal() {
+    setPrivateFeedbackModal(null);
+    setPrivateFeedbackActionError("");
+
+    if (feedbackParam) {
+      router.replace("/dashboard", { scroll: false });
+    }
+  }
+
+  async function markPrivateFeedbackHandled(sessionId: string) {
+    setPrivateFeedbackActionLoading(true);
+    setPrivateFeedbackActionError("");
+
+    try {
+      const res = await fetchWithAuth(`/api/private-feedback/${sessionId}/handled`, {
+        method: "POST",
+      });
+      const body = (await res.json()) as {
+        error?: string;
+        private_feedback_handled_at?: string;
+      };
+
+      if (!res.ok) {
+        throw new Error(body.error || "Couldn’t mark feedback as handled.");
+      }
+
+      const handledAt =
+        body.private_feedback_handled_at ?? new Date().toISOString();
+
+      setPrivateFeedbackItems((prev) =>
+        prev.map((item) =>
+          item.sessionId === sessionId
+            ? {
+                ...item,
+                status: "handled",
+                handledAt,
+              }
+            : item,
+        ),
+      );
+
+      setActivityItems((prev) =>
+        prev.map((item) =>
+          item.sessionId === sessionId
+            ? {
+                ...item,
+                privateFeedbackStatus: "handled",
+                privateFeedbackHandledAt: handledAt,
+              }
+            : item,
+        ),
+      );
+
+      setPrivateFeedbackModal((prev) =>
+        prev && prev.sessionId === sessionId
+          ? {
+              ...prev,
+              status: "handled",
+              handledAt,
+            }
+          : prev,
+      );
+    } catch (error) {
+      setPrivateFeedbackActionError(
+        error instanceof Error
+          ? error.message
+          : "Couldn’t mark feedback as handled.",
+      );
+    } finally {
+      setPrivateFeedbackActionLoading(false);
+    }
   }
 
   const FUNNEL_STAGES: { key: keyof FunnelData; label: string }[] = [
@@ -680,6 +888,61 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* ─── Private Feedback ─── */}
+        {!loading && privateFeedbackItems.length > 0 && (
+          <div className="mt-6">
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="text-[15px] font-semibold text-[var(--dash-text)]">
+                Private Feedback
+              </h2>
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#EFF6FF] px-1.5 text-[10px] font-semibold text-[#2563EB]">
+                {privateFeedbackItems.filter((item) => item.status === "new").length}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {privateFeedbackItems.slice(0, 5).map((item) => (
+                <button
+                  key={item.sessionId}
+                  type="button"
+                  onClick={() => {
+                    setPrivateFeedbackModal(item);
+                    setPrivateFeedbackActionError("");
+                  }}
+                  className="w-full rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-4 text-left shadow-[var(--dash-shadow)] transition-colors hover:border-[#E05A3D]/40"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[14px] font-semibold text-[var(--dash-text)]">
+                          {item.name}
+                        </p>
+                        <StatusPill
+                          status={
+                            item.status === "new" ? "private_feedback" : "handled"
+                          }
+                        />
+                        {item.stars ? <RatingBadge rating={item.stars} /> : null}
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                        {item.message}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[var(--dash-muted)]">
+                        {item.serviceType ? <span>{item.serviceType}</span> : null}
+                        {item.employeeName ? <span>{item.employeeName}</span> : null}
+                        <span>{item.time}</span>
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-[12px] font-medium text-[var(--dash-primary)]">
+                      Review
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ─── Two-Column Layout ─── */}
         <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-5">
 
@@ -700,7 +963,9 @@ export default function Dashboard() {
               ) : activityItems.length > 0 ? (
                 activityItems.map((item, i) => {
                   const initial = item.name.charAt(0).toUpperCase();
-                  const isCopied = item.status === "copied";
+                  const isCopied =
+                    item.status === "copied" && item.feedbackType !== "private";
+                  const isPrivateFeedback = item.feedbackType === "private";
                   const hasReplied = !!item.repliedAt;
                   return (
                     <div
@@ -716,11 +981,37 @@ export default function Dashboard() {
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] font-medium text-[var(--dash-text)]">{item.name}</span>
                           <StatusPill status={item.status} />
+                          {isPrivateFeedback && item.privateFeedbackStatus === "handled" && (
+                            <span className="text-[10px] font-medium text-[#2563EB]">Handled</span>
+                          )}
                           {hasReplied && (
                             <span className="text-[10px] font-medium text-[#059669]">Replied &#10003;</span>
                           )}
                         </div>
                       </div>
+                      {isPrivateFeedback && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPrivateFeedbackModal({
+                              sessionId: item.sessionId,
+                              name: item.name,
+                              time: item.time,
+                              stars: item.stars,
+                              message: item.snippet ?? "",
+                              employeeName: item.employeeName,
+                              serviceType: item.serviceType,
+                              customerContact: item.customerContact,
+                              status: item.privateFeedbackStatus ?? "new",
+                              handledAt: item.privateFeedbackHandledAt,
+                            });
+                            setPrivateFeedbackActionError("");
+                          }}
+                          className="shrink-0 rounded-[var(--dash-radius-sm)] border border-[#2563EB] px-2.5 py-1 text-[11px] font-semibold text-[#2563EB] transition-colors hover:bg-[#2563EB]/5 active:scale-[0.97]"
+                        >
+                          Review
+                        </button>
+                      )}
                       {isCopied && !hasReplied && (
                         <button
                           type="button"
@@ -812,6 +1103,140 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      {/* ─── Private Feedback Modal ─── */}
+      {privateFeedbackModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+          onClick={closePrivateFeedbackModal}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") closePrivateFeedbackModal();
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Private feedback"
+            className="w-full max-w-[560px] rounded-t-[16px] bg-white p-6 shadow-xl sm:mx-4 sm:rounded-[var(--dash-radius)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-[18px] font-bold text-[var(--dash-text)]">
+                    {privateFeedbackModal.name}
+                  </h3>
+                  <StatusPill
+                    status={
+                      privateFeedbackModal.status === "new"
+                        ? "private_feedback"
+                        : "handled"
+                    }
+                  />
+                  {privateFeedbackModal.stars ? (
+                    <RatingBadge rating={privateFeedbackModal.stars} />
+                  ) : null}
+                </div>
+                <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
+                  {privateFeedbackModal.time}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closePrivateFeedbackModal}
+                aria-label="Close"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--dash-muted)] transition-colors hover:bg-[var(--dash-bg)]"
+              >
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-3 text-[13px] text-[var(--dash-muted)]">
+              {(privateFeedbackModal.serviceType || privateFeedbackModal.employeeName) && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {privateFeedbackModal.serviceType ? (
+                    <span>
+                      <strong className="text-[var(--dash-text)]">Service:</strong>{" "}
+                      {privateFeedbackModal.serviceType}
+                    </span>
+                  ) : null}
+                  {privateFeedbackModal.employeeName ? (
+                    <span>
+                      <strong className="text-[var(--dash-text)]">Employee:</strong>{" "}
+                      {privateFeedbackModal.employeeName}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+
+              {privateFeedbackModal.customerContact &&
+                (() => {
+                  const contact = formatCustomerContact(
+                    privateFeedbackModal.customerContact,
+                  );
+
+                  return contact ? (
+                    <div>
+                      <strong className="text-[var(--dash-text)]">Customer contact:</strong>{" "}
+                      <a
+                        href={contact.href}
+                        className="font-medium text-[var(--dash-primary)] underline underline-offset-2"
+                      >
+                        {contact.label}
+                      </a>
+                    </div>
+                  ) : null;
+                })()}
+            </div>
+
+            <div className="mt-5 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] p-4">
+              <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--dash-muted)]">
+                Message
+              </p>
+              <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--dash-text)]">
+                {privateFeedbackModal.message}
+              </p>
+            </div>
+
+            {privateFeedbackActionError && (
+              <div className="mt-4 rounded-[var(--dash-radius-sm)] border border-[#DC2626]/20 bg-[#FEF2F2] px-4 py-3 text-[13px] text-[#DC2626]">
+                {privateFeedbackActionError}
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-[12px] text-[var(--dash-muted)]">
+                {privateFeedbackModal.status === "handled" &&
+                privateFeedbackModal.handledAt
+                  ? `Marked handled ${timeAgo(privateFeedbackModal.handledAt)}`
+                  : "Private feedback should be handled in your own workflow — small Talk just keeps the record straight."}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={closePrivateFeedbackModal}
+                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                >
+                  Close
+                </button>
+                {privateFeedbackModal.status !== "handled" && (
+                  <button
+                    type="button"
+                    onClick={() => markPrivateFeedbackHandled(privateFeedbackModal.sessionId)}
+                    disabled={privateFeedbackActionLoading}
+                    className="rounded-[var(--dash-radius-sm)] bg-[var(--dash-primary)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-60"
+                  >
+                    {privateFeedbackActionLoading ? "Saving..." : "Mark handled"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Reply Modal ─── */}
       {replyModal && (

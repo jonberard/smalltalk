@@ -48,6 +48,8 @@ export async function POST(
     .from("review_sessions")
     .update({
       feedback_type: "private",
+      private_feedback_status: "new",
+      private_feedback_handled_at: null,
       optional_text: feedback,
       star_rating: starRating,
       status: "drafted",
@@ -61,6 +63,7 @@ export async function POST(
 
   if (!sessionContext.session.private_owner_notified_at) {
     const notifyResult = await sendOwnerNotification({
+      sessionId: sessionContext.session.id,
       reviewLinkId: sessionContext.reviewLink.id,
       customerName: sessionContext.reviewLink.customer_name,
       starRating,

@@ -111,7 +111,7 @@ function buildPrivateEmailHtml({
         </td></tr>
         <tr><td style="padding:24px 32px;">
           <p style="margin:0 0 16px;font-size:15px;color:#1A2E25;line-height:1.5;">
-            ${escapeHtml(customerName)} rated their experience <strong>${starRating} star${starRating !== 1 ? "s" : ""}</strong> and chose to send you feedback directly instead of posting publicly. This is your chance to make it right.
+            ${escapeHtml(customerName)} rated their experience <strong>${starRating} star${starRating !== 1 ? "s" : ""}</strong> and chose to send you feedback directly instead of posting publicly.
           </p>
           <div style="margin:0 0 16px;">
             ${starHtml(starRating)}
@@ -120,7 +120,7 @@ function buildPrivateEmailHtml({
             <p style="margin:0;font-size:14px;color:#1A2E25;line-height:1.6;white-space:pre-wrap;">${feedbackText.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
           </div>
           <p style="margin:0 0 24px;font-size:14px;color:#5E7268;line-height:1.5;">
-            Reaching out quickly can turn this experience around. You can view this feedback and respond from your dashboard.
+            You can view this feedback, mark it handled, and follow up from your dashboard.
           </p>
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
@@ -171,12 +171,14 @@ async function loadOwnerNotificationContext(reviewLinkId: string) {
 }
 
 export async function sendOwnerNotification({
+  sessionId,
   reviewLinkId,
   customerName,
   starRating,
   reviewText,
   isPrivate,
 }: {
+  sessionId?: string;
   reviewLinkId: string;
   customerName: string;
   starRating: number;
@@ -199,7 +201,9 @@ export async function sendOwnerNotification({
     return { success: false, error: "Business has no owner email configured" };
   }
 
-  const dashboardUrl = `${getAppBaseUrl()}/dashboard`;
+  const dashboardUrl = isPrivate && sessionId
+    ? `${getAppBaseUrl()}/dashboard?feedback=${encodeURIComponent(sessionId)}`
+    : `${getAppBaseUrl()}/dashboard`;
   const resend = new Resend(apiKey);
   const subject = isPrivate
     ? `${customerName} sent you private feedback`

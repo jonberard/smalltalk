@@ -39,6 +39,7 @@ export type PublicReviewData = {
 };
 
 export type PublicFlowSessionState = {
+  sessionId: string;
   status: string;
   starRating: number | null;
   feedbackType: "public" | "private";
@@ -46,6 +47,7 @@ export type PublicFlowSessionState = {
   optionalText: string;
   generatedReview: string;
   voiceId: string | null;
+  parentPrivateFeedbackSessionId: string | null;
 };
 
 export type PublicBootstrapPayload = {
@@ -53,6 +55,7 @@ export type PublicBootstrapPayload = {
   topics: Record<"positive" | "neutral" | "negative", PublicTopicDef[]>;
   session: PublicFlowSessionState;
   isNewSession: boolean;
+  revisitSourceSessionId: string | null;
 };
 
 type ReviewLinkContext = {
@@ -79,6 +82,7 @@ type ReviewLinkContext = {
 type SessionRow = {
   id: string;
   review_link_id: string;
+  device_token: string | null;
   status: string;
   star_rating: number | null;
   topics_selected: unknown;
@@ -86,6 +90,9 @@ type SessionRow = {
   generated_review: string | null;
   voice_id: string | null;
   feedback_type: "public" | "private";
+  private_feedback_status: "new" | "handled";
+  private_feedback_handled_at: string | null;
+  parent_private_feedback_session_id: string | null;
   public_owner_notified_at: string | null;
   private_owner_notified_at: string | null;
 };
@@ -96,6 +103,14 @@ function isCompletedSession(session: SessionRow) {
     (session.feedback_type === "private" &&
       !!session.optional_text &&
       session.optional_text.trim().length > 0)
+  );
+}
+
+function isCompletedPrivateFeedbackSession(session: SessionRow) {
+  return (
+    session.feedback_type === "private" &&
+    !!session.optional_text &&
+    session.optional_text.trim().length > 0
   );
 }
 
@@ -179,6 +194,7 @@ function buildTopicsByTier(
 
 function toSessionState(session: SessionRow): PublicFlowSessionState {
   return {
+    sessionId: session.id,
     status: session.status,
     starRating: session.star_rating,
     feedbackType: session.feedback_type || "public",
@@ -186,6 +202,24 @@ function toSessionState(session: SessionRow): PublicFlowSessionState {
     optionalText: session.optional_text || "",
     generatedReview: session.generated_review || "",
     voiceId: session.voice_id,
+    parentPrivateFeedbackSessionId:
+      session.parent_private_feedback_session_id || null,
+  };
+}
+
+function toPrivateFeedbackRecourseState(
+  session: SessionRow,
+): PublicFlowSessionState {
+  return {
+    sessionId: session.id,
+    status: session.status,
+    starRating: session.star_rating,
+    feedbackType: "private",
+    topicsSelected: [],
+    optionalText: "",
+    generatedReview: "",
+    voiceId: null,
+    parentPrivateFeedbackSessionId: null,
   };
 }
 
@@ -268,7 +302,7 @@ async function loadSession(sessionId: string) {
   const { data, error } = await supabaseAdmin
     .from("review_sessions")
     .select(
-      "id, review_link_id, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, public_owner_notified_at, private_owner_notified_at",
+      "id, review_link_id, device_token, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, public_owner_notified_at, private_owner_notified_at",
     )
     .eq("id", sessionId)
     .maybeSingle();
@@ -280,15 +314,40 @@ async function loadSession(sessionId: string) {
   return data as SessionRow;
 }
 
-async function createSession(reviewLinkId: string, deviceToken: string) {
+async function createSession(
+  reviewLinkId: string,
+  deviceToken: string,
+  overrides?: Partial<{
+    status: string;
+    star_rating: number | null;
+    feedback_type: "public" | "private";
+    parent_private_feedback_session_id: string | null;
+  }>,
+) {
   const { data, error } = await supabaseAdmin
     .from("review_sessions")
     .insert({
       review_link_id: reviewLinkId,
       device_token: deviceToken,
+      ...(overrides?.status ? { status: overrides.status } : {}),
+      ...(Object.prototype.hasOwnProperty.call(overrides ?? {}, "star_rating")
+        ? { star_rating: overrides?.star_rating ?? null }
+        : {}),
+      ...(overrides?.feedback_type
+        ? { feedback_type: overrides.feedback_type }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(
+        overrides ?? {},
+        "parent_private_feedback_session_id",
+      )
+        ? {
+            parent_private_feedback_session_id:
+              overrides?.parent_private_feedback_session_id ?? null,
+          }
+        : {}),
     })
     .select(
-      "id, review_link_id, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, public_owner_notified_at, private_owner_notified_at",
+      "id, review_link_id, device_token, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, public_owner_notified_at, private_owner_notified_at",
     )
     .single();
 
@@ -304,6 +363,7 @@ function buildBootstrapPayload(
   topics: Record<"positive" | "neutral" | "negative", PublicTopicDef[]>,
   session: SessionRow,
   isNewSession: boolean,
+  revisitSourceSessionId: string | null = null,
 ): PublicBootstrapPayload {
   const businessName = reviewLink.businesses?.name || "";
 
@@ -322,7 +382,72 @@ function buildBootstrapPayload(
     topics,
     session: toSessionState(session),
     isNewSession,
+    revisitSourceSessionId,
   };
+}
+
+function buildPrivateFeedbackRecoursePayload(
+  reviewLink: ReviewLinkContext,
+  topics: Record<"positive" | "neutral" | "negative", PublicTopicDef[]>,
+  sourceSession: SessionRow,
+) {
+  const businessName = reviewLink.businesses?.name || "";
+
+  return {
+    review: {
+      businessName,
+      businessInitials: getBusinessInitials(businessName),
+      employeeName: reviewLink.employees?.name || null,
+      serviceType: reviewLink.services?.name || "",
+      customerName: reviewLink.customer_name,
+      googleReviewUrl: reviewLink.businesses?.google_review_url || "",
+      googlePlaceId: reviewLink.businesses?.google_place_id || null,
+      businessCity: reviewLink.businesses?.business_city || null,
+      neighborhoods: reviewLink.businesses?.neighborhoods || [],
+    },
+    topics,
+    session: toPrivateFeedbackRecourseState(sourceSession),
+    isNewSession: false,
+    revisitSourceSessionId: sourceSession.id,
+  } satisfies PublicBootstrapPayload;
+}
+
+async function loadLatestCompletedPrivateFeedbackSession(reviewLinkId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("review_sessions")
+    .select(
+      "id, review_link_id, device_token, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, public_owner_notified_at, private_owner_notified_at",
+    )
+    .eq("review_link_id", reviewLinkId)
+    .eq("feedback_type", "private")
+    .not("optional_text", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data || !isCompletedPrivateFeedbackSession(data as SessionRow)) {
+    return null;
+  }
+
+  return data as SessionRow;
+}
+
+async function loadExistingPublicFollowupSession(parentSessionId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("review_sessions")
+    .select(
+      "id, review_link_id, device_token, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, public_owner_notified_at, private_owner_notified_at",
+    )
+    .eq("parent_private_feedback_session_id", parentSessionId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as SessionRow;
 }
 
 export async function bootstrapPublicReviewFlow(
@@ -370,10 +495,42 @@ export async function bootstrapPublicReviewFlow(
       session.review_link_id === reviewLink.id &&
       !shouldStartFreshGenericSession
     ) {
+      if (
+        !reviewLink.is_generic &&
+        isCompletedPrivateFeedbackSession(session)
+      ) {
+        return {
+          status: "ok",
+          payload: buildPrivateFeedbackRecoursePayload(
+            reviewLink,
+            topics,
+            session,
+          ),
+          cookiePayload: null,
+        };
+      }
+
       return {
         status: "ok",
         payload: buildBootstrapPayload(reviewLink, topics, session, false),
         cookiePayload: existingCookie,
+      };
+    }
+  }
+
+  if (!reviewLink.is_generic) {
+    const priorPrivateFeedbackSession =
+      await loadLatestCompletedPrivateFeedbackSession(reviewLink.id);
+
+    if (priorPrivateFeedbackSession) {
+      return {
+        status: "ok",
+        payload: buildPrivateFeedbackRecoursePayload(
+          reviewLink,
+          topics,
+          priorPrivateFeedbackSession,
+        ),
+        cookiePayload: null,
       };
     }
   }
@@ -447,4 +604,93 @@ export async function requirePublicFlowSession(
 
 export async function loadPublicReviewContext(code: string) {
   return loadReviewLinkContext(code);
+}
+
+export async function startPublicFollowupSession(
+  req: NextRequest,
+  code: string,
+  sourceSessionId?: string | null,
+): Promise<
+  | {
+      status: "ok";
+      payload: PublicBootstrapPayload;
+      cookiePayload: PublicFlowSessionCookie;
+    }
+  | { status: "not_found" }
+  | { status: "invalid_source" }
+> {
+  const reviewLink = await loadReviewLinkContext(code);
+
+  if (!reviewLink || reviewLink.is_generic) {
+    return { status: "not_found" };
+  }
+
+  const topicRows = await loadTopicRows(reviewLink.business_id);
+  const topics = buildTopicsByTier(
+    topicRows as Array<{
+      id: string;
+      label: string;
+      tier: "positive" | "neutral" | "negative";
+      follow_up_question: string;
+      follow_up_options: string[];
+    }>,
+  );
+
+  const existingCookie = readPublicFlowSessionCookie(req, code);
+  const cookieSession = existingCookie
+    ? await loadSession(existingCookie.sessionId)
+    : null;
+
+  const requestedSourceSession =
+    sourceSessionId && sourceSessionId.trim().length > 0
+      ? await loadSession(sourceSessionId)
+      : null;
+
+  const sourceSession =
+    requestedSourceSession &&
+    requestedSourceSession.review_link_id === reviewLink.id &&
+    isCompletedPrivateFeedbackSession(requestedSourceSession)
+      ? requestedSourceSession
+      : cookieSession &&
+          cookieSession.review_link_id === reviewLink.id &&
+          isCompletedPrivateFeedbackSession(cookieSession)
+        ? cookieSession
+        : await loadLatestCompletedPrivateFeedbackSession(reviewLink.id);
+
+  if (!sourceSession || sourceSession.review_link_id !== reviewLink.id) {
+    return { status: "invalid_source" };
+  }
+
+  const existingFollowup = await loadExistingPublicFollowupSession(
+    sourceSession.id,
+  );
+
+  const deviceToken =
+    existingFollowup?.device_token ||
+    existingCookie?.deviceToken ||
+    randomUUID();
+
+  const publicSession =
+    existingFollowup ||
+    (await createSession(reviewLink.id, deviceToken, {
+      status: "in_progress",
+      star_rating: sourceSession.star_rating,
+      feedback_type: "public",
+      parent_private_feedback_session_id: sourceSession.id,
+    }));
+
+  if (!publicSession) {
+    return { status: "not_found" };
+  }
+
+  return {
+    status: "ok",
+    payload: buildBootstrapPayload(reviewLink, topics, publicSession, false),
+    cookiePayload: {
+      code,
+      sessionId: publicSession.id,
+      deviceToken,
+      issuedAt: Date.now(),
+    },
+  };
 }

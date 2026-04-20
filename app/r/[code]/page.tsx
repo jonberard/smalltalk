@@ -99,6 +99,7 @@ type Step =
   | "interstitial"
   | "success"
   | "private-feedback"
+  | "private-revisit"
   | "private-success";
 
 type TopicAnswer = { option: string; detail: string };
@@ -111,6 +112,7 @@ type StoredTopicAnswer = {
 };
 
 type PublicFlowSessionState = {
+  sessionId: string;
   status: string;
   starRating: number | null;
   feedbackType: "public" | "private";
@@ -118,6 +120,7 @@ type PublicFlowSessionState = {
   optionalText: string;
   generatedReview: string;
   voiceId: string | null;
+  parentPrivateFeedbackSessionId: string | null;
 };
 
 type BootstrapResponse = {
@@ -125,6 +128,7 @@ type BootstrapResponse = {
   topics: Record<"positive" | "neutral" | "negative", TopicDef[]>;
   session: PublicFlowSessionState;
   isNewSession: boolean;
+  revisitSourceSessionId: string | null;
 };
 
 type RestoredFlowState = {
@@ -196,6 +200,7 @@ function restoreSelectedTopics(
 function restoreFlowState(
   session: PublicFlowSessionState,
   allTopics: Record<string, TopicDef[]>,
+  revisitSourceSessionId: string | null,
 ): RestoredFlowState {
   const selectedTopics = restoreSelectedTopics(session.topicsSelected, allTopics);
   const topicAnswers: Record<string, TopicAnswer> = {};
@@ -224,6 +229,8 @@ function restoreFlowState(
   const path =
     session.feedbackType === "private"
       ? "private"
+      : session.parentPrivateFeedbackSessionId
+        ? "public"
       : rating > 0 && rating <= 2 && hasAdvancedPastChoice
         ? "public"
         : null;
@@ -231,6 +238,8 @@ function restoreFlowState(
 
   if (session.status === "copied" && finalReview) {
     step = "success";
+  } else if (revisitSourceSessionId) {
+    step = "private-revisit";
   } else if (
     session.feedbackType === "private" &&
     session.status === "drafted" &&
@@ -1957,7 +1966,7 @@ function PrivateFeedbackScreen({
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Tell them what happened and how they can make it right..."
+        placeholder="Tell them what happened..."
         rows={5}
         className="mt-6 w-full resize-none rounded-card border border-accent bg-background p-4 text-[15px] text-text placeholder:text-muted/60 focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors duration-200"
       />
@@ -1981,7 +1990,15 @@ function PrivateFeedbackScreen({
    SCREEN: PRIVATE SUCCESS
    ═══════════════════════════════════════════════════ */
 
-function PrivateSuccessScreen({ data }: { data: ReviewData }) {
+function PrivateSuccessScreen({
+  data,
+  onPostPublicly,
+  showPublicOption,
+}: {
+  data: ReviewData;
+  onPostPublicly: () => void;
+  showPublicOption: boolean;
+}) {
   return (
     <div className="animate-fade-in flex flex-col items-center text-center">
       <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-accent">
@@ -1995,12 +2012,67 @@ function PrivateSuccessScreen({ data }: { data: ReviewData }) {
       <p className="mt-3 text-[15px] leading-relaxed text-muted">
         Your feedback has been sent to {data.businessName}.
         <br />
-        Thank you for giving them a chance to make it right.
+        You chose to send this privately first.
       </p>
 
-      <p className="mt-8 text-[13px] text-muted">
-        They&rsquo;ll receive it right away and can reach out to you directly.
+      <p className="mt-5 text-[13px] leading-relaxed text-muted">
+        You can still post a public review later if you decide to.
       </p>
+
+      {showPublicOption && (
+        <button
+          type="button"
+          onClick={onPostPublicly}
+          className="mt-6 rounded-pill border border-accent px-5 py-2.5 text-[14px] font-semibold text-text transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          Write a public review
+        </button>
+      )}
+
+      <p className="mt-8 text-[13px] text-muted">
+        They&rsquo;ll receive it right away and can follow up directly if they choose.
+      </p>
+    </div>
+  );
+}
+
+function PrivateRevisitScreen({
+  onPostPublicly,
+  onDone,
+}: {
+  onPostPublicly: () => void;
+  onDone: () => void;
+}) {
+  return (
+    <div className="animate-fade-in flex flex-col items-center text-center">
+      <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-accent">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      </div>
+
+      <ScreenHeading>You already sent private feedback</ScreenHeading>
+
+      <p className="mt-3 text-[15px] leading-relaxed text-muted">
+        If you&rsquo;d still like to share your experience publicly, you can.
+      </p>
+
+      <div className="mt-8 flex w-full flex-col gap-3">
+        <button
+          type="button"
+          onClick={onPostPublicly}
+          className="w-full rounded-pill border border-accent px-5 py-3 text-[14px] font-semibold text-text transition-all duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          Write a public review
+        </button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="text-[13px] font-medium text-muted underline underline-offset-2 transition-opacity duration-200 hover:opacity-80"
+        >
+          Done
+        </button>
+      </div>
     </div>
   );
 }
@@ -2106,16 +2178,20 @@ function ReviewFlowInner({
   allTopics,
   session,
   isNewSession,
+  revisitSourceSessionId,
+  onStartPublicFollowup,
 }: {
   code: string;
   data: ReviewData;
   allTopics: Record<string, TopicDef[]>;
   session: PublicFlowSessionState;
   isNewSession: boolean;
+  revisitSourceSessionId: string | null;
+  onStartPublicFollowup: (sourceSessionId?: string | null) => Promise<void>;
 }) {
   const restoredState = useMemo(
-    () => restoreFlowState(session, allTopics),
-    [session, allTopics],
+    () => restoreFlowState(session, allTopics, revisitSourceSessionId),
+    [session, allTopics, revisitSourceSessionId],
   );
   const [step, setStep] = useState<Step>(restoredState.step);
   const [rating, setRating] = useState(restoredState.rating);
@@ -2127,6 +2203,7 @@ function ReviewFlowInner({
   >(restoredState.topicAnswers);
   const [optionalDetail, setOptionalDetail] = useState(restoredState.optionalDetail);
   const [finalReview, setFinalReview] = useState(restoredState.finalReview);
+  const [showPrivateSuccessPublicOption, setShowPrivateSuccessPublicOption] = useState(true);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const saveProgress = useCallback(
@@ -2413,8 +2490,19 @@ function ReviewFlowInner({
 
     capture("private_feedback_submitted", { star_rating: rating });
     capture("review_completed", { star_rating: rating, feedback_type: "private" });
+    setShowPrivateSuccessPublicOption(true);
     setStep("private-success");
   }, [code, rating]);
+
+  const handleStartPublicReview = useCallback(async () => {
+    try {
+      await onStartPublicFollowup(revisitSourceSessionId || session.sessionId);
+    } catch {
+      setToastMsg(
+        "Couldn’t reopen this request for public posting — please try again.",
+      );
+    }
+  }, [onStartPublicFollowup, revisitSourceSessionId, session.sessionId]);
 
   // Back handlers
   const handleBackToStars = useCallback(() => {
@@ -2423,13 +2511,18 @@ function ReviewFlowInner({
   }, []);
 
   const handleBackFromTopics = useCallback(() => {
+    if (session.parentPrivateFeedbackSessionId) {
+      setStep("private-revisit");
+      return;
+    }
+
     if (rating <= 2) {
       setStep("low-rating-choice");
     } else {
       setRating(0);
       setStep("stars");
     }
-  }, [rating]);
+  }, [rating, session.parentPrivateFeedbackSessionId]);
 
   const handleBackFromFollowup = useCallback(() => {
     if (currentTopicIdx > 0) {
@@ -2551,7 +2644,23 @@ function ReviewFlowInner({
             />
           )}
 
-          {step === "private-success" && <PrivateSuccessScreen data={data} />}
+          {step === "private-revisit" && (
+            <PrivateRevisitScreen
+              onPostPublicly={handleStartPublicReview}
+              onDone={() => {
+                setShowPrivateSuccessPublicOption(false);
+                setStep("private-success");
+              }}
+            />
+          )}
+
+          {step === "private-success" && (
+            <PrivateSuccessScreen
+              data={data}
+              onPostPublicly={handleStartPublicReview}
+              showPublicOption={showPrivateSuccessPublicOption}
+            />
+          )}
         </div>
       </div>
 
@@ -2605,6 +2714,25 @@ export default function ReviewFlow() {
     load();
   }, [code]);
 
+  const handleStartPublicFollowup = useCallback(
+    async (sourceSessionId?: string | null) => {
+      const result = await fetchPublicFlow<BootstrapResponse>(
+        `/api/public/review-flow/${code}/start-public-followup`,
+        {
+          method: "POST",
+          body: JSON.stringify(
+            sourceSessionId
+              ? { source_session_id: sourceSessionId }
+              : {},
+          ),
+        },
+      );
+
+      setBootstrapData(result);
+    },
+    [code],
+  );
+
   if (loading) return <LoadingSkeleton />;
   if (loadError) {
     return (
@@ -2617,11 +2745,14 @@ export default function ReviewFlow() {
   if (notFound || !bootstrapData) return <NotFoundScreen />;
   return (
     <ReviewFlowInner
+      key={`${bootstrapData.revisitSourceSessionId ?? "flow"}-${bootstrapData.session.sessionId}`}
       code={code}
       data={bootstrapData.review}
       allTopics={bootstrapData.topics}
       session={bootstrapData.session}
       isNewSession={bootstrapData.isNewSession}
+      revisitSourceSessionId={bootstrapData.revisitSourceSessionId}
+      onStartPublicFollowup={handleStartPublicFollowup}
     />
   );
 }
