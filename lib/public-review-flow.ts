@@ -59,6 +59,7 @@ type ReviewLinkContext = {
   id: string;
   business_id: string;
   customer_name: string;
+  is_generic: boolean;
   businesses: {
     name: string;
     logo_url: string | null;
@@ -88,6 +89,15 @@ type SessionRow = {
   public_owner_notified_at: string | null;
   private_owner_notified_at: string | null;
 };
+
+function isCompletedSession(session: SessionRow) {
+  return (
+    session.status === "copied" ||
+    (session.feedback_type === "private" &&
+      !!session.optional_text &&
+      session.optional_text.trim().length > 0)
+  );
+}
 
 function getBusinessInitials(name: string) {
   return name
@@ -183,7 +193,7 @@ async function loadReviewLinkContext(code: string) {
   const { data, error } = await supabaseAdmin
     .from("review_links")
     .select(
-      "id, business_id, customer_name, businesses!inner(name, logo_url, google_review_url, google_place_id, business_city, neighborhoods), services!inner(name), employees(name)",
+      "id, business_id, customer_name, is_generic, businesses!inner(name, logo_url, google_review_url, google_place_id, business_city, neighborhoods), services!inner(name), employees(name)",
     )
     .eq("unique_code", code)
     .maybeSingle();
@@ -206,6 +216,7 @@ async function loadReviewLinkContext(code: string) {
     id: data.id,
     business_id: data.business_id,
     customer_name: data.customer_name,
+    is_generic: data.is_generic,
     businesses: businessRecord
       ? {
           name: businessRecord.name,
@@ -348,7 +359,17 @@ export async function bootstrapPublicReviewFlow(
   if (existingCookie) {
     const session = await loadSession(existingCookie.sessionId);
 
-    if (session && session.review_link_id === reviewLink.id) {
+    const shouldStartFreshGenericSession =
+      !!session &&
+      session.review_link_id === reviewLink.id &&
+      reviewLink.is_generic &&
+      isCompletedSession(session);
+
+    if (
+      session &&
+      session.review_link_id === reviewLink.id &&
+      !shouldStartFreshGenericSession
+    ) {
       return {
         status: "ok",
         payload: buildBootstrapPayload(reviewLink, topics, session, false),
