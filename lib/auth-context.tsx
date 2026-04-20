@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { fetchWithAuth, supabase } from "@/lib/supabase";
 import { identify as phIdentify, reset as phReset } from "@/lib/posthog";
 import type { Session } from "@supabase/supabase-js";
 import type { Business } from "@/lib/types";
@@ -32,6 +32,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const [noBusiness, setNoBusiness] = useState(false);
+  const [setupMessage, setSetupMessage] = useState(
+    "Your account was created but we couldn’t finish setting up your business profile. Try signing out and back in, or contact us for help.",
+  );
 
   useEffect(() => {
     // Get initial session — use getUser() for server-verified auth
@@ -64,33 +67,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  async function fetchBusiness(userId: string) {
+  async function recoverBusiness() {
+    const res = await fetchWithAuth("/api/auth/recover-business", {
+      method: "POST",
+    });
+
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error || "Could not recover your business profile");
+    }
+  }
+
+  async function fetchBusiness(userId: string, hasRetriedRecovery = false) {
     const { data, error } = await supabase
       .from("businesses")
       .select("id, name, owner_email, logo_url, google_review_url, google_place_id, business_city, neighborhoods, subscription_status, trial_requests_remaining, trial_ends_at, reply_voice_id, custom_reply_voice, connected_crms, created_at, stripe_customer_id, stripe_subscription_id, onboarding_completed, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone")
       .eq("id", userId)
       .single();
 
-    if (error || !data) {
-      // Orphaned auth account — no business record exists
-      setNoBusiness(true);
-      setBusiness(null);
-    } else {
+    if (!error && data) {
       const biz = data as Business;
       setNoBusiness(false);
       setBusiness(biz);
+      setSetupMessage(
+        "Your account was created but we couldn’t finish setting up your business profile. Try signing out and back in, or contact us for help.",
+      );
 
-      // Identify user in PostHog (no PII — just business-level traits)
       phIdentify(userId, {
         subscription_status: biz.subscription_status,
         onboarding_completed: biz.onboarding_completed,
       });
 
-      // Redirect to onboarding if not completed (unless already there)
       if (!biz.onboarding_completed && !window.location.pathname.startsWith("/onboarding")) {
         router.replace("/onboarding");
       }
+
+      setLoading(false);
+      return;
     }
+
+    const isMissingBusiness = error?.code === "PGRST116" || !data;
+
+    if (isMissingBusiness && !hasRetriedRecovery) {
+      try {
+        await recoverBusiness();
+        await fetchBusiness(userId, true);
+        return;
+      } catch (recoveryError) {
+        console.error("[auth] Failed to recover business profile:", recoveryError);
+        setSetupMessage(
+          "We found your login, but your business profile still needs to be rebuilt. Please try again, or contact us if this keeps happening.",
+        );
+      }
+    } else if (error) {
+      console.error("[auth] Failed to fetch business:", error);
+      setSetupMessage(
+        "We signed you in, but couldn’t load your business profile right now. Please try again in a moment.",
+      );
+    }
+
+    setNoBusiness(true);
+    setBusiness(null);
     setLoading(false);
   }
 
@@ -150,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             We hit a snag setting up your business
           </h2>
           <p className="mt-2 text-[14px] leading-relaxed text-[#6B7280]">
-            Your account was created but we couldn&apos;t finish setting up your business profile. Try signing out and back in, or contact us for help.
+            {setupMessage}
           </p>
           <div className="mt-6 flex flex-col gap-3">
             <button
@@ -158,6 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               onClick={async () => {
                 setLoading(true);
                 setNoBusiness(false);
+                setBusiness(null);
                 if (session?.user?.id) {
                   await fetchBusiness(session.user.id);
                 } else {
