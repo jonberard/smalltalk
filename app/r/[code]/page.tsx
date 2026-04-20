@@ -35,10 +35,16 @@ declare global {
   }
 }
 
-import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  type ReactNode,
+} from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 import { capture } from "@/lib/posthog";
 
 /* ═══════════════════════════════════════════════════
@@ -55,9 +61,6 @@ type ReviewData = {
   googlePlaceId: string | null;
   businessCity: string | null;
   neighborhoods: string[];
-  reviewLinkId: string;
-  businessId: string;
-  sessionId: string;
 };
 
 type TopicDef = {
@@ -99,6 +102,173 @@ type Step =
   | "private-success";
 
 type TopicAnswer = { option: string; detail: string };
+
+type StoredTopicAnswer = {
+  topic_id?: string;
+  label: string;
+  follow_up_answer: string;
+  detail_text?: string;
+};
+
+type PublicFlowSessionState = {
+  status: string;
+  starRating: number | null;
+  feedbackType: "public" | "private";
+  topicsSelected: StoredTopicAnswer[];
+  optionalText: string;
+  generatedReview: string;
+  voiceId: string | null;
+};
+
+type BootstrapResponse = {
+  review: ReviewData;
+  topics: Record<"positive" | "neutral" | "negative", TopicDef[]>;
+  session: PublicFlowSessionState;
+  isNewSession: boolean;
+};
+
+type RestoredFlowState = {
+  step: Step;
+  rating: number;
+  path: "public" | "private" | null;
+  selectedTopics: TopicDef[];
+  currentTopicIdx: number;
+  topicAnswers: Record<string, TopicAnswer>;
+  optionalDetail: string;
+  finalReview: string;
+};
+
+async function fetchPublicFlow<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    credentials: "same-origin",
+    headers: {
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers,
+    },
+  });
+
+  const body = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      (body as { error?: string }).error ||
+        `Request failed with status ${res.status}`,
+    );
+  }
+
+  return body as T;
+}
+
+function restoreSelectedTopics(
+  storedTopics: StoredTopicAnswer[],
+  allTopics: Record<string, TopicDef[]>,
+) {
+  const topicLookup = new Map<string, TopicDef>();
+
+  for (const tierTopics of Object.values(allTopics)) {
+    for (const topic of tierTopics) {
+      topicLookup.set(topic.id, topic);
+      topicLookup.set(topic.label, topic);
+    }
+  }
+
+  return storedTopics.map((storedTopic) => {
+    const existing =
+      (storedTopic.topic_id && topicLookup.get(storedTopic.topic_id)) ||
+      topicLookup.get(storedTopic.label);
+
+    if (existing) {
+      return existing;
+    }
+
+    return {
+      ...OTHER_TOPIC,
+      id: storedTopic.topic_id || "other",
+      label: storedTopic.label,
+    };
+  });
+}
+
+function restoreFlowState(
+  session: PublicFlowSessionState,
+  allTopics: Record<string, TopicDef[]>,
+): RestoredFlowState {
+  const selectedTopics = restoreSelectedTopics(session.topicsSelected, allTopics);
+  const topicAnswers: Record<string, TopicAnswer> = {};
+  let currentTopicIdx = 0;
+  let firstUnansweredIdx = -1;
+
+  selectedTopics.forEach((topic, index) => {
+    const stored = session.topicsSelected[index];
+    const option = stored?.follow_up_answer || "";
+    const detail = stored?.detail_text || "";
+
+    if (option || detail) {
+      topicAnswers[topic.label] = { option, detail };
+    }
+
+    if (!option && firstUnansweredIdx === -1) {
+      firstUnansweredIdx = index;
+    }
+  });
+
+  const rating = session.starRating ?? 0;
+  const optionalDetail = session.optionalText || "";
+  const finalReview = session.generatedReview || "";
+  const hasAdvancedPastChoice =
+    selectedTopics.length > 0 || !!optionalDetail.trim() || !!finalReview.trim();
+  const path =
+    session.feedbackType === "private"
+      ? "private"
+      : rating > 0 && rating <= 2 && hasAdvancedPastChoice
+        ? "public"
+        : null;
+  let step: Step = "stars";
+
+  if (session.status === "copied" && finalReview) {
+    step = "success";
+  } else if (
+    session.feedbackType === "private" &&
+    session.status === "drafted" &&
+    optionalDetail.trim()
+  ) {
+    step = "private-success";
+  } else if (finalReview) {
+    step = "review";
+  } else if (session.feedbackType === "private" && optionalDetail.trim()) {
+    step = "private-feedback";
+  } else if (path !== "private" && optionalDetail.trim()) {
+    step = "review";
+  } else if (selectedTopics.length > 0) {
+    if (firstUnansweredIdx !== -1) {
+      step = "followup";
+      currentTopicIdx = firstUnansweredIdx;
+    } else {
+      step = "detail";
+    }
+  } else if (rating > 0) {
+    if (rating <= 2) {
+      step = path ? "topics" : "low-rating-choice";
+    } else {
+      step = "topics";
+    }
+  }
+
+  return {
+    step,
+    rating,
+    path,
+    selectedTopics,
+    currentTopicIdx,
+    topicAnswers,
+    optionalDetail,
+    finalReview,
+  };
+}
 
 /* ═══════════════════════════════════════════════════
    SHARED COMPONENTS
@@ -1006,25 +1176,31 @@ function ReviewShimmer() {
 }
 
 function ReviewScreen({
+  code,
   rating,
   topicAnswers,
   selectedTopics,
   optionalDetail,
+  initialReviewText,
+  initialVoiceId,
   onPost,
   onBack,
   data,
 }: {
+  code: string;
   rating: number;
   topicAnswers: Record<string, TopicAnswer>;
   selectedTopics: TopicDef[];
   optionalDetail: string;
+  initialReviewText: string;
+  initialVoiceId: string | null;
   onPost: (finalReview: string, voiceId: string, copyFailed: boolean) => void;
   onBack: () => void;
   data: ReviewData;
 }) {
-  const [reviewText, setReviewText] = useState("");
-  const [voiceId, setVoiceId] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(true);
+  const [reviewText, setReviewText] = useState(initialReviewText);
+  const [voiceId, setVoiceId] = useState<string | null>(initialVoiceId);
+  const [generating, setGenerating] = useState(!initialReviewText);
   const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -1033,15 +1209,7 @@ function ReviewScreen({
 
   const buildPayload = useCallback(
     (excludeVoice?: string) => ({
-      session_id: data.sessionId,
       star_rating: rating,
-      business_name: data.businessName,
-      service_type: data.serviceType,
-      employee_name: data.employeeName,
-      business_city: data.businessCity,
-      neighborhood: data.neighborhoods.length > 0
-        ? data.neighborhoods[Math.floor(Math.random() * data.neighborhoods.length)]
-        : null,
       topics_selected: selectedTopics.map((t) => ({
         label: t.label,
         follow_up_answer: topicAnswers[t.label]?.option || "",
@@ -1058,49 +1226,39 @@ function ReviewScreen({
       setGenerating(true);
       setError("");
       try {
-        const res = await fetch("/api/generate-review", {
+        const result = await fetchPublicFlow<{
+          review_text: string;
+          voice_id: string;
+        }>(`/api/public/review-flow/${code}/generate`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(buildPayload(excludeVoice)),
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "Failed to generate review");
-        }
-        const result = await res.json();
         setReviewText(result.review_text);
         setVoiceId(result.voice_id);
-        capture("review_generated", { star_rating: rating, word_count: result.review_text.split(/\s+/).length, session_id: data.sessionId });
-
-        // Save to session
-        const { error: saveErr } = await supabase
-          .from("review_sessions")
-          .update({
-            generated_review: result.review_text,
-            voice_id: result.voice_id,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", data.sessionId);
-
-        if (saveErr) {
-          setError("Couldn\u2019t save your review \u2014 tap to try again.");
-        }
-      } catch {
-        setError("Something went wrong — tap to try again");
+        capture("review_generated", {
+          star_rating: rating,
+          word_count: result.review_text.split(/\s+/).length,
+        });
+      } catch (error) {
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Something went wrong — tap to try again",
+        );
       } finally {
         setGenerating(false);
       }
     },
-    [buildPayload, data.sessionId]
+    [buildPayload, code, rating]
   );
 
   // Generate on mount
   useEffect(() => {
-    if (!hasGenerated.current) {
+    if (!hasGenerated.current && !initialReviewText) {
       hasGenerated.current = true;
       callApi();
     }
-  }, [callApi]);
+  }, [callApi, initialReviewText]);
 
   const handleEdit = useCallback(() => {
     setIsEditing(true);
@@ -1144,14 +1302,20 @@ function ReviewScreen({
     }
 
     setCopied(true);
-    capture("review_copied", { copy_method: "auto", word_count: reviewText.split(/\s+/).length, session_id: data.sessionId });
+    capture("review_copied", {
+      copy_method: "auto",
+      word_count: reviewText.split(/\s+/).length,
+    });
     onPost(reviewText, voiceId || "", false);
-  }, [reviewText, voiceId, onPost, data.sessionId]);
+  }, [reviewText, voiceId, onPost]);
 
   const handleManualCopyDone = useCallback(() => {
-    capture("review_copied", { copy_method: "manual", word_count: reviewText.split(/\s+/).length, session_id: data.sessionId });
+    capture("review_copied", {
+      copy_method: "manual",
+      word_count: reviewText.split(/\s+/).length,
+    });
     onPost(reviewText, voiceId || "", false);
-  }, [reviewText, voiceId, onPost, data.sessionId]);
+  }, [reviewText, voiceId, onPost]);
 
   return (
     <div className="flex flex-col items-center">
@@ -1748,16 +1912,18 @@ function SuccessScreen({ reviewText, data, cameFromInterstitial }: { reviewText:
 
 function PrivateFeedbackScreen({
   topicAnswers,
+  initialText,
   onSubmit,
   onBack,
   data,
 }: {
   topicAnswers: Record<string, TopicAnswer>;
+  initialText: string;
   onSubmit: (feedback: string) => void;
   onBack: () => void;
   data: ReviewData;
 }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
 
   // Pre-fill summary from topic answers if any
   const hasPriorAnswers = Object.keys(topicAnswers).length > 0;
@@ -1866,7 +2032,17 @@ function LoadingSkeleton() {
    NOT FOUND
    ═══════════════════════════════════════════════════ */
 
-function NotFoundScreen() {
+function NotFoundScreen({
+  title = (
+    <>
+      Lost the <em className="text-primary">conversation</em>
+    </>
+  ),
+  message = "This link wandered off. Ask the business to send you a fresh one — it takes two seconds.",
+}: {
+  title?: ReactNode;
+  message?: string;
+}) {
   return (
     <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-6">
       {/* Giant background 404 */}
@@ -1898,11 +2074,11 @@ function NotFoundScreen() {
         </div>
 
         <h1 className="font-heading text-[36px] font-bold leading-[1.1] tracking-tight text-text sm:text-[44px]">
-          Lost the <em className="text-primary">conversation</em>
+          {title}
         </h1>
 
         <p className="mx-auto mt-5 max-w-[340px] text-[16px] leading-[1.7] text-muted">
-          This link wandered off. Ask the business to send you a fresh one — it takes two seconds.
+          {message}
         </p>
 
         <Link
@@ -1924,25 +2100,54 @@ function NotFoundScreen() {
    MAIN FLOW
    ═══════════════════════════════════════════════════ */
 
-function ReviewFlowInner({ data, allTopics, isNewSession }: { data: ReviewData; allTopics: Record<string, TopicDef[]>; isNewSession: boolean }) {
-  const [step, setStep] = useState<Step>("stars");
-  const [rating, setRating] = useState(0);
-  const [path, setPath] = useState<"public" | "private" | null>(null);
-  const [selectedTopics, setSelectedTopics] = useState<TopicDef[]>([]);
-  const [currentTopicIdx, setCurrentTopicIdx] = useState(0);
+function ReviewFlowInner({
+  code,
+  data,
+  allTopics,
+  session,
+  isNewSession,
+}: {
+  code: string;
+  data: ReviewData;
+  allTopics: Record<string, TopicDef[]>;
+  session: PublicFlowSessionState;
+  isNewSession: boolean;
+}) {
+  const restoredState = useMemo(
+    () => restoreFlowState(session, allTopics),
+    [session, allTopics],
+  );
+  const [step, setStep] = useState<Step>(restoredState.step);
+  const [rating, setRating] = useState(restoredState.rating);
+  const [path, setPath] = useState<"public" | "private" | null>(restoredState.path);
+  const [selectedTopics, setSelectedTopics] = useState<TopicDef[]>(restoredState.selectedTopics);
+  const [currentTopicIdx, setCurrentTopicIdx] = useState(restoredState.currentTopicIdx);
   const [topicAnswers, setTopicAnswers] = useState<
     Record<string, TopicAnswer>
-  >({});
-  const [optionalDetail, setOptionalDetail] = useState("");
-  const [finalReview, setFinalReview] = useState("");
+  >(restoredState.topicAnswers);
+  const [optionalDetail, setOptionalDetail] = useState(restoredState.optionalDetail);
+  const [finalReview, setFinalReview] = useState(restoredState.finalReview);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const saveProgress = useCallback(
+    async (payload: Record<string, unknown>) => {
+      await fetchPublicFlow<{ success: boolean }>(
+        `/api/public/review-flow/${code}/progress`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        },
+      );
+    },
+    [code],
+  );
 
   // Track link opened — only on first visit (new session), not refreshes/revisits
   useEffect(() => {
     if (isNewSession) {
-      capture("review_link_opened", { session_id: data.sessionId });
+      capture("review_link_opened", { has_service: !!data.serviceType });
     }
-  }, [data.sessionId, isNewSession]);
+  }, [data.serviceType, isNewSession]);
 
   // Check if browser supports Web Speech API
   const hasSpeechSupport = useMemo(() => {
@@ -1975,13 +2180,11 @@ function ReviewFlowInner({ data, allTopics, isNewSession }: { data: ReviewData; 
   // Star rating handler
   const handleRate = useCallback(async (r: number) => {
     setRating(r);
-    capture("stars_selected", { star_rating: r, session_id: data.sessionId });
-    const { error } = await supabase
-      .from("review_sessions")
-      .update({ star_rating: r, status: "in_progress", updated_at: new Date().toISOString() })
-      .eq("id", data.sessionId);
+    capture("stars_selected", { star_rating: r });
 
-    if (error) {
+    try {
+      await saveProgress({ star_rating: r, status: "in_progress" });
+    } catch {
       setToastMsg("Couldn\u2019t save your progress \u2014 please try again.");
       setRating(0);
       return;
@@ -1991,69 +2194,97 @@ function ReviewFlowInner({ data, allTopics, isNewSession }: { data: ReviewData; 
     } else {
       setStep("topics");
     }
-  }, [data.sessionId]);
+  }, [saveProgress]);
 
   // Low rating choice
-  const handlePublic = useCallback(() => {
+  const handlePublic = useCallback(async () => {
     setPath("public");
+    try {
+      await saveProgress({ feedback_type: "public" });
+    } catch {
+      setToastMsg("Couldn\u2019t save your choice \u2014 please try again.");
+      return;
+    }
     setStep("topics");
-  }, []);
+  }, [saveProgress]);
 
-  const handlePrivate = useCallback(() => {
+  const handlePrivate = useCallback(async () => {
     setPath("private");
-    supabase
-      .from("review_sessions")
-      .update({ feedback_type: "private", updated_at: new Date().toISOString() })
-      .eq("id", data.sessionId)
-      .then();
+    try {
+      await saveProgress({ feedback_type: "private" });
+    } catch {
+      setToastMsg("Couldn\u2019t save your choice \u2014 please try again.");
+      return;
+    }
     setStep("topics");
-  }, [data.sessionId]);
+  }, [saveProgress]);
 
   // Topic selection
   const handleTopics = useCallback(
-    (labels: string[], customTopic: string | null) => {
+    async (labels: string[], customTopic: string | null) => {
       const resolved = resolveTopics(labels, customTopic);
       setSelectedTopics(resolved);
       setCurrentTopicIdx(0);
       capture("topics_selected", {
         topic_count: resolved.length,
         has_custom_topic: !!customTopic,
-        session_id: data.sessionId,
       });
+      try {
+        await saveProgress({
+          topics_selected: resolved.map((topic) => ({
+            topic_id: topic.id,
+            label: topic.label,
+            follow_up_answer: "",
+            detail_text: undefined,
+          })),
+        });
+      } catch {
+        setToastMsg("Couldn\u2019t save your progress \u2014 please try again.");
+        return;
+      }
       if (resolved.length > 0) {
         setStep("followup");
       } else {
         setStep("detail");
       }
     },
-    [resolveTopics]
+    [resolveTopics, saveProgress]
   );
 
-  const handleSkipTopics = useCallback(() => {
+  const handleSkipTopics = useCallback(async () => {
     setSelectedTopics([]);
+    try {
+      await saveProgress({ topics_selected: [] });
+    } catch {
+      setToastMsg("Couldn\u2019t save your progress \u2014 please try again.");
+      return;
+    }
     setStep("detail");
-  }, []);
+  }, [saveProgress]);
 
   // Voice input — skip topics/followups, go straight to review
   const handleVoice = useCallback(() => {
     setStep("voice");
   }, []);
 
-  const handleVoiceDone = useCallback((transcript: string) => {
+  const handleVoiceDone = useCallback(async (transcript: string) => {
     setOptionalDetail(transcript);
     setSelectedTopics([]);
     setTopicAnswers({});
-    supabase
-      .from("review_sessions")
-      .update({ optional_text: transcript, updated_at: new Date().toISOString() })
-      .eq("id", data.sessionId)
-      .then();
+    if (path !== "private") {
+      try {
+        await saveProgress({ optional_text: transcript });
+      } catch {
+        setToastMsg("Couldn\u2019t save your progress \u2014 please try again.");
+        return;
+      }
+    }
     if (path === "private") {
       setStep("private-feedback");
     } else {
       setStep("review");
     }
-  }, [path, data.sessionId]);
+  }, [path, saveProgress]);
 
   const handleVoiceCancel = useCallback(() => {
     setStep("topics");
@@ -2061,7 +2292,7 @@ function ReviewFlowInner({ data, allTopics, isNewSession }: { data: ReviewData; 
 
   // Follow-up answer
   const handleFollowUpAnswer = useCallback(
-    (option: string, detail: string) => {
+    async (option: string, detail: string) => {
       const topic = selectedTopics[currentTopicIdx];
       const newAnswers = {
         ...topicAnswers,
@@ -2074,12 +2305,23 @@ function ReviewFlowInner({ data, allTopics, isNewSession }: { data: ReviewData; 
         topic_id: selectedTopics.find((t) => t.label === label)?.id || "custom",
         label,
         follow_up_answer: ans.option,
+        detail_text: ans.detail || undefined,
       }));
-      supabase
-        .from("review_sessions")
-        .update({ topics_selected: topicsSelected, updated_at: new Date().toISOString() })
-        .eq("id", data.sessionId)
-        .then();
+      for (const remainingTopic of selectedTopics.slice(topicsSelected.length)) {
+        topicsSelected.push({
+          topic_id: remainingTopic.id,
+          label: remainingTopic.label,
+          follow_up_answer: "",
+          detail_text: undefined,
+        });
+      }
+
+      try {
+        await saveProgress({ topics_selected: topicsSelected });
+      } catch {
+        setToastMsg("Couldn\u2019t save your progress \u2014 please try again.");
+        return;
+      }
 
       const nextIdx = currentTopicIdx + 1;
       if (nextIdx < selectedTopics.length) {
@@ -2089,24 +2331,25 @@ function ReviewFlowInner({ data, allTopics, isNewSession }: { data: ReviewData; 
         setStep("detail");
       }
     },
-    [selectedTopics, currentTopicIdx, topicAnswers, data.sessionId]
+    [selectedTopics, currentTopicIdx, topicAnswers, saveProgress]
   );
 
   // Detail
   const handleDetail = useCallback(
-    (text: string) => {
+    async (text: string) => {
       setOptionalDetail(text);
       capture("detail_provided", {
         had_detail: !!text,
         word_count: text ? text.trim().split(/\s+/).length : 0,
-        session_id: data.sessionId,
       });
-      if (text) {
-        supabase
-          .from("review_sessions")
-          .update({ optional_text: text, updated_at: new Date().toISOString() })
-          .eq("id", data.sessionId)
-          .then();
+
+      if (path !== "private") {
+        try {
+          await saveProgress({ optional_text: text || null });
+        } catch {
+          setToastMsg("Couldn\u2019t save your progress \u2014 please try again.");
+          return;
+        }
       }
       if (path === "private") {
         setStep("private-feedback");
@@ -2114,7 +2357,7 @@ function ReviewFlowInner({ data, allTopics, isNewSession }: { data: ReviewData; 
         setStep("review");
       }
     },
-    [path, data.sessionId]
+    [path, saveProgress]
   );
 
   // Review — open Google, copy to clipboard, then save to Supabase in background
@@ -2140,61 +2383,38 @@ function ReviewFlowInner({ data, allTopics, isNewSession }: { data: ReviewData; 
 
     setStep("interstitial");
 
-    // Step 3 (async, background): Save to Supabase — fire-and-forget
-    supabase
-      .from("review_sessions")
-      .update({ generated_review: text, status: "copied", updated_at: new Date().toISOString() })
-      .eq("id", data.sessionId)
-      .then(({ error }) => {
-        if (error) console.error("[handlePost] Failed to save copied status:", error.message);
-      });
-
-    // Notify business owner for low-rating public reviews
-    if (rating <= 2 && path === "public") {
-      fetch("/api/notify-owner", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: data.sessionId,
-          review_link_id: data.reviewLinkId,
-          customer_name: data.customerName,
-          star_rating: rating,
-          review_text: text,
-        }),
-      }).catch(() => {});
-    }
-  }, [data.sessionId, data.reviewLinkId, data.customerName, data.googlePlaceId, data.googleReviewUrl, rating, path]);
+    fetch(`/api/public/review-flow/${code}/complete-public`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        star_rating: rating,
+        generated_review: text,
+      }),
+    }).catch(() => {});
+  }, [code, data.googlePlaceId, data.googleReviewUrl, rating]);
 
   // Private feedback
   const handlePrivateSubmit = useCallback(async (feedback: string) => {
-    const { error } = await supabase
-      .from("review_sessions")
-      .update({ optional_text: feedback, status: "drafted", updated_at: new Date().toISOString() })
-      .eq("id", data.sessionId);
-
-    if (error) {
+    try {
+      await fetchPublicFlow<{ success: boolean }>(
+        `/api/public/review-flow/${code}/private-feedback`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            feedback,
+            star_rating: rating,
+          }),
+        },
+      );
+    } catch {
       setToastMsg("Couldn\u2019t save your feedback \u2014 please try again.");
       return;
     }
 
-    // Notify business owner of private feedback
-    fetch("/api/notify-owner", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        session_id: data.sessionId,
-        review_link_id: data.reviewLinkId,
-        customer_name: data.customerName,
-        star_rating: rating,
-        review_text: feedback,
-        is_private: true,
-      }),
-    }).catch(() => {}); // fire-and-forget — don't block the customer
-
-    capture("private_feedback_submitted", { star_rating: rating, session_id: data.sessionId });
-    capture("review_completed", { star_rating: rating, feedback_type: "private", session_id: data.sessionId });
+    capture("private_feedback_submitted", { star_rating: rating });
+    capture("review_completed", { star_rating: rating, feedback_type: "private" });
     setStep("private-success");
-  }, [data.sessionId, data.reviewLinkId, data.customerName, rating]);
+  }, [code, rating]);
 
   // Back handlers
   const handleBackToStars = useCallback(() => {
@@ -2298,6 +2518,9 @@ function ReviewFlowInner({ data, allTopics, isNewSession }: { data: ReviewData; 
               topicAnswers={topicAnswers}
               selectedTopics={selectedTopics}
               optionalDetail={optionalDetail}
+              initialReviewText={finalReview}
+              initialVoiceId={session.voiceId}
+              code={code}
               onPost={handlePost}
               onBack={handleBackFromReview}
               data={data}
@@ -2310,7 +2533,7 @@ function ReviewFlowInner({ data, allTopics, isNewSession }: { data: ReviewData; 
               rating={rating}
               data={data}
               onContinue={() => {
-                capture("review_completed", { star_rating: rating, feedback_type: "public", session_id: data.sessionId });
+                capture("review_completed", { star_rating: rating, feedback_type: "public" });
                 setStep("success");
               }}
             />
@@ -2321,6 +2544,7 @@ function ReviewFlowInner({ data, allTopics, isNewSession }: { data: ReviewData; 
           {step === "private-feedback" && (
             <PrivateFeedbackScreen
               topicAnswers={topicAnswers}
+              initialText={path === "private" ? optionalDetail : ""}
               onSubmit={handlePrivateSubmit}
               onBack={handleBackFromPrivateFeedback}
               data={data}
@@ -2352,150 +2576,52 @@ export default function ReviewFlow() {
   const params = useParams();
   const code = params.code as string;
 
-  const [data, setData] = useState<ReviewData | null>(null);
-  const [allTopics, setAllTopics] = useState<Record<string, TopicDef[]>>({});
+  const [bootstrapData, setBootstrapData] = useState<BootstrapResponse | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isNewSession, setIsNewSession] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      // 1. Look up the review link by unique_code
-      const { data: link, error: linkError } = await supabase
-        .from("review_links")
-        .select("id, business_id, service_id, employee_id, customer_name")
-        .eq("unique_code", code)
-        .single();
-
-      if (linkError || !link) {
-        setNotFound(true);
+      try {
+        const result = await fetchPublicFlow<BootstrapResponse>(
+          `/api/public/review-flow/${code}/bootstrap`,
+        );
+        setBootstrapData(result);
         setLoading(false);
-        return;
-      }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to load review link";
 
-      // 2. Fetch business, service, and optionally employee
-      const [bizRes, svcRes, empRes] = await Promise.all([
-        supabase.from("businesses").select("name, logo_url, google_review_url, google_place_id, business_city, neighborhoods").eq("id", link.business_id).single(),
-        supabase.from("services").select("name").eq("id", link.service_id).single(),
-        link.employee_id
-          ? supabase.from("employees").select("name").eq("id", link.employee_id).single()
-          : Promise.resolve({ data: null, error: null }),
-      ]);
-
-      if (bizRes.error || !bizRes.data || svcRes.error || !svcRes.data) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
-
-      const businessName = bizRes.data.name;
-      const employeeName = empRes.data?.name || null;
-      const initials = businessName
-        .split(/\s+/)
-        .map((w: string) => w[0])
-        .join("")
-        .slice(0, 3)
-        .toUpperCase();
-
-      // 3. Fetch topics for this business (or global defaults)
-      const { data: bizTopics } = await supabase
-        .from("topics")
-        .select("id, label, tier, follow_up_question, follow_up_options, sort_order")
-        .eq("business_id", link.business_id)
-        .order("sort_order");
-
-      let topicRows = bizTopics;
-      if (!topicRows || topicRows.length === 0) {
-        // Fall back to global defaults
-        const { data: globalTopics } = await supabase
-          .from("topics")
-          .select("id, label, tier, follow_up_question, follow_up_options, sort_order")
-          .is("business_id", null)
-          .order("sort_order");
-        topicRows = globalTopics;
-      }
-
-      // Group topics by tier
-      const grouped: Record<string, TopicDef[]> = { positive: [], neutral: [], negative: [] };
-      if (topicRows) {
-        for (const t of topicRows) {
-          const def: TopicDef = {
-            id: t.id,
-            label: t.label,
-            followUp: t.follow_up_question,
-            options: t.follow_up_options,
-          };
-          if (grouped[t.tier]) {
-            grouped[t.tier].push(def);
-          }
-        }
-      }
-
-      // 4. Find or create a review_session (per-device, prevents overwrites)
-      // Generate a device-specific token so two customers sharing a link get separate sessions
-      const storageKey = `st_session_${code}`;
-      let deviceToken = localStorage.getItem(storageKey);
-      if (!deviceToken) {
-        deviceToken = crypto.randomUUID();
-        localStorage.setItem(storageKey, deviceToken);
-      }
-
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { data: existingSession } = await supabase
-        .from("review_sessions")
-        .select("id")
-        .eq("review_link_id", link.id)
-        .eq("device_token", deviceToken)
-        .gte("created_at", twentyFourHoursAgo)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      let session: { id: string };
-      let sessionIsNew = false;
-      if (existingSession) {
-        session = existingSession;
-      } else {
-        const { data: newSession, error: sessionError } = await supabase
-          .from("review_sessions")
-          .insert({ review_link_id: link.id, device_token: deviceToken })
-          .select("id")
-          .single();
-
-        if (sessionError || !newSession) {
+        if (message.toLowerCase().includes("not found")) {
           setNotFound(true);
-          setLoading(false);
-          return;
+        } else {
+          setLoadError(message);
         }
-        session = newSession;
-        sessionIsNew = true;
+        setLoading(false);
       }
-
-      const reviewData: ReviewData = {
-        businessName,
-        businessInitials: initials,
-        employeeName,
-        serviceType: svcRes.data.name,
-        customerName: link.customer_name,
-        googleReviewUrl: bizRes.data.google_review_url,
-        googlePlaceId: bizRes.data.google_place_id || null,
-        businessCity: bizRes.data.business_city || null,
-        neighborhoods: bizRes.data.neighborhoods || [],
-        reviewLinkId: link.id,
-        businessId: link.business_id,
-        sessionId: session.id,
-      };
-
-      setData(reviewData);
-      setAllTopics(grouped);
-      setIsNewSession(sessionIsNew);
-      setLoading(false);
     }
 
     load();
   }, [code]);
 
   if (loading) return <LoadingSkeleton />;
-  if (notFound || !data) return <NotFoundScreen />;
-  return <ReviewFlowInner data={data} allTopics={allTopics} isNewSession={isNewSession} />;
+  if (loadError) {
+    return (
+      <NotFoundScreen
+        title="Please try again in a bit"
+        message={loadError}
+      />
+    );
+  }
+  if (notFound || !bootstrapData) return <NotFoundScreen />;
+  return (
+    <ReviewFlowInner
+      code={code}
+      data={bootstrapData.review}
+      allTopics={bootstrapData.topics}
+      session={bootstrapData.session}
+      isNewSession={bootstrapData.isNewSession}
+    />
+  );
 }

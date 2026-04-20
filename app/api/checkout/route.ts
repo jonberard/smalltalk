@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { getAppBaseUrl } from "@/lib/app-url";
 
 export async function POST(req: NextRequest) {
   const { STRIPE_SECRET_KEY, STRIPE_PRICE_ID } = process.env;
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   // Create Stripe checkout session
   const stripe = new Stripe(STRIPE_SECRET_KEY);
-  const origin = req.headers.get("origin") || "https://usesmalltalk.com";
+  const appBaseUrl = getAppBaseUrl();
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -41,8 +42,8 @@ export async function POST(req: NextRequest) {
       subscription_data: {
         trial_period_days: 7,
       },
-      success_url: `${origin}/dashboard?checkout=success`,
-      cancel_url: `${origin}/pricing`,
+      success_url: `${appBaseUrl}/dashboard?checkout=success`,
+      cancel_url: `${appBaseUrl}/pricing`,
       client_reference_id: user.id,
       metadata: { userId: user.id },
     });

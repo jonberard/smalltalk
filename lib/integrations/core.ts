@@ -1,4 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import { getAppBaseUrl } from "@/lib/app-url";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 /* ═══════════════════════════════════════════════════
    CRM INTEGRATION CORE ENGINE
@@ -6,11 +7,6 @@ import { createClient } from "@supabase/supabase-js";
    (webhook, Jobber, ServiceTitan, etc.) and creates
    a review link with fuzzy-matched service/employee.
    ═══════════════════════════════════════════════════ */
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
 
 /* ─── TYPES ─── */
 
@@ -124,25 +120,43 @@ export async function handleReviewRequest(
   }
 
   // 5. Generate unique code and create review link
-  const code = generateCode();
   const customerContact =
     input.customerPhone || input.customerEmail || "";
+  let code = "";
+  let link: { id: string } | null = null;
+  let linkErr: { code?: string; message?: string } | null = null;
 
-  const { data: link, error: linkErr } = await supabaseAdmin
-    .from("review_links")
-    .insert({
-      business_id: input.businessId,
-      service_id: resolvedServiceId,
-      employee_id: resolvedEmployeeId,
-      customer_name: input.customerName,
-      customer_contact: customerContact,
-      unique_code: code,
-      source: input.source,
-    })
-    .select("id")
-    .single();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    code = generateCode();
 
-  if (linkErr || !link) {
+    const result = await supabaseAdmin
+      .from("review_links")
+      .insert({
+        business_id: input.businessId,
+        service_id: resolvedServiceId,
+        employee_id: resolvedEmployeeId,
+        customer_name: input.customerName,
+        customer_contact: customerContact,
+        unique_code: code,
+        source: input.source,
+      })
+      .select("id")
+      .single();
+
+    if (!result.error && result.data) {
+      link = result.data;
+      linkErr = null;
+      break;
+    }
+
+    linkErr = result.error;
+
+    if (result.error?.code !== "23505") {
+      break;
+    }
+  }
+
+  if (!link) {
     throw new Error(
       `Failed to create review link: ${linkErr?.message || "unknown error"}`,
     );
@@ -150,7 +164,7 @@ export async function handleReviewRequest(
 
   return {
     success: true,
-    reviewUrl: `https://usesmalltalk.com/r/${code}`,
+    reviewUrl: `${getAppBaseUrl()}/r/${code}`,
     reviewLinkId: link.id,
   };
 }

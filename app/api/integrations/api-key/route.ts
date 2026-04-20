@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 /* ═══════════════════════════════════════════════════
    API Key Management
@@ -27,14 +28,14 @@ export async function POST(req: NextRequest) {
   crypto.getRandomValues(bytes);
   const apiKey = `st_${Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("")}`;
 
-  const { error } = await supabase
+  const { error: adminError } = await supabaseAdmin
     .from("businesses")
     .update({ api_key: apiKey })
     .eq("id", user.id);
 
-  if (error) {
+  if (adminError) {
     return NextResponse.json(
-      { error: `Failed to save API key: ${error.message}` },
+      { error: `Failed to save API key: ${adminError.message}` },
       { status: 500 },
     );
   }

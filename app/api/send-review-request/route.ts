@@ -7,6 +7,13 @@ import {
   buildReminderSmsMessage,
   buildReviewRequestEmail,
 } from "@/lib/review-request-messages";
+import { getAppBaseUrl } from "@/lib/app-url";
+import {
+  decrementTrialIfNeeded,
+  isBusinessAllowedToCreateReviewRequest,
+  REVIEW_REQUEST_BUSINESS_SELECT,
+  type ReviewRequestBusiness,
+} from "@/lib/review-request-eligibility";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendReviewSms } from "@/lib/twilio-send";
 import { serverCapture } from "@/lib/posthog-server";
@@ -18,17 +25,7 @@ type SendRequestBody = {
   employee_id?: string | null;
 };
 
-type BusinessRow = {
-  id: string;
-  name: string;
-  subscription_status: string;
-  trial_requests_remaining: number;
-  trial_ends_at: string | null;
-  reminder_sequence_enabled: boolean | null;
-};
-
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const APP_BASE_URL = "https://usesmalltalk.com";
 
 function generateCode() {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -40,19 +37,6 @@ function generateCode() {
   }
 
   return code;
-}
-
-function isBusinessAllowedToSend(business: BusinessRow) {
-  if (business.subscription_status === "active" || business.subscription_status === "trialing") {
-    return true;
-  }
-
-  if (business.subscription_status !== "trial") {
-    return false;
-  }
-
-  const trialActive = !business.trial_ends_at || new Date(business.trial_ends_at) > new Date();
-  return trialActive && business.trial_requests_remaining > 0;
 }
 
 async function getAuthenticatedUserId(req: NextRequest) {
@@ -72,34 +56,6 @@ async function getAuthenticatedUserId(req: NextRequest) {
   } = await supabase.auth.getUser(authHeader);
 
   return user?.id ?? null;
-}
-
-async function decrementTrialIfNeeded(business: BusinessRow) {
-  if (business.subscription_status !== "trial") {
-    return business.trial_requests_remaining;
-  }
-
-  const nextRemaining = Math.max(0, business.trial_requests_remaining - 1);
-
-  const { data: updated } = await supabaseAdmin
-    .from("businesses")
-    .update({ trial_requests_remaining: nextRemaining })
-    .eq("id", business.id)
-    .eq("trial_requests_remaining", business.trial_requests_remaining)
-    .select("trial_requests_remaining")
-    .single();
-
-  if (updated) {
-    return updated.trial_requests_remaining;
-  }
-
-  const { data: current } = await supabaseAdmin
-    .from("businesses")
-    .select("trial_requests_remaining")
-    .eq("id", business.id)
-    .single();
-
-  return current?.trial_requests_remaining ?? nextRemaining;
 }
 
 export async function POST(req: NextRequest) {
@@ -142,7 +98,7 @@ export async function POST(req: NextRequest) {
 
   const { data: business, error: businessError } = await supabaseAdmin
     .from("businesses")
-    .select("id, name, subscription_status, trial_requests_remaining, trial_ends_at, reminder_sequence_enabled")
+    .select(REVIEW_REQUEST_BUSINESS_SELECT)
     .eq("id", userId)
     .single();
 
@@ -150,7 +106,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Business not found" }, { status: 404 });
   }
 
-  if (!isBusinessAllowedToSend(business as BusinessRow)) {
+  if (
+    !isBusinessAllowedToCreateReviewRequest(
+      business as ReviewRequestBusiness,
+    )
+  ) {
     return NextResponse.json(
       { error: "Your subscription is inactive. Please subscribe to send review links." },
       { status: 403 },
@@ -228,7 +188,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const reviewLinkUrl = `${APP_BASE_URL}/r/${reviewLink.unique_code}`;
+  const reviewLinkUrl = `${getAppBaseUrl()}/r/${reviewLink.unique_code}`;
   const initialMessageBody =
     channel === "sms"
       ? buildInitialSmsMessage({
@@ -333,7 +293,9 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const remainingTrialRequests = await decrementTrialIfNeeded(business as BusinessRow);
+      const remainingTrialRequests = await decrementTrialIfNeeded(
+        business as ReviewRequestBusiness,
+      );
 
       return NextResponse.json({
         success: true,
@@ -414,7 +376,9 @@ export async function POST(req: NextRequest) {
       .eq("id", reviewLink.id);
 
     serverCapture(userId, "review_request_sent", { channel, business_id: business.id });
-    const remainingTrialRequests = await decrementTrialIfNeeded(business as BusinessRow);
+    const remainingTrialRequests = await decrementTrialIfNeeded(
+      business as ReviewRequestBusiness,
+    );
 
     return NextResponse.json({
       success: true,

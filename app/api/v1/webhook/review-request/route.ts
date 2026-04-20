@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { handleReviewRequest } from "@/lib/integrations/core";
+import {
+  decrementTrialIfNeeded,
+  isBusinessAllowedToCreateReviewRequest,
+  REVIEW_REQUEST_BUSINESS_SELECT,
+  type ReviewRequestBusiness,
+} from "@/lib/review-request-eligibility";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 /* ═══════════════════════════════════════════════════
    GENERIC WEBHOOK — Review Request
    POST /api/v1/webhook/review-request
    Auth: Bearer [api_key] in Authorization header
    ═══════════════════════════════════════════════════ */
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
 
 export async function POST(req: NextRequest) {
   // 1. Authenticate via API key
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
   // 2. Look up business by API key
   const { data: business, error: lookupErr } = await supabaseAdmin
     .from("businesses")
-    .select("id")
+    .select(REVIEW_REQUEST_BUSINESS_SELECT)
     .eq("api_key", apiKey)
     .single();
 
@@ -42,6 +43,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "Invalid API key" },
       { status: 401 },
+    );
+  }
+
+  if (
+    !isBusinessAllowedToCreateReviewRequest(
+      business as ReviewRequestBusiness,
+    )
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "This business is not eligible to create review requests right now.",
+      },
+      { status: 403 },
     );
   }
 
@@ -94,10 +109,15 @@ export async function POST(req: NextRequest) {
       source: "webhook",
     });
 
+    const remainingTrialRequests = await decrementTrialIfNeeded(
+      business as ReviewRequestBusiness,
+    );
+
     return NextResponse.json({
       success: true,
       review_url: result.reviewUrl,
       review_link_id: result.reviewLinkId,
+      remaining_trial_requests: remainingTrialRequests,
     });
   } catch (err) {
     const message =
