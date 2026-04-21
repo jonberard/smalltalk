@@ -110,6 +110,33 @@ export type SupportMessage = {
   updated_at: string;
 };
 
+export type AiProvider = "anthropic" | "openai" | "gemini";
+export type AiRoutingMode = "auto" | "force";
+export type AiGenerationFeature = "review" | "reply";
+
+export type AdminAiSettings = {
+  id: string;
+  routing_mode: AiRoutingMode;
+  primary_provider: AiProvider;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AiGenerationEvent = {
+  id: string;
+  feature: AiGenerationFeature;
+  provider: AiProvider;
+  model: string;
+  success: boolean;
+  latency_ms: number | null;
+  fallback_step: number;
+  routing_mode: AiRoutingMode;
+  primary_provider: AiProvider;
+  error_message: string | null;
+  created_at: string;
+};
+
 // ═══════════════════════════════════════════
 // SERVICES
 // ═══════════════════════════════════════════

@@ -88,8 +88,8 @@ Anything big and complicated needs to earn its way onto the roadmap through real
 
 - [x] Basic owner dashboard exists
 - [ ] The owner dashboard is not yet a fully polished action center
-- [ ] The admin dashboard does not exist yet
-- [ ] Multi-provider AI failover does not exist yet
+- [x] Founder admin dashboard foundation exists
+- [x] Multi-provider AI failover foundation exists
 
 ---
 
@@ -184,7 +184,6 @@ The customer flow is getting strong. The owner experience is the biggest remaini
   - Still to do:
     - turn it into a real owner help center, not just a support page
     - add workflow-first help home and article pages
-    - land messages in the founder admin inbox, not just email
     - add richer FAQs based on real owner confusion
     - consider attaching screenshots or screen recordings later
 
@@ -206,24 +205,26 @@ If the owner cannot comfortably work through feedback and review activity from t
 small Talk depends on AI generation. That means provider resilience is a launch requirement, not a luxury.
 
 - [x] Anthropic review generation is live
-- [ ] OpenAI provider implementation
-- [ ] Gemini provider implementation
-- [ ] Automatic provider fallback chain
+- [x] OpenAI provider implementation
+- [x] Gemini provider implementation
+- [x] Automatic provider fallback chain
   - Anthropic → OpenAI → Gemini
   - Customer only sees an error if all providers fail
 
-- [ ] Admin control for model/provider selection
+- [x] Admin control for model/provider selection — foundation shipped
   - default mode
   - forced provider mode
   - emergency provider override
   - system-tab visibility into live provider health and fallback status
   - quick manual provider switch if Anthropic is degraded or down
 
-- [ ] Provider health logging
+- [x] Provider health logging — foundation shipped
   - failures
   - latency
   - model used
-  - cost estimates
+  - Still to do:
+    - cost estimates
+    - richer outage/degradation heuristics
 
 - [ ] Internal usage + cost tracker
   - provider

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { AiRoutingError } from "@/lib/ai-routing";
 import { generateReview } from "@/lib/review-generator";
 import {
   loadPublicReviewContext,
@@ -187,7 +188,7 @@ export async function POST(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to generate review";
-    const status = message.includes("not implemented") ? 501 : 500;
+    const status = error instanceof AiRoutingError ? error.statusCode : 500;
 
     return NextResponse.json({ error: message }, { status });
   }

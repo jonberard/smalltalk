@@ -1,4 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { generateAiText } from "@/lib/ai-routing";
+import type { AiProvider } from "@/lib/types";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -14,11 +15,14 @@ export type GenerateReplyInput = {
   replyVoiceId: string;
   customReplyVoice?: string;
   reviewSource: "smalltalk" | "organic";
+  provider?: AiProvider;
 };
 
 export type GenerateReplyResult = {
   reply_text: string;
   voice_id: string;
+  provider: AiProvider;
+  model: string;
 };
 
 /* ═══════════════════════════════════════════════════
@@ -165,50 +169,27 @@ function buildUserPrompt(input: GenerateReplyInput): string {
 }
 
 /* ═══════════════════════════════════════════════════
-   SMART MODEL ROUTING
-   ═══════════════════════════════════════════════════ */
-
-function getModel(rating: number): string {
-  if (process.env.ANTHROPIC_MODEL) {
-    return process.env.ANTHROPIC_MODEL;
-  }
-  // Sonnet for nuanced 1-3 star replies, Haiku for straightforward 4-5 star
-  if (rating <= 3) {
-    return "claude-sonnet-4-20250514";
-  }
-  return "claude-haiku-4-5-20251001";
-}
-
-/* ═══════════════════════════════════════════════════
    MAIN EXPORT
    ═══════════════════════════════════════════════════ */
 
 export async function generateReply(
   input: GenerateReplyInput
 ): Promise<GenerateReplyResult> {
-  const client = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  });
-
-  const model = getModel(input.starRating);
   const systemPrompt = buildSystemPrompt(input);
   const userPrompt = buildUserPrompt(input);
 
-  const response = await client.messages.create({
-    model,
-    max_tokens: 256,
-    temperature: 0.9,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
+  const result = await generateAiText({
+    feature: "reply",
+    starRating: input.starRating,
+    systemPrompt,
+    userPrompt,
+    providerOverride: input.provider,
   });
 
-  const block = response.content[0];
-  if (block.type !== "text") {
-    throw new Error("Unexpected response format from Anthropic");
-  }
-
   return {
-    reply_text: block.text.trim(),
+    reply_text: result.text,
     voice_id: input.replyVoiceId,
+    provider: result.provider,
+    model: result.model,
   };
 }

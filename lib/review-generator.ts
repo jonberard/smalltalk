@@ -1,5 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { generateAiText } from "./ai-routing";
 import { REVIEW_VOICES, type ReviewVoice } from "./review-voices";
+import type { AiProvider } from "./types";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -20,7 +21,7 @@ export type GenerateReviewInput = {
   neighborhood?: string | null;
   topics_selected: TopicInput[];
   optional_text?: string;
-  provider?: "anthropic" | "openai" | "gemini";
+  provider?: AiProvider;
   exclude_voice_id?: string;
 };
 
@@ -28,7 +29,7 @@ export type GenerateReviewResult = {
   review_text: string;
   voice_id: string;
   voice_name: string;
-  provider: string;
+  provider: AiProvider;
   model: string;
 };
 
@@ -165,89 +166,12 @@ function buildUserPrompt(input: GenerateReviewInput): string {
 }
 
 /* ═══════════════════════════════════════════════════
-   SMART MODEL ROUTING
-   ═══════════════════════════════════════════════════ */
-
-function getAnthropicModel(rating: number): string {
-  // Manual override — if ANTHROPIC_MODEL is set, use it for everything
-  if (process.env.ANTHROPIC_MODEL) {
-    return process.env.ANTHROPIC_MODEL;
-  }
-  // Smart routing: Sonnet for nuanced 1-3 star reviews, Haiku for straightforward 4-5 star
-  if (rating <= 3) {
-    return "claude-sonnet-4-20250514";
-  }
-  return "claude-haiku-4-5-20251001";
-}
-
-/* ═══════════════════════════════════════════════════
-   PROVIDER FUNCTIONS
-   ═══════════════════════════════════════════════════ */
-
-type ProviderFn = (
-  systemPrompt: string,
-  userPrompt: string,
-  model: string
-) => Promise<string>;
-
-async function callAnthropic(
-  systemPrompt: string,
-  userPrompt: string,
-  model: string
-): Promise<string> {
-  const client = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  });
-
-  const response = await client.messages.create({
-    model,
-    max_tokens: 256,
-    temperature: 0.9,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
-  });
-
-  const block = response.content[0];
-  if (block.type !== "text") {
-    throw new Error("Unexpected response format from Anthropic");
-  }
-  return block.text.trim();
-}
-
-async function callOpenAI(
-  _systemPrompt: string,
-  _userPrompt: string,
-  _model: string
-): Promise<string> {
-  throw new Error("Provider not implemented yet");
-}
-
-async function callGemini(
-  _systemPrompt: string,
-  _userPrompt: string,
-  _model: string
-): Promise<string> {
-  throw new Error("Provider not implemented yet");
-}
-
-const PROVIDER_ORDER = ["anthropic", "openai", "gemini"] as const;
-
-const providers: Record<string, ProviderFn> = {
-  anthropic: callAnthropic,
-  openai: callOpenAI,
-  gemini: callGemini,
-};
-
-/* ═══════════════════════════════════════════════════
    MAIN EXPORT
    ═══════════════════════════════════════════════════ */
 
 export async function generateReview(
   input: GenerateReviewInput
 ): Promise<GenerateReviewResult> {
-  const primary = input.provider ?? process.env.REVIEW_PROVIDER ?? "anthropic";
-  const anthropicModel = getAnthropicModel(input.star_rating);
-
   const voice = pickVoice(input.exclude_voice_id);
   const systemPrompt = buildSystemPrompt(
     voice,
@@ -257,39 +181,19 @@ export async function generateReview(
   );
   const userPrompt = buildUserPrompt(input);
 
-  // Build fallback order: primary first, then remaining providers
-  const fallbackOrder = [
-    primary,
-    ...PROVIDER_ORDER.filter((p) => p !== primary),
-  ];
+  const result = await generateAiText({
+    feature: "review",
+    starRating: input.star_rating,
+    systemPrompt,
+    userPrompt,
+    providerOverride: input.provider,
+  });
 
-  let lastError: Error | null = null;
-
-  for (const providerName of fallbackOrder) {
-    const providerFn = providers[providerName];
-    if (!providerFn) continue;
-
-    const model = providerName === "anthropic" ? anthropicModel : providerName;
-
-    try {
-      const review_text = await providerFn(systemPrompt, userPrompt, model);
-      return {
-        review_text,
-        voice_id: voice.id,
-        voice_name: voice.name,
-        provider: providerName,
-        model,
-      };
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      // If it's "not implemented", skip to the next provider silently
-      if (lastError.message.includes("not implemented")) continue;
-      // For real failures (API error, timeout, etc.), also try fallback
-      continue;
-    }
-  }
-
-  throw new Error(
-    `All providers failed. Last error: ${lastError?.message || "unknown"}`
-  );
+  return {
+    review_text: result.text,
+    voice_id: voice.id,
+    voice_name: voice.name,
+    provider: result.provider,
+    model: result.model,
+  };
 }

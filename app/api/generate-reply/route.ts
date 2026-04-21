@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { AiRoutingError } from "@/lib/ai-routing";
 import { generateReply, type GenerateReplyInput } from "@/lib/reply-generator";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -92,6 +93,7 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     const message =
       err instanceof Error ? err.message : "Failed to generate reply";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const status = err instanceof AiRoutingError ? err.statusCode : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
