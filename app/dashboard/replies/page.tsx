@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
@@ -10,6 +11,7 @@ import { StatusPill } from "@/components/dashboard/status-pill";
 
 type ReplyItem = {
   sessionId: string;
+  reviewLinkId: string;
   name: string;
   time: string;
   stars: number | null;
@@ -83,7 +85,7 @@ export default function RepliesPage() {
     async function fetchReplies() {
       const { data } = await supabase
         .from("review_sessions")
-        .select("id, star_rating, generated_review, replied_at, reply_text, topics_selected, updated_at, review_links!inner(business_id, customer_name, services(name), employees(name))")
+        .select("id, review_link_id, star_rating, generated_review, replied_at, reply_text, topics_selected, updated_at, review_links!inner(business_id, customer_name, services(name), employees(name))")
         .eq("review_links.business_id", businessId)
         .eq("status", "copied")
         .neq("feedback_type", "private")
@@ -99,6 +101,7 @@ export default function RepliesPage() {
 
           return {
             sessionId: session.id,
+            reviewLinkId: session.review_link_id,
             name: link.customer_name,
             time: timeAgo(session.updated_at),
             stars: session.star_rating,
@@ -282,6 +285,12 @@ export default function RepliesPage() {
                     </div>
                   </div>
                   <div className="flex shrink-0 gap-2">
+                    <Link
+                      href={`/dashboard/requests/${item.reviewLinkId}`}
+                      className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                    >
+                      Open request
+                    </Link>
                     <button
                       type="button"
                       onClick={() => generateReplyForItem(item)}
@@ -400,6 +409,15 @@ export default function RepliesPage() {
               >
                 {replyCopied ? "Copied" : "Copy reply"}
               </button>
+            </div>
+
+            <div className="mt-3 flex justify-end">
+              <Link
+                href={`/dashboard/requests/${selected.reviewLinkId}`}
+                className="text-[12px] font-semibold text-[var(--dash-primary)] underline underline-offset-2 hover:no-underline"
+              >
+                Open request detail
+              </Link>
             </div>
 
             {!replyCopied && !replyLoading ? (

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -10,6 +11,7 @@ import { StatusPill } from "@/components/dashboard/status-pill";
 
 type PrivateFeedbackItem = {
   sessionId: string;
+  reviewLinkId: string;
   name: string;
   time: string;
   stars: number | null;
@@ -76,7 +78,7 @@ export default function InboxPage() {
     async function fetchInbox() {
       const { data } = await supabase
         .from("review_sessions")
-        .select("id, star_rating, optional_text, customer_contact, private_feedback_status, private_feedback_handled_at, updated_at, review_links!inner(business_id, customer_name, customer_contact, services(name), employees(name))")
+        .select("id, review_link_id, star_rating, optional_text, customer_contact, private_feedback_status, private_feedback_handled_at, updated_at, review_links!inner(business_id, customer_name, customer_contact, services(name), employees(name))")
         .eq("review_links.business_id", businessId)
         .eq("feedback_type", "private")
         .not("optional_text", "is", null)
@@ -93,6 +95,7 @@ export default function InboxPage() {
 
           return {
             sessionId: session.id,
+            reviewLinkId: session.review_link_id,
             name: link.customer_name,
             time: timeAgo(session.updated_at),
             stars: session.star_rating,
@@ -378,6 +381,12 @@ export default function InboxPage() {
                 Follow up in your normal channel, then mark this handled so your inbox stays clean.
               </p>
               <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/dashboard/requests/${selected.reviewLinkId}`}
+                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                >
+                  Open request
+                </Link>
                 {selected.customerContact ? (
                   <a
                     href={formatCustomerContact(selected.customerContact)?.href}

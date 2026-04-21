@@ -37,6 +37,7 @@ type AttentionItem = {
 
 type ActivityItem = {
   sessionId: string;
+  reviewLinkId: string;
   name: string;
   action: string;
   time: string;
@@ -56,6 +57,7 @@ type ActivityItem = {
 
 type PrivateFeedbackItem = {
   sessionId: string;
+  reviewLinkId: string;
   name: string;
   time: string;
   stars: number | null;
@@ -319,7 +321,7 @@ export default function Dashboard() {
 
       const { data: allSessions } = await supabase
         .from("review_sessions")
-        .select("id, star_rating, status, feedback_type, customer_contact, optional_text, generated_review, topics_selected, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, replied_at, created_at, updated_at, review_links!inner(business_id, customer_name, customer_contact, services(name), employees(name))")
+        .select("id, review_link_id, star_rating, status, feedback_type, customer_contact, optional_text, generated_review, topics_selected, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, replied_at, created_at, updated_at, review_links!inner(business_id, customer_name, customer_contact, services(name), employees(name))")
         .eq("review_links.business_id", businessId)
         .order("updated_at", { ascending: false });
 
@@ -356,6 +358,7 @@ export default function Dashboard() {
 
           return {
             sessionId: session.id,
+            reviewLinkId: session.review_link_id,
             name: link.customer_name,
             time: timeAgo(session.updated_at),
             stars: session.star_rating,
@@ -407,6 +410,7 @@ export default function Dashboard() {
 
           return {
             sessionId: session.id,
+            reviewLinkId: session.review_link_id,
             name: link.customer_name,
             action: statusToAction(
               session.status,
@@ -918,13 +922,21 @@ export default function Dashboard() {
                     </p>
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <span className="text-[12px] text-[var(--dash-muted)]">{item.time}</span>
-                      <button
-                        type="button"
-                        onClick={() => generateReplyForItem(item)}
-                        className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-3 py-1.5 text-[12px] font-semibold text-[var(--dash-primary)] transition-colors hover:bg-[var(--dash-primary)]/5"
-                      >
-                        Draft reply
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/dashboard/requests/${item.reviewLinkId}`}
+                          className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-3 py-1.5 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-white"
+                        >
+                          Open request
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => generateReplyForItem(item)}
+                          className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-3 py-1.5 text-[12px] font-semibold text-[var(--dash-primary)] transition-colors hover:bg-[var(--dash-primary)]/5"
+                        >
+                          Draft reply
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1007,6 +1019,7 @@ export default function Dashboard() {
                           onClick={() => {
                             setPrivateFeedbackModal({
                               sessionId: item.sessionId,
+                              reviewLinkId: item.reviewLinkId,
                               name: item.name,
                               time: item.time,
                               stars: item.stars,
@@ -1024,14 +1037,29 @@ export default function Dashboard() {
                           View
                         </button>
                       ) : isCopied && !isReplied ? (
-                        <button
-                          type="button"
-                          onClick={() => generateReplyForItem(item)}
-                          className="shrink-0 rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-primary)] transition-colors hover:bg-[var(--dash-primary)]/5"
+                        <div className="flex shrink-0 flex-wrap gap-2">
+                          <Link
+                            href={`/dashboard/requests/${item.reviewLinkId}`}
+                            className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-white"
+                          >
+                            Open request
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => generateReplyForItem(item)}
+                            className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-primary)] transition-colors hover:bg-[var(--dash-primary)]/5"
+                          >
+                            Draft reply
+                          </button>
+                        </div>
+                      ) : (
+                        <Link
+                          href={`/dashboard/requests/${item.reviewLinkId}`}
+                          className="shrink-0 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-white"
                         >
-                          Draft reply
-                        </button>
-                      ) : null}
+                          Open request
+                        </Link>
+                      )}
                     </div>
                   </div>
                 );
@@ -1211,6 +1239,12 @@ export default function Dashboard() {
                   : "Handle the follow-up in your normal channel, then keep the record clean here."}
               </div>
               <div className="flex gap-2">
+                <Link
+                  href={`/dashboard/requests/${privateFeedbackModal.reviewLinkId}`}
+                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                >
+                  Open request
+                </Link>
                 <button
                   type="button"
                   onClick={closePrivateFeedbackModal}
@@ -1317,6 +1351,15 @@ export default function Dashboard() {
               >
                 {replyCopied ? "Copied" : "Copy reply"}
               </button>
+            </div>
+
+            <div className="mt-3 flex justify-end">
+              <Link
+                href={`/dashboard/requests/${replyModal.reviewLinkId}`}
+                className="text-[12px] font-semibold text-[var(--dash-primary)] underline underline-offset-2 hover:no-underline"
+              >
+                Open request detail
+              </Link>
             </div>
 
             {!replyCopied && !replyLoading ? (

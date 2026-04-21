@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
@@ -851,7 +852,11 @@ export default function SendPage() {
           ) : (
             <div className="overflow-hidden rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)]">
               {recentLinks.map((link, i) => (
-                <div key={link.id} className={`flex items-center gap-3 px-4 py-3 ${i < recentLinks.length - 1 ? "border-b border-[var(--dash-border)]" : ""}`}>
+                <Link
+                  key={link.id}
+                  href={`/dashboard/requests/${link.id}`}
+                  className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--dash-bg)] ${i < recentLinks.length - 1 ? "border-b border-[var(--dash-border)]" : ""}`}
+                >
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-medium text-[var(--dash-text)]">{link.customer_name}</p>
                     <p className="text-[12px] text-[var(--dash-muted)]">{maskContact(link.customer_contact)} · {link.service_name}</p>
@@ -871,7 +876,7 @@ export default function SendPage() {
                     <StatusPill status={link.status} />
                   </div>
                   <span className="shrink-0 text-[11px] text-[var(--dash-muted)]">{timeAgo(link.created_at)}</span>
-                </div>
+                </Link>
               ))}
             </div>
           )}
