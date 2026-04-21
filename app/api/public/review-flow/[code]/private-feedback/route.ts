@@ -1,12 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendOwnerNotification } from "@/lib/owner-notifications";
 import { requirePublicFlowSession } from "@/lib/public-review-flow";
+import { normalizePhone } from "@/lib/phone";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 type PrivateFeedbackBody = {
   feedback?: string;
   star_rating?: number;
+  customer_contact?: string;
 };
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeOptionalCustomerContact(rawValue: string | undefined) {
+  const trimmed = rawValue?.trim() ?? "";
+
+  if (!trimmed) {
+    return { value: null as string | null };
+  }
+
+  const normalizedPhone = normalizePhone(trimmed);
+  if (normalizedPhone) {
+    return { value: normalizedPhone };
+  }
+
+  const normalizedEmail = trimmed.toLowerCase();
+  if (EMAIL_REGEX.test(normalizedEmail)) {
+    return { value: normalizedEmail };
+  }
+
+  return {
+    value: null as string | null,
+    error: "Enter a valid email or phone number, or leave it blank.",
+  };
+}
 
 export async function POST(
   req: NextRequest,
@@ -44,12 +71,24 @@ export async function POST(
     return NextResponse.json({ error: "star_rating must be between 1 and 5" }, { status: 400 });
   }
 
+  const normalizedCustomerContact = normalizeOptionalCustomerContact(
+    body.customer_contact,
+  );
+
+  if (normalizedCustomerContact.error) {
+    return NextResponse.json(
+      { error: normalizedCustomerContact.error },
+      { status: 400 },
+    );
+  }
+
   const { error } = await supabaseAdmin
     .from("review_sessions")
     .update({
       feedback_type: "private",
       private_feedback_status: "new",
       private_feedback_handled_at: null,
+      customer_contact: normalizedCustomerContact.value,
       optional_text: feedback,
       star_rating: starRating,
       status: "drafted",
@@ -66,6 +105,10 @@ export async function POST(
       sessionId: sessionContext.session.id,
       reviewLinkId: sessionContext.reviewLink.id,
       customerName: sessionContext.reviewLink.customer_name,
+      customerContact:
+        normalizedCustomerContact.value ??
+        sessionContext.reviewLink.customer_contact ??
+        null,
       starRating,
       reviewText: feedback,
       isPrivate: true,
@@ -80,5 +123,11 @@ export async function POST(
     }
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({
+    success: true,
+    customer_contact:
+      normalizedCustomerContact.value ??
+      sessionContext.reviewLink.customer_contact ??
+      null,
+  });
 }

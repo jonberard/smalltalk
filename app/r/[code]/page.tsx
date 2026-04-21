@@ -57,6 +57,8 @@ type ReviewData = {
   employeeName: string | null;
   serviceType: string;
   customerName: string;
+  customerContact: string | null;
+  isGeneric: boolean;
   googleReviewUrl: string;
   googlePlaceId: string | null;
   businessCity: string | null;
@@ -116,6 +118,7 @@ type PublicFlowSessionState = {
   status: string;
   starRating: number | null;
   feedbackType: "public" | "private";
+  customerContact: string | null;
   topicsSelected: StoredTopicAnswer[];
   optionalText: string;
   generatedReview: string;
@@ -1280,7 +1283,7 @@ function ReviewScreen({
 
   const [copyFailed, setCopyFailed] = useState(false);
 
-  const handleCopyAndOpen = useCallback(() => {
+  const handleCopyAndContinue = useCallback(() => {
     // Step 1: Try clipboard API
     let didCopy = false;
     try {
@@ -1413,7 +1416,7 @@ function ReviewScreen({
             </svg>
             Try another
           </button>
-          <PrimaryButton onClick={handleCopyAndOpen} disabled={copied}>
+          <PrimaryButton onClick={handleCopyAndContinue} disabled={copied}>
             {copied ? (
               <>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-fade-in">
@@ -1422,7 +1425,7 @@ function ReviewScreen({
                 Copied!
               </>
             ) : (
-              "Copy & Open Google"
+              "Copy review"
             )}
           </PrimaryButton>
         </ButtonRow>
@@ -1443,7 +1446,7 @@ function ReviewScreen({
           />
           <div className="mt-4">
             <PrimaryButton onClick={handleManualCopyDone}>
-              I&rsquo;ve copied it &mdash; open Google
+              I&rsquo;ve copied it &mdash; continue
             </PrimaryButton>
           </div>
         </div>
@@ -1605,7 +1608,7 @@ function InterstitialScreen({
         Your review is copied.
       </h2>
       <p className="mt-2 text-[14px] text-muted">
-        Paste it in the Google tab we just opened.
+        Next, open Google and paste it into the review box.
       </p>
 
       {/* Animated dark-mode Google review card */}
@@ -1735,7 +1738,7 @@ function InterstitialScreen({
           onClick={handleOpenGoogle}
           className="flex-1 rounded-full bg-primary px-4 py-3 text-[14px] font-bold text-white shadow-[0_4px_16px_rgba(224,90,61,0.25)] transition-all duration-200 active:scale-[0.98]"
         >
-          Open Google again
+          Open Google
         </button>
       </div>
     </div>
@@ -1922,17 +1925,22 @@ function SuccessScreen({ reviewText, data, cameFromInterstitial }: { reviewText:
 function PrivateFeedbackScreen({
   topicAnswers,
   initialText,
+  initialContact,
+  showOptionalContactField,
   onSubmit,
   onBack,
   data,
 }: {
   topicAnswers: Record<string, TopicAnswer>;
   initialText: string;
-  onSubmit: (feedback: string) => void;
+  initialContact: string;
+  showOptionalContactField: boolean;
+  onSubmit: (feedback: string, customerContact: string) => void;
   onBack: () => void;
   data: ReviewData;
 }) {
   const [text, setText] = useState(initialText);
+  const [customerContact, setCustomerContact] = useState(initialContact);
 
   // Pre-fill summary from topic answers if any
   const hasPriorAnswers = Object.keys(topicAnswers).length > 0;
@@ -1974,9 +1982,40 @@ function PrivateFeedbackScreen({
         {text.length > 0 ? `${text.length} characters` : ""}
       </p>
 
+      {showOptionalContactField && (
+        <div className="mt-5 w-full">
+          <label
+            htmlFor="private-feedback-contact"
+            className="mb-2 block text-left text-[12px] font-semibold uppercase tracking-wide text-muted"
+          >
+            Want them to follow up?
+          </label>
+          <input
+            id="private-feedback-contact"
+            type="text"
+            value={customerContact}
+            onChange={(e) => setCustomerContact(e.target.value)}
+            placeholder="Phone or email (optional)"
+            className="w-full rounded-card border border-accent bg-background px-4 py-3 text-[15px] text-text placeholder:text-muted/60 transition-colors duration-200 focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          />
+          <p className="mt-2 text-[12px] leading-relaxed text-muted">
+            Leave a phone number or email if you want {data.businessName} to be
+            able to follow up directly.
+          </p>
+        </div>
+      )}
+
       <ButtonRow>
         <PrimaryButton
-          onClick={() => onSubmit(text || Object.entries(topicAnswers).map(([t, a]) => `${t}: ${a.option}`).join(", "))}
+          onClick={() =>
+            onSubmit(
+              text ||
+                Object.entries(topicAnswers)
+                  .map(([t, a]) => `${t}: ${a.option}`)
+                  .join(", "),
+              customerContact,
+            )
+          }
           disabled={text.trim().length === 0 && !hasPriorAnswers}
         >
           Send feedback
@@ -1992,10 +2031,12 @@ function PrivateFeedbackScreen({
 
 function PrivateSuccessScreen({
   data,
+  hasContactInfo,
   onPostPublicly,
   showPublicOption,
 }: {
   data: ReviewData;
+  hasContactInfo: boolean;
   onPostPublicly: () => void;
   showPublicOption: boolean;
 }) {
@@ -2030,7 +2071,9 @@ function PrivateSuccessScreen({
       )}
 
       <p className="mt-8 text-[13px] text-muted">
-        They&rsquo;ll receive it right away and can follow up directly if they choose.
+        {hasContactInfo
+          ? "They’ll receive it right away and can follow up directly if they choose."
+          : "They’ll receive it right away."}
       </p>
     </div>
   );
@@ -2054,7 +2097,7 @@ function PrivateRevisitScreen({
       <ScreenHeading>You already sent private feedback</ScreenHeading>
 
       <p className="mt-3 text-[15px] leading-relaxed text-muted">
-        If you&rsquo;d still like to share your experience publicly, you can.
+        If you&rsquo;d still like to share your experience publicly, you can do that here.
       </p>
 
       <div className="mt-8 flex w-full flex-col gap-3">
@@ -2070,7 +2113,7 @@ function PrivateRevisitScreen({
           onClick={onDone}
           className="text-[13px] font-medium text-muted underline underline-offset-2 transition-opacity duration-200 hover:opacity-80"
         >
-          Done
+          Close
         </button>
       </div>
     </div>
@@ -2203,6 +2246,9 @@ function ReviewFlowInner({
   >(restoredState.topicAnswers);
   const [optionalDetail, setOptionalDetail] = useState(restoredState.optionalDetail);
   const [finalReview, setFinalReview] = useState(restoredState.finalReview);
+  const [privateFeedbackContact, setPrivateFeedbackContact] = useState(
+    session.customerContact ?? data.customerContact ?? "",
+  );
   const [showPrivateSuccessPublicOption, setShowPrivateSuccessPublicOption] = useState(true);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -2437,23 +2483,9 @@ function ReviewFlowInner({
     [path, saveProgress]
   );
 
-  // Review — open Google, copy to clipboard, then save to Supabase in background
-  // IMPORTANT: window.open must be synchronous from click — no awaits before it
+  // Review — once the text is copied, move to the handoff screen and save in the background
   const handlePost = useCallback((text: string, _voiceId: string, copyFailed: boolean) => {
     setFinalReview(text);
-
-    // Step 1 (sync): Open Google — must happen before any await to avoid popup blocker
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (data.googlePlaceId) {
-      const base = isMobile
-        ? "https://search.google.com/local/writereview/mobile"
-        : "https://search.google.com/local/writereview";
-      window.open(`${base}?placeid=${data.googlePlaceId}`, "_blank");
-    } else if (data.googleReviewUrl) {
-      window.open(data.googleReviewUrl, "_blank");
-    } else {
-      window.open("https://www.google.com/maps", "_blank");
-    }
 
     // If copy failed, don't advance — ReviewScreen handles the manual copy fallback
     if (copyFailed) return;
@@ -2468,31 +2500,45 @@ function ReviewFlowInner({
         generated_review: text,
       }),
     }).catch(() => {});
-  }, [code, data.googlePlaceId, data.googleReviewUrl, rating]);
+  }, [code, rating]);
 
   // Private feedback
-  const handlePrivateSubmit = useCallback(async (feedback: string) => {
+  const handlePrivateSubmit = useCallback(
+    async (feedback: string, customerContact: string) => {
+      let result: { success: boolean; customer_contact?: string | null };
+
     try {
-      await fetchPublicFlow<{ success: boolean }>(
-        `/api/public/review-flow/${code}/private-feedback`,
-        {
+        result = await fetchPublicFlow<{
+          success: boolean;
+          customer_contact?: string | null;
+        }>(`/api/public/review-flow/${code}/private-feedback`, {
           method: "POST",
           body: JSON.stringify({
             feedback,
             star_rating: rating,
+            customer_contact: customerContact,
           }),
-        },
-      );
-    } catch {
-      setToastMsg("Couldn\u2019t save your feedback \u2014 please try again.");
+        });
+    } catch (error) {
+        setToastMsg(
+          error instanceof Error
+            ? error.message
+            : "Couldn’t save your feedback — please try again.",
+        );
       return;
     }
 
-    capture("private_feedback_submitted", { star_rating: rating });
-    capture("review_completed", { star_rating: rating, feedback_type: "private" });
-    setShowPrivateSuccessPublicOption(true);
-    setStep("private-success");
-  }, [code, rating]);
+      setPrivateFeedbackContact(result.customer_contact ?? "");
+      capture("private_feedback_submitted", { star_rating: rating });
+      capture("review_completed", {
+        star_rating: rating,
+        feedback_type: "private",
+      });
+      setShowPrivateSuccessPublicOption(true);
+      setStep("private-success");
+    },
+    [code, rating],
+  );
 
   const handleStartPublicReview = useCallback(async () => {
     try {
@@ -2638,6 +2684,8 @@ function ReviewFlowInner({
             <PrivateFeedbackScreen
               topicAnswers={topicAnswers}
               initialText={path === "private" ? optionalDetail : ""}
+              initialContact={privateFeedbackContact}
+              showOptionalContactField={data.isGeneric}
               onSubmit={handlePrivateSubmit}
               onBack={handleBackFromPrivateFeedback}
               data={data}
@@ -2657,6 +2705,7 @@ function ReviewFlowInner({
           {step === "private-success" && (
             <PrivateSuccessScreen
               data={data}
+              hasContactInfo={!!(privateFeedbackContact || data.customerContact)}
               onPostPublicly={handleStartPublicReview}
               showPublicOption={showPrivateSuccessPublicOption}
             />

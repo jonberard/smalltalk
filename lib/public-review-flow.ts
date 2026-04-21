@@ -32,6 +32,8 @@ export type PublicReviewData = {
   employeeName: string | null;
   serviceType: string;
   customerName: string;
+  customerContact: string | null;
+  isGeneric: boolean;
   googleReviewUrl: string;
   googlePlaceId: string | null;
   businessCity: string | null;
@@ -43,6 +45,7 @@ export type PublicFlowSessionState = {
   status: string;
   starRating: number | null;
   feedbackType: "public" | "private";
+  customerContact: string | null;
   topicsSelected: StoredPublicTopicAnswer[];
   optionalText: string;
   generatedReview: string;
@@ -62,6 +65,7 @@ type ReviewLinkContext = {
   id: string;
   business_id: string;
   customer_name: string;
+  customer_contact: string | null;
   is_generic: boolean;
   businesses: {
     name: string;
@@ -83,6 +87,7 @@ type SessionRow = {
   id: string;
   review_link_id: string;
   device_token: string | null;
+  customer_contact: string | null;
   status: string;
   star_rating: number | null;
   topics_selected: unknown;
@@ -198,6 +203,7 @@ function toSessionState(session: SessionRow): PublicFlowSessionState {
     status: session.status,
     starRating: session.star_rating,
     feedbackType: session.feedback_type || "public",
+    customerContact: session.customer_contact || null,
     topicsSelected: normalizeStoredTopics(session.topics_selected),
     optionalText: session.optional_text || "",
     generatedReview: session.generated_review || "",
@@ -215,6 +221,7 @@ function toPrivateFeedbackRecourseState(
     status: session.status,
     starRating: session.star_rating,
     feedbackType: "private",
+    customerContact: session.customer_contact || null,
     topicsSelected: [],
     optionalText: "",
     generatedReview: "",
@@ -227,7 +234,7 @@ async function loadReviewLinkContext(code: string) {
   const { data, error } = await supabaseAdmin
     .from("review_links")
     .select(
-      "id, business_id, customer_name, is_generic, businesses!inner(name, logo_url, google_review_url, google_place_id, business_city, neighborhoods), services!inner(name), employees(name)",
+      "id, business_id, customer_name, customer_contact, is_generic, businesses!inner(name, logo_url, google_review_url, google_place_id, business_city, neighborhoods), services!inner(name), employees(name)",
     )
     .eq("unique_code", code)
     .maybeSingle();
@@ -250,6 +257,7 @@ async function loadReviewLinkContext(code: string) {
     id: data.id,
     business_id: data.business_id,
     customer_name: data.customer_name,
+    customer_contact: data.customer_contact?.trim() ? data.customer_contact : null,
     is_generic: data.is_generic,
     businesses: businessRecord
       ? {
@@ -302,7 +310,7 @@ async function loadSession(sessionId: string) {
   const { data, error } = await supabaseAdmin
     .from("review_sessions")
     .select(
-      "id, review_link_id, device_token, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, public_owner_notified_at, private_owner_notified_at",
+      "id, review_link_id, device_token, customer_contact, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, public_owner_notified_at, private_owner_notified_at",
     )
     .eq("id", sessionId)
     .maybeSingle();
@@ -347,7 +355,7 @@ async function createSession(
         : {}),
     })
     .select(
-      "id, review_link_id, device_token, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, public_owner_notified_at, private_owner_notified_at",
+      "id, review_link_id, device_token, customer_contact, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, public_owner_notified_at, private_owner_notified_at",
     )
     .single();
 
@@ -374,6 +382,8 @@ function buildBootstrapPayload(
       employeeName: reviewLink.employees?.name || null,
       serviceType: reviewLink.services?.name || "",
       customerName: reviewLink.customer_name,
+      customerContact: reviewLink.customer_contact,
+      isGeneric: reviewLink.is_generic,
       googleReviewUrl: reviewLink.businesses?.google_review_url || "",
       googlePlaceId: reviewLink.businesses?.google_place_id || null,
       businessCity: reviewLink.businesses?.business_city || null,
@@ -400,6 +410,8 @@ function buildPrivateFeedbackRecoursePayload(
       employeeName: reviewLink.employees?.name || null,
       serviceType: reviewLink.services?.name || "",
       customerName: reviewLink.customer_name,
+      customerContact: reviewLink.customer_contact,
+      isGeneric: reviewLink.is_generic,
       googleReviewUrl: reviewLink.businesses?.google_review_url || "",
       googlePlaceId: reviewLink.businesses?.google_place_id || null,
       businessCity: reviewLink.businesses?.business_city || null,
@@ -416,7 +428,7 @@ async function loadLatestCompletedPrivateFeedbackSession(reviewLinkId: string) {
   const { data, error } = await supabaseAdmin
     .from("review_sessions")
     .select(
-      "id, review_link_id, device_token, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, public_owner_notified_at, private_owner_notified_at",
+      "id, review_link_id, device_token, customer_contact, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, public_owner_notified_at, private_owner_notified_at",
     )
     .eq("review_link_id", reviewLinkId)
     .eq("feedback_type", "private")
@@ -436,7 +448,7 @@ async function loadExistingPublicFollowupSession(parentSessionId: string) {
   const { data, error } = await supabaseAdmin
     .from("review_sessions")
     .select(
-      "id, review_link_id, device_token, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, public_owner_notified_at, private_owner_notified_at",
+      "id, review_link_id, device_token, customer_contact, status, star_rating, topics_selected, optional_text, generated_review, voice_id, feedback_type, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, public_owner_notified_at, private_owner_notified_at",
     )
     .eq("parent_private_feedback_session_id", parentSessionId)
     .order("created_at", { ascending: false })

@@ -321,7 +321,7 @@ export default function Dashboard() {
       // 2. All sessions for this business
       const { data: allSessions } = await supabase
         .from("review_sessions")
-        .select("id, star_rating, status, feedback_type, optional_text, generated_review, topics_selected, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, replied_at, created_at, updated_at, review_links!inner(business_id, customer_name, customer_contact, services(name), employees(name))")
+        .select("id, star_rating, status, feedback_type, customer_contact, optional_text, generated_review, topics_selected, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, replied_at, created_at, updated_at, review_links!inner(business_id, customer_name, customer_contact, services(name), employees(name))")
         .eq("review_links.business_id", businessId)
         .order("updated_at", { ascending: false });
 
@@ -367,7 +367,7 @@ export default function Dashboard() {
             message: s.optional_text,
             employeeName: link.employees?.name ?? null,
             serviceType: link.services?.name ?? null,
-            customerContact: link.customer_contact ?? null,
+            customerContact: s.customer_contact ?? link.customer_contact ?? null,
             status:
               (s.private_feedback_status as "new" | "handled" | null) ?? "new",
             handledAt: s.private_feedback_handled_at ?? null,
@@ -438,7 +438,7 @@ export default function Dashboard() {
             repliedAt: s.replied_at ?? null,
             employeeName: link.employees?.name ?? null,
             serviceType: link.services?.name ?? null,
-            customerContact: link.customer_contact ?? null,
+            customerContact: s.customer_contact ?? link.customer_contact ?? null,
             topicsSelected: s.topics_selected as { label: string; follow_up_answer: string }[] | null,
             parentPrivateFeedbackSessionId:
               s.parent_private_feedback_session_id ?? null,

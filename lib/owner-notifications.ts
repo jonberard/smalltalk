@@ -19,6 +19,28 @@ function starHtml(rating: number): string {
   return `<span style="font-size:24px;color:#E05A3D;letter-spacing:2px;">${filled.repeat(rating)}${empty.repeat(5 - rating)}</span>`;
 }
 
+function buildCustomerContactHtml(customerContact: string | null) {
+  if (!customerContact) {
+    return `<p style="margin:0 0 24px;font-size:14px;color:#5E7268;line-height:1.5;">
+      No direct customer contact was included with this feedback.
+    </p>`;
+  }
+
+  const isEmail = customerContact.includes("@");
+  const href = isEmail
+    ? `mailto:${customerContact}`
+    : `tel:${customerContact}`;
+
+  return `<div style="margin:0 0 24px;padding:14px 16px;border:1px solid #EDE8DE;border-radius:12px;background-color:#FFFFFF;">
+    <p style="margin:0 0 6px;font-size:12px;color:#5E7268;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;">
+      Customer contact
+    </p>
+    <a href="${escapeHtml(href)}" style="font-size:14px;color:#E05A3D;font-weight:600;text-decoration:underline;text-underline-offset:2px;">
+      ${escapeHtml(customerContact)}
+    </a>
+  </div>`;
+}
+
 function buildPublicEmailHtml({
   customerName,
   starRating,
@@ -89,11 +111,13 @@ function buildPrivateEmailHtml({
   customerName,
   starRating,
   feedbackText,
+  customerContact,
   dashboardUrl,
 }: {
   customerName: string;
   starRating: number;
   feedbackText: string;
+  customerContact: string | null;
   dashboardUrl: string;
 }) {
   return `<!DOCTYPE html>
@@ -119,6 +143,7 @@ function buildPrivateEmailHtml({
           <div style="background-color:#F9F6F0;border-radius:12px;padding:20px;margin:0 0 24px;">
             <p style="margin:0;font-size:14px;color:#1A2E25;line-height:1.6;white-space:pre-wrap;">${feedbackText.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
           </div>
+          ${buildCustomerContactHtml(customerContact)}
           <p style="margin:0 0 24px;font-size:14px;color:#5E7268;line-height:1.5;">
             You can view this feedback, mark it handled, and follow up from your dashboard.
           </p>
@@ -147,7 +172,7 @@ function buildPrivateEmailHtml({
 async function loadOwnerNotificationContext(reviewLinkId: string) {
   const { data, error } = await supabaseAdmin
     .from("review_links")
-    .select("business_id, businesses!inner(owner_email, name, google_review_url)")
+    .select("business_id, customer_contact, businesses!inner(owner_email, name, google_review_url)")
     .eq("id", reviewLinkId)
     .single();
 
@@ -163,10 +188,16 @@ async function loadOwnerNotificationContext(reviewLinkId: string) {
     return null;
   }
 
-  return businessRecord as {
+  return {
+    owner_email: businessRecord.owner_email,
+    name: businessRecord.name,
+    google_review_url: businessRecord.google_review_url,
+    customer_contact: data.customer_contact ?? null,
+  } as {
     owner_email: string | null;
     name: string;
     google_review_url: string | null;
+    customer_contact: string | null;
   };
 }
 
@@ -174,6 +205,7 @@ export async function sendOwnerNotification({
   sessionId,
   reviewLinkId,
   customerName,
+  customerContact,
   starRating,
   reviewText,
   isPrivate,
@@ -181,6 +213,7 @@ export async function sendOwnerNotification({
   sessionId?: string;
   reviewLinkId: string;
   customerName: string;
+  customerContact?: string | null;
   starRating: number;
   reviewText: string;
   isPrivate: boolean;
@@ -210,11 +243,12 @@ export async function sendOwnerNotification({
     : `${customerName} may have posted a ${starRating}-star review`;
   const html = isPrivate
     ? buildPrivateEmailHtml({
-        customerName,
-        starRating,
-        feedbackText: reviewText,
-        dashboardUrl,
-      })
+      customerName,
+      starRating,
+      feedbackText: reviewText,
+      customerContact: customerContact ?? context.customer_contact ?? null,
+      dashboardUrl,
+    })
     : buildPublicEmailHtml({
         customerName,
         starRating,
