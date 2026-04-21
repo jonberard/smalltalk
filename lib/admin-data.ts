@@ -781,6 +781,13 @@ export async function listAdminSupportMessages(): Promise<AdminSupportMessageSum
     created_at: string;
     updated_at: string;
     businesses:
+      | {
+          name: string;
+          admin_business_notes:
+            | { follow_up_status: AdminBusinessFollowUpStatus }[]
+            | { follow_up_status: AdminBusinessFollowUpStatus }
+            | null;
+        }
       | Array<{
           name: string;
           admin_business_notes:
@@ -791,8 +798,10 @@ export async function listAdminSupportMessages(): Promise<AdminSupportMessageSum
       | null;
   };
 
-  const rows = ((data as RawSupportRow[] | null) ?? []).map((row) => {
-    const business = row.businesses?.[0] ?? null;
+  const rows = ((data as unknown as RawSupportRow[] | null) ?? []).map((row) => {
+    const business = Array.isArray(row.businesses)
+      ? row.businesses[0] ?? null
+      : row.businesses ?? null;
     const rawNote = business?.admin_business_notes;
     const note = Array.isArray(rawNote) ? rawNote[0] : rawNote;
 
