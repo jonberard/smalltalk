@@ -1057,7 +1057,7 @@ export default function Dashboard() {
                 Request flow
               </p>
               <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
-                Keep the top numbers light on mobile
+                How requests are moving
               </h2>
             </div>
             <div className="flex gap-1 rounded-full bg-[#EFEAE2] p-1">
