@@ -58,6 +58,7 @@ type RawAdminBusinessNote = {
   business_id: string;
   follow_up_status: AdminBusinessFollowUpStatus;
   note: string | null;
+  reminder_due_at: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -69,6 +70,7 @@ export type AdminAttentionReasonKey =
   | "new_private_feedback"
   | "failed_deliveries"
   | "inactive"
+  | "reminder_due"
   | "founder_follow_up";
 
 export type AdminAttentionReason = {
@@ -103,6 +105,9 @@ export type AdminBusinessSummary = {
   founderNotePreview: string | null;
   founderNoteUpdatedAt: string | null;
   founderNoteUpdatedLabel: string | null;
+  reminderDueAt: string | null;
+  reminderDueLabel: string | null;
+  reminderUrgency: "none" | "upcoming" | "today" | "tomorrow" | "overdue";
   attentionReasons: AdminAttentionReason[];
   attentionScore: number;
 };
@@ -120,6 +125,8 @@ export type AdminOverviewData = {
     publicFlowCompletion30d: number;
     privateFeedback30d: number;
     failedDeliveries30d: number;
+    remindersDue: number;
+    remindersOverdue: number;
   };
   attention: Array<{
     businessId: string;
@@ -144,6 +151,16 @@ export type AdminOverviewData = {
     lastActivityLabel: string;
     subscriptionStatus: string;
   }>;
+  reminders: Array<{
+    businessId: string;
+    name: string;
+    ownerEmail: string | null;
+    subscriptionStatus: string;
+    followUpStatus: AdminBusinessFollowUpStatus;
+    reminderDueLabel: string;
+    reminderUrgency: "upcoming" | "today" | "tomorrow" | "overdue";
+    founderNotePreview: string | null;
+  }>;
 };
 
 export type AdminBusinessDetail = {
@@ -151,6 +168,9 @@ export type AdminBusinessDetail = {
   founderNote: {
     followUpStatus: AdminBusinessFollowUpStatus;
     note: string;
+    reminderDueAt: string | null;
+    reminderDueLabel: string | null;
+    reminderUrgency: "none" | "upcoming" | "today" | "tomorrow" | "overdue";
     updatedAt: string | null;
     updatedLabel: string | null;
   };
@@ -219,6 +239,66 @@ function maxDate(values: Array<string | null | undefined>) {
   }
 
   return new Date(Math.max(...timestamps)).toISOString();
+}
+
+function startOfToday() {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function formatCalendarDate(dateString: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(dateString));
+}
+
+function getReminderMeta(reminderDueAt: string | null) {
+  if (!reminderDueAt) {
+    return {
+      dueLabel: null,
+      urgency: "none" as const,
+      sortValue: null as number | null,
+    };
+  }
+
+  const dueDate = new Date(reminderDueAt);
+  const dueTime = dueDate.getTime();
+  const today = startOfToday();
+  const todayTime = today.getTime();
+  const tomorrowTime = todayTime + DAY_MS;
+  const dayAfterTomorrowTime = tomorrowTime + DAY_MS;
+
+  if (dueTime < todayTime) {
+    return {
+      dueLabel: `Overdue · ${formatCalendarDate(reminderDueAt)}`,
+      urgency: "overdue" as const,
+      sortValue: dueTime,
+    };
+  }
+
+  if (dueTime < tomorrowTime) {
+    return {
+      dueLabel: "Due today",
+      urgency: "today" as const,
+      sortValue: dueTime,
+    };
+  }
+
+  if (dueTime < dayAfterTomorrowTime) {
+    return {
+      dueLabel: "Due tomorrow",
+      urgency: "tomorrow" as const,
+      sortValue: dueTime,
+    };
+  }
+
+  return {
+    dueLabel: `Due ${formatCalendarDate(reminderDueAt)}`,
+    urgency: "upcoming" as const,
+    sortValue: dueTime,
+  };
 }
 
 function getAdminBusinessNote(raw: RawBusiness) {
@@ -322,6 +402,19 @@ function getAttentionReasons(summary: Omit<AdminBusinessSummary, "attentionReaso
     });
   }
 
+  if (summary.reminderUrgency !== "none") {
+    reasons.push({
+      key: "reminder_due",
+      label: summary.reminderDueLabel ?? "Founder reminder due",
+      tone:
+        summary.reminderUrgency === "overdue"
+          ? "critical"
+          : summary.reminderUrgency === "today"
+            ? "warning"
+            : "info",
+    });
+  }
+
   const followUpReason = getFounderFollowUpReason(summary.founderFollowUpStatus);
 
   if (followUpReason) {
@@ -334,6 +427,7 @@ function getAttentionReasons(summary: Omit<AdminBusinessSummary, "attentionReaso
 function getAttentionScore(reasons: AdminAttentionReason[]) {
   const weight: Record<AdminAttentionReasonKey, number> = {
     past_due: 100,
+    reminder_due: 90,
     onboarding_stuck: 80,
     new_private_feedback: 70,
     failed_deliveries: 60,
@@ -378,6 +472,7 @@ function getCurrentStateLabel(link: RawReviewLink) {
 function summarizeBusiness(raw: RawBusiness): AdminBusinessSummary {
   const links = raw.review_links ?? [];
   const note = getAdminBusinessNote(raw);
+  const reminder = getReminderMeta(note?.reminder_due_at ?? null);
   const sessions = links.flatMap((link) => link.review_sessions ?? []);
   const publicSessions = sessions.filter((session) => session.feedback_type === "public");
   const privateSessions = sessions.filter((session) => session.feedback_type === "private");
@@ -463,6 +558,9 @@ function summarizeBusiness(raw: RawBusiness): AdminBusinessSummary {
     founderNotePreview: founderNotePreview(note?.note ?? null),
     founderNoteUpdatedAt: note?.updated_at ?? null,
     founderNoteUpdatedLabel: note?.updated_at ? formatRelative(note.updated_at) : null,
+    reminderDueAt: note?.reminder_due_at ?? null,
+    reminderDueLabel: reminder.dueLabel,
+    reminderUrgency: reminder.urgency,
   };
 
   const attentionReasons = getAttentionReasons(baseSummary);
@@ -478,7 +576,7 @@ async function fetchBusinessesRaw(filterBusinessId?: string) {
   let query = supabaseAdmin
     .from("businesses")
     .select(
-      "id, name, owner_email, subscription_status, onboarding_completed, trial_requests_remaining, trial_ends_at, created_at, admin_business_notes(business_id, follow_up_status, note, updated_by, created_at, updated_at), review_links(id, customer_name, customer_contact, unique_code, source, is_generic, created_at, review_sessions(id, customer_contact, star_rating, optional_text, status, feedback_type, private_feedback_status, updated_at, created_at), review_message_deliveries(id, channel, kind, status, created_at, sent_at, last_error, to_address))",
+      "id, name, owner_email, subscription_status, onboarding_completed, trial_requests_remaining, trial_ends_at, created_at, admin_business_notes(business_id, follow_up_status, note, reminder_due_at, updated_by, created_at, updated_at), review_links(id, customer_name, customer_contact, unique_code, source, is_generic, created_at, review_sessions(id, customer_contact, star_rating, optional_text, status, feedback_type, private_feedback_status, updated_at, created_at), review_message_deliveries(id, channel, kind, status, created_at, sent_at, last_error, to_address))",
     )
     .order("created_at", { ascending: false });
 
@@ -521,6 +619,8 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
     })(),
     privateFeedback30d: businesses.reduce((total, business) => total + business.privateFeedback30d, 0),
     failedDeliveries30d: businesses.reduce((total, business) => total + business.failedDeliveries30d, 0),
+    remindersDue: businesses.filter((business) => business.reminderUrgency !== "none").length,
+    remindersOverdue: businesses.filter((business) => business.reminderUrgency === "overdue").length,
   };
 
   return {
@@ -556,6 +656,20 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
         ownerEmail: business.ownerEmail,
         lastActivityLabel: business.lastActivityLabel,
         subscriptionStatus: business.subscriptionStatus,
+      })),
+    reminders: businesses
+      .filter((business) => business.reminderUrgency !== "none" && business.reminderDueLabel)
+      .sort((a, b) => new Date(a.reminderDueAt ?? 0).getTime() - new Date(b.reminderDueAt ?? 0).getTime())
+      .slice(0, 6)
+      .map((business) => ({
+        businessId: business.id,
+        name: business.name,
+        ownerEmail: business.ownerEmail,
+        subscriptionStatus: business.subscriptionStatus,
+        followUpStatus: business.founderFollowUpStatus,
+        reminderDueLabel: business.reminderDueLabel!,
+        reminderUrgency: business.reminderUrgency as "upcoming" | "today" | "tomorrow" | "overdue",
+        founderNotePreview: business.founderNotePreview,
       })),
   };
 }
@@ -626,6 +740,9 @@ export async function getAdminBusinessDetail(
     founderNote: {
       followUpStatus: note?.follow_up_status ?? "none",
       note: trimFounderNote(note?.note ?? null) ?? "",
+      reminderDueAt: note?.reminder_due_at ?? null,
+      reminderDueLabel: getReminderMeta(note?.reminder_due_at ?? null).dueLabel,
+      reminderUrgency: getReminderMeta(note?.reminder_due_at ?? null).urgency,
       updatedAt: note?.updated_at ?? null,
       updatedLabel: note?.updated_at ? formatRelative(note.updated_at) : null,
     },

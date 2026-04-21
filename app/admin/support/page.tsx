@@ -24,6 +24,8 @@ type BusinessSummary = {
   founderFollowUpStatus: AdminBusinessFollowUpStatus;
   founderNotePreview: string | null;
   founderNoteUpdatedLabel: string | null;
+  reminderDueLabel: string | null;
+  reminderUrgency: "none" | "upcoming" | "today" | "tomorrow" | "overdue";
   attentionReasons: AttentionReason[];
 };
 
@@ -83,6 +85,18 @@ export default function FounderSupportPage() {
     () => businesses.filter((business) => business.attentionReasons.length > 0),
     [businesses],
   );
+  const reminders = useMemo(
+    () =>
+      businesses
+        .filter((business) => business.reminderUrgency !== "none" && business.reminderDueLabel)
+        .sort((a, b) => {
+          const aDue = a.reminderUrgency === "overdue" ? 0 : a.reminderUrgency === "today" ? 1 : a.reminderUrgency === "tomorrow" ? 2 : 3;
+          const bDue = b.reminderUrgency === "overdue" ? 0 : b.reminderUrgency === "today" ? 1 : b.reminderUrgency === "tomorrow" ? 2 : 3;
+          if (aDue !== bDue) return aDue - bDue;
+          return a.name.localeCompare(b.name);
+        }),
+    [businesses],
+  );
 
   return (
     <>
@@ -98,7 +112,65 @@ export default function FounderSupportPage() {
         </p>
       </div>
 
-      <div className="mt-6 rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
+      <div className="mt-6 grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+        <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+                Follow-up reminders
+              </p>
+              <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
+                In urgency order, not buried in your notes.
+              </h2>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="mt-4 space-y-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <SkeletonRow key={index} />
+              ))}
+            </div>
+          ) : reminders.length === 0 ? (
+            <div className="mt-4">
+              <EmptyState
+                icon={<WarningIcon />}
+                title="No founder reminders yet"
+                description="Add a reminder date to any founder note and it will show up here in urgency order."
+              />
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {reminders.map((business) => (
+                <Link
+                  key={`${business.id}-reminder`}
+                  href={`/admin/businesses/${business.id}`}
+                  className="block rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[#FCFAF6] p-4 transition-colors hover:bg-white hover:border-[#E05A3D]/30"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[14px] font-semibold text-[var(--dash-text)]">{business.name}</p>
+                      {business.ownerEmail && (
+                        <p className="mt-1 text-[12px] text-[var(--dash-muted)]">{business.ownerEmail}</p>
+                      )}
+                    </div>
+                    <FounderFollowUpPill status={business.founderFollowUpStatus} />
+                  </div>
+                  <p className="mt-3 text-[12px] font-semibold text-[var(--dash-text)]">
+                    {business.reminderDueLabel}
+                  </p>
+                  {business.founderNotePreview && (
+                    <p className="mt-2 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+                      {business.founderNotePreview}
+                    </p>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
         {loading ? (
           <div className="p-5 space-y-4">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -163,6 +235,7 @@ export default function FounderSupportPage() {
             ))}
           </div>
         )}
+        </div>
       </div>
     </>
   );

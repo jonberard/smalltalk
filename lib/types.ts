@@ -81,6 +81,7 @@ export type AdminBusinessNote = {
   business_id: string;
   follow_up_status: AdminBusinessFollowUpStatus;
   note: string | null;
+  reminder_due_at: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;

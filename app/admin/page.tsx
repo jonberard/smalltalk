@@ -7,6 +7,8 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { SkeletonCard } from "@/components/dashboard/skeleton";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { StatusPill } from "@/components/dashboard/status-pill";
+import { FounderFollowUpPill } from "@/components/admin/founder-follow-up-pill";
+import type { AdminBusinessFollowUpStatus } from "@/lib/types";
 
 type AttentionReason = {
   key: string;
@@ -27,6 +29,8 @@ type OverviewResponse = {
     publicFlowCompletion30d: number;
     privateFeedback30d: number;
     failedDeliveries30d: number;
+    remindersDue: number;
+    remindersOverdue: number;
   };
   attention: Array<{
     businessId: string;
@@ -50,6 +54,16 @@ type OverviewResponse = {
     ownerEmail: string | null;
     lastActivityLabel: string;
     subscriptionStatus: string;
+  }>;
+  reminders: Array<{
+    businessId: string;
+    name: string;
+    ownerEmail: string | null;
+    subscriptionStatus: string;
+    followUpStatus: AdminBusinessFollowUpStatus;
+    reminderDueLabel: string;
+    reminderUrgency: "upcoming" | "today" | "tomorrow" | "overdue";
+    founderNotePreview: string | null;
   }>;
 };
 
@@ -247,6 +261,17 @@ export default function FounderAdminHomePage() {
                   failed sends in the last 30 days
                 </p>
               </div>
+              <div className="rounded-[var(--dash-radius-sm)] border border-white/70 bg-white/85 p-4">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+                  Founder reminders
+                </p>
+                <p className="mt-2 text-[24px] font-semibold tracking-tight text-[var(--dash-text)]">
+                  {overview.metrics.remindersDue}
+                </p>
+                <p className="mt-1 text-[13px] text-[var(--dash-muted)]">
+                  {overview.metrics.remindersOverdue} overdue
+                </p>
+              </div>
             </div>
           </section>
 
@@ -316,6 +341,56 @@ export default function FounderAdminHomePage() {
             </div>
 
             <div className="space-y-6">
+              <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+                      Follow-up reminders
+                    </p>
+                    <h2 className="mt-2 text-[18px] font-semibold tracking-tight text-[var(--dash-text)]">
+                      Due soon and overdue
+                    </h2>
+                  </div>
+                  <Link href="/admin/support" className="text-[12px] font-semibold text-[var(--dash-primary)]">
+                    Open queue
+                  </Link>
+                </div>
+                {overview.reminders.length === 0 ? (
+                  <div className="mt-4">
+                    <EmptyState
+                      icon={<SparkIcon />}
+                      title="No founder reminders right now"
+                      description="Set a reminder date on any founder note and it will show up here in urgency order."
+                    />
+                  </div>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {overview.reminders.map((item) => (
+                      <Link
+                        key={item.businessId}
+                        href={`/admin/businesses/${item.businessId}`}
+                        className="block rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[#FCFAF6] p-4 transition-colors hover:border-[#E05A3D]/30 hover:bg-white"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[14px] font-semibold text-[var(--dash-text)]">{item.name}</p>
+                            <p className="mt-1 text-[12px] font-semibold text-[var(--dash-muted)]">
+                              {item.reminderDueLabel}
+                            </p>
+                          </div>
+                          <FounderFollowUpPill status={item.followUpStatus} />
+                        </div>
+                        {item.founderNotePreview && (
+                          <p className="mt-2 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+                            {item.founderNotePreview}
+                          </p>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
                   Operating snapshot

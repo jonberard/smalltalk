@@ -124,6 +124,11 @@ export default function MorePage() {
               title="Billing"
               description="Manage your plan, payment status, invoices, and subscription details."
             />
+            <ShortcutCard
+              href="/dashboard/support"
+              title="Support"
+              description="See how the product works, what statuses mean, and message the founder directly with questions or suggestions."
+            />
           </div>
 
           <div className="mt-5 flex flex-col gap-3 border-t border-[var(--dash-border)] pt-5 sm:flex-row sm:items-center sm:justify-between">

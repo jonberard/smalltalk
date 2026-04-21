@@ -34,6 +34,8 @@ type BusinessSummary = {
   founderFollowUpStatus: AdminBusinessFollowUpStatus;
   founderNotePreview: string | null;
   founderNoteUpdatedLabel: string | null;
+  reminderDueLabel: string | null;
+  reminderUrgency: "none" | "upcoming" | "today" | "tomorrow" | "overdue";
   attentionReasons: AttentionReason[];
   attentionScore: number;
 };
@@ -171,6 +173,11 @@ export default function FounderBusinessesPage() {
                             Updated {business.founderNoteUpdatedLabel}
                           </span>
                         )}
+                      </p>
+                    )}
+                    {business.reminderDueLabel && (
+                      <p className="mt-2 text-[12px] font-semibold text-[var(--dash-muted)]">
+                        {business.reminderDueLabel}
                       </p>
                     )}
                     <div className="mt-3 flex flex-wrap gap-2">

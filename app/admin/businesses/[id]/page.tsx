@@ -40,10 +40,16 @@ type BusinessDetail = {
     founderNotePreview: string | null;
     founderNoteUpdatedAt: string | null;
     founderNoteUpdatedLabel: string | null;
+    reminderDueAt: string | null;
+    reminderDueLabel: string | null;
+    reminderUrgency: "none" | "upcoming" | "today" | "tomorrow" | "overdue";
   };
   founderNote: {
     followUpStatus: AdminBusinessFollowUpStatus;
     note: string;
+    reminderDueAt: string | null;
+    reminderDueLabel: string | null;
+    reminderUrgency: "none" | "upcoming" | "today" | "tomorrow" | "overdue";
     updatedAt: string | null;
     updatedLabel: string | null;
   };
@@ -120,6 +126,7 @@ export default function FounderBusinessDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
+  const [reminderDraft, setReminderDraft] = useState("");
   const [followUpStatus, setFollowUpStatus] =
     useState<AdminBusinessFollowUpStatus>("none");
   const [savingNote, setSavingNote] = useState(false);
@@ -165,6 +172,7 @@ export default function FounderBusinessDetailPage() {
     }
 
     setNoteDraft(detail.founderNote.note);
+    setReminderDraft(detail.founderNote.reminderDueAt?.slice(0, 10) ?? "");
     setFollowUpStatus(detail.founderNote.followUpStatus);
   }, [detail]);
 
@@ -195,6 +203,7 @@ export default function FounderBusinessDetailPage() {
   const { summary } = detail;
   const hasNoteChanges =
     noteDraft !== detail.founderNote.note ||
+    reminderDraft !== (detail.founderNote.reminderDueAt?.slice(0, 10) ?? "") ||
     followUpStatus !== detail.founderNote.followUpStatus;
   const noteUpdatedCopy = !detail.founderNote.updatedLabel
     ? "Founder notes help you remember context before you step back into a business."
@@ -211,6 +220,7 @@ export default function FounderBusinessDetailPage() {
         body: JSON.stringify({
           note: noteDraft,
           followUpStatus,
+          reminderDueAt: reminderDraft ? `${reminderDraft}T12:00:00.000Z` : null,
         }),
       });
 
@@ -331,6 +341,11 @@ export default function FounderBusinessDetailPage() {
               {summary.founderNotePreview ??
                 "No founder note yet. Use notes below to track follow-up, edge cases, or support context."}
             </p>
+            {summary.reminderDueLabel && (
+              <p className="mt-3 text-[12px] font-semibold text-[var(--dash-text)]">
+                {summary.reminderDueLabel}
+              </p>
+            )}
           </div>
         </div>
 
@@ -463,6 +478,34 @@ export default function FounderBusinessDetailPage() {
                   placeholder="Write what happened, what you promised, or what to check next."
                   className="min-h-[180px] rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-3 text-[13px] leading-relaxed text-[var(--dash-text)] outline-none transition-colors placeholder:text-[var(--dash-muted)] focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
                 />
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[var(--dash-muted)]">
+                  Reminder date
+                </span>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <input
+                    type="date"
+                    value={reminderDraft}
+                    onChange={(event) => setReminderDraft(event.target.value)}
+                    className="w-full rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-2.5 text-[13px] text-[var(--dash-text)] outline-none transition-colors focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)] sm:max-w-[240px]"
+                  />
+                  {reminderDraft && (
+                    <button
+                      type="button"
+                      onClick={() => setReminderDraft("")}
+                      className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-3.5 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                    >
+                      Clear reminder
+                    </button>
+                  )}
+                </div>
+                <p className="text-[12px] leading-relaxed text-[var(--dash-muted)]">
+                  {detail.founderNote.reminderDueLabel
+                    ? `Saved reminder: ${detail.founderNote.reminderDueLabel}.`
+                    : "Set one follow-up date if you want this business to resurface automatically."}
+                </p>
               </label>
             </div>
 

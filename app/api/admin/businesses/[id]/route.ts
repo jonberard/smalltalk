@@ -53,6 +53,7 @@ export async function PATCH(
   const body = (await req.json().catch(() => ({}))) as {
     note?: string;
     followUpStatus?: AdminBusinessFollowUpStatus;
+    reminderDueAt?: string | null;
   };
 
   const followUpStatus = body.followUpStatus ?? "none";
@@ -62,6 +63,10 @@ export async function PATCH(
   }
 
   const note = typeof body.note === "string" ? body.note.trim() : "";
+  const reminderDueAt =
+    body.reminderDueAt && body.reminderDueAt.trim().length > 0
+      ? body.reminderDueAt
+      : null;
 
   if (note.length > 4000) {
     return NextResponse.json(
@@ -70,10 +75,15 @@ export async function PATCH(
     );
   }
 
+  if (reminderDueAt && Number.isNaN(new Date(reminderDueAt).getTime())) {
+    return NextResponse.json({ error: "Invalid reminder date." }, { status: 400 });
+  }
+
   const row = {
     business_id: id,
     follow_up_status: followUpStatus,
     note: note.length > 0 ? note : null,
+    reminder_due_at: reminderDueAt,
     updated_by: auth.user.id,
     updated_at: new Date().toISOString(),
   };

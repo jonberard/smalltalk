@@ -177,6 +177,14 @@ The customer flow is getting strong. The owner experience is the biggest remaini
   - replies area
   - cleaner mobile navigation
 
+- [x] **Owner support page — foundation shipped**
+  - plain-English explanation of how guided reviews work
+  - plain-English explanation of private feedback and reminders
+  - direct founder message form from inside the dashboard
+  - Still to do:
+    - add richer FAQs based on real owner confusion
+    - consider attaching screenshots or screen recordings later
+
 - [ ] **Screen-by-screen mobile QA**
   - dashboard home
   - send page
@@ -316,6 +324,8 @@ This is for running small Talk itself, not for business owners.
 - [x] **Founder notes**
   - [x] support notes per business
   - [x] follow-up state
+  - [x] one reminder date per business note
+  - [x] reminder queue visible in urgency order
   - [x] quick context before replying
 
 - [ ] **Founder mobile / narrow-screen fallback**
