@@ -8,7 +8,7 @@ import { fetchWithAuth } from "@/lib/supabase";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { ToastProvider } from "@/components/dashboard/toast";
 
-const TABS = [
+const NAV_ITEMS = [
   {
     label: "Home",
     href: "/dashboard",
@@ -21,6 +21,16 @@ const TABS = [
     ),
   },
   {
+    label: "Inbox",
+    href: "/dashboard/inbox",
+    icon: (active: boolean) => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+        <path d="M3 8l7.2 5.4a3 3 0 0 0 3.6 0L21 8" fill={active ? "currentColor" : "none"} />
+      </svg>
+    ),
+  },
+  {
     label: "Send",
     href: "/dashboard/send",
     icon: (active: boolean) => (
@@ -29,24 +39,27 @@ const TABS = [
         <path d="M22 2L15 22l-4-9-9-4 20-7z" />
       </svg>
     ),
+    mobileAccent: true,
   },
   {
-    label: "Billing",
-    href: "/dashboard/billing",
+    label: "Replies",
+    href: "/dashboard/replies",
     icon: (active: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.75"} strokeLinecap="round" strokeLinejoin="round">
-        <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-        <line x1="1" y1="10" x2="23" y2="10" stroke={active ? "white" : "currentColor"} strokeWidth="1.75" />
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        <path d="M8 9h8" />
+        <path d="M8 13h5" />
       </svg>
     ),
   },
   {
-    label: "Settings",
-    href: "/dashboard/settings",
+    label: "More",
+    href: "/dashboard/more",
     icon: (active: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="3" fill={active ? "currentColor" : "none"} />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.75"} strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="5" cy="12" r="2" />
+        <circle cx="12" cy="12" r="2" />
+        <circle cx="19" cy="12" r="2" />
       </svg>
     ),
   },
@@ -159,21 +172,33 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
       {/* ─── Bottom Tab Bar ─── */}
       <nav aria-label="Main navigation" className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--dash-border)] bg-white/95 backdrop-blur-md font-dashboard sm:hidden">
         <div className="mx-auto flex max-w-[600px] items-stretch">
-          {TABS.map((tab) => {
+          {NAV_ITEMS.map((tab) => {
             const active = isActive(tab.href);
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`flex flex-1 flex-col items-center gap-0.5 pb-[env(safe-area-inset-bottom,8px)] pt-2.5 transition-colors duration-200 ${
+                className={`flex flex-1 flex-col items-center gap-1 pb-[env(safe-area-inset-bottom,8px)] pt-2.5 transition-colors duration-200 ${
                   active ? "text-[#E05A3D]" : "text-[var(--dash-muted)]"
-                }`}
+                } ${tab.mobileAccent ? "-mt-3" : ""}`}
               >
-                {tab.icon(active)}
+                <span
+                  className={`flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 ${
+                    tab.mobileAccent
+                      ? active
+                        ? "bg-[#C94D33] text-white shadow-[0_8px_24px_rgba(224,90,61,0.32)]"
+                        : "bg-[#E05A3D] text-white shadow-[0_8px_24px_rgba(224,90,61,0.22)]"
+                      : active
+                        ? "bg-[#E05A3D]/10 text-[#E05A3D]"
+                        : "bg-transparent"
+                  }`}
+                >
+                  {tab.icon(active)}
+                </span>
                 <span className={`text-[10px] ${active ? "font-semibold" : "font-medium"}`}>
                   {tab.label}
                 </span>
-                {active && (
+                {active && !tab.mobileAccent && (
                   <span className="mt-0.5 h-1 w-1 rounded-full bg-[#E05A3D]" />
                 )}
               </Link>
@@ -189,7 +214,7 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
           <p className="text-[11px] text-[var(--dash-muted)]">Dashboard</p>
         </div>
         <div className="flex flex-1 flex-col gap-1 px-3">
-          {TABS.map((tab) => {
+          {NAV_ITEMS.map((tab) => {
             const active = isActive(tab.href);
             return (
               <Link

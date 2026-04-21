@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             <div className="mt-2 h-3 w-14 animate-pulse rounded bg-[#E8E5E0]" />
           </div>
           <div className="flex flex-col gap-2 px-3">
-            {[1, 2, 3, 4].map((i) => (
+            {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="h-10 animate-pulse rounded-[10px] bg-[#F3F0EB]" />
             ))}
           </div>

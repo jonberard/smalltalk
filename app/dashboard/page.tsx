@@ -1,18 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { supabase, fetchWithAuth } from "@/lib/supabase";
+import { fetchWithAuth, supabase } from "@/lib/supabase";
 import { capture } from "@/lib/posthog";
-import { StatCard } from "@/components/dashboard/stat-card";
-import { StatusPill } from "@/components/dashboard/status-pill";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { SkeletonCard, SkeletonRow } from "@/components/dashboard/skeleton";
-
-/* ═══════════════════════════════════════════════════
-   TYPES
-   ═══════════════════════════════════════════════════ */
+import { StatCard } from "@/components/dashboard/stat-card";
+import { StatusPill } from "@/components/dashboard/status-pill";
 
 type DashboardStats = {
   reviewsThisMonth: number;
@@ -70,10 +67,6 @@ type PrivateFeedbackItem = {
   handledAt: string | null;
 };
 
-/* ═══════════════════════════════════════════════════
-   HELPERS
-   ═══════════════════════════════════════════════════ */
-
 function timeAgo(dateStr: string): string {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
@@ -104,8 +97,8 @@ function statusToAction(
     switch (status) {
       case "copied":
         return stars
-          ? `posted a ${stars}-star review after private feedback`
-          : "posted a review after private feedback";
+          ? `copied a ${stars}-star public review after private feedback`
+          : "copied a public review after private feedback";
       case "drafted":
         return "drafted a public review after private feedback";
       case "in_progress":
@@ -119,7 +112,7 @@ function statusToAction(
 
   switch (status) {
     case "copied":
-      return stars ? `posted a ${stars}-star review` : "posted a review";
+      return stars ? `copied a ${stars}-star review` : "copied a review";
     case "drafted":
       return "drafted a review";
     case "in_progress":
@@ -133,13 +126,14 @@ function statusToAction(
 
 function statusToAttentionDetail(status: string, updatedAt: string): string {
   const ago = timeAgo(updatedAt);
+
   switch (status) {
     case "drafted":
-      return `Drafted a review ${ago} but hasn't posted it`;
+      return `Drafted a review ${ago} but has not copied it yet`;
     case "in_progress":
-      return `Started the flow ${ago} but didn't finish`;
+      return `Started the flow ${ago} but did not finish`;
     case "created":
-      return `Opened the link ${ago} but didn't start`;
+      return `Opened the link ${ago} but did not start`;
     default:
       return `Last activity ${ago}`;
   }
@@ -152,12 +146,14 @@ function formatCustomerContact(contact: string | null) {
     return {
       href: `mailto:${contact}`,
       label: contact,
+      actionLabel: "Email customer",
     };
   }
 
   return {
     href: `tel:${contact}`,
     label: contact,
+    actionLabel: "Call customer",
   };
 }
 
@@ -167,10 +163,6 @@ function getGreeting(): string {
   if (hour >= 12 && hour < 17) return "Good afternoon";
   return "Good evening";
 }
-
-/* ═══════════════════════════════════════════════════
-   INLINE SVG ICONS
-   ═══════════════════════════════════════════════════ */
 
 function CalendarIcon() {
   return (
@@ -202,8 +194,8 @@ function ChartIcon() {
 function MiniStars({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <svg key={i} width={14} height={14} viewBox="0 0 24 24" fill={i <= Math.round(rating) ? "#E05A3D" : "#D1D5DB"} stroke="none">
+      {[1, 2, 3, 4, 5].map((index) => (
+        <svg key={index} width={14} height={14} viewBox="0 0 24 24" fill={index <= Math.round(rating) ? "#E05A3D" : "#D1D5DB"} stroke="none">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
         </svg>
       ))}
@@ -215,12 +207,17 @@ function ProgressRing({ percentage }: { percentage: number }) {
   const radius = 18;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (percentage / 100) * circumference;
+
   return (
     <svg width={44} height={44} viewBox="0 0 44 44">
       <circle cx="22" cy="22" r={radius} fill="none" stroke="#E8E5E0" strokeWidth="3" />
       <circle
-        cx="22" cy="22" r={radius} fill="none"
-        stroke="#E05A3D" strokeWidth="3"
+        cx="22"
+        cy="22"
+        r={radius}
+        fill="none"
+        stroke="#E05A3D"
+        strokeWidth="3"
         strokeDasharray={circumference}
         strokeDashoffset={offset}
         strokeLinecap="round"
@@ -232,21 +229,20 @@ function ProgressRing({ percentage }: { percentage: number }) {
 
 function RatingBadge({ rating }: { rating: number }) {
   const color =
-    rating >= 4 ? "text-[#059669] bg-[#ECFDF5]" :
-    rating === 3 ? "text-[#D97706] bg-[#FFFBEB]" :
-    "text-[#DC2626] bg-[#FEF2F2]";
+    rating >= 4
+      ? "text-[#059669] bg-[#ECFDF5]"
+      : rating === 3
+        ? "text-[#D97706] bg-[#FFFBEB]"
+        : "text-[#DC2626] bg-[#FEF2F2]";
+
   return (
     <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${color}`}>
-      {rating}<span className="text-[10px]">★</span>
+      {rating}
+      <span className="text-[10px]">★</span>
     </span>
   );
 }
 
-/* ═══════════════════════════════════════════════════
-   PAGE
-   ═══════════════════════════════════════════════════ */
-
-// Status progression order for "at or beyond" funnel logic
 const STATUS_PROGRESSION = ["created", "in_progress", "drafted", "copied"];
 
 function isAtOrBeyond(status: string, target: string): boolean {
@@ -262,7 +258,13 @@ export default function Dashboard() {
     completionRate: 0,
     totalLinks: 0,
   });
-  const [funnel, setFunnel] = useState<FunnelData>({ sent: 0, opened: 0, started: 0, drafted: 0, posted: 0 });
+  const [funnel, setFunnel] = useState<FunnelData>({
+    sent: 0,
+    opened: 0,
+    started: 0,
+    drafted: 0,
+    posted: 0,
+  });
   const [funnelFilter, setFunnelFilter] = useState<FunnelFilter>("month");
   const [funnelLoading, setFunnelLoading] = useState(true);
   const [attention, setAttention] = useState<AttentionItem[]>([]);
@@ -282,12 +284,10 @@ export default function Dashboard() {
   const router = useRouter();
   const feedbackParam = searchParams.get("feedback");
 
-  // Safety net: verify subscription with Stripe after checkout redirect
   useEffect(() => {
     if (searchParams.get("checkout") !== "success") return;
     if (!business) return;
 
-    // Remove ?checkout=success from URL so it doesn't re-fire
     router.replace("/dashboard", { scroll: false });
 
     fetchWithAuth("/api/verify-subscription", { method: "POST" })
@@ -297,20 +297,19 @@ export default function Dashboard() {
           window.location.href = "/dashboard";
         }
       })
-      .catch((err) => {
-        console.error("[dashboard] Failed to verify subscription:", err);
+      .catch((error) => {
+        console.error("[dashboard] Failed to verify subscription:", error);
       });
   }, [searchParams, business, router]);
 
   useEffect(() => {
     if (!business) return;
+    const businessId = business.id;
 
     async function fetchAll() {
-      const businessId = business!.id;
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      // 1. Total review links (= "sent")
       const { count: totalLinks } = await supabase
         .from("review_links")
         .select("*", { count: "exact", head: true })
@@ -318,7 +317,6 @@ export default function Dashboard() {
 
       const linkCount = totalLinks ?? 0;
 
-      // 2. All sessions for this business
       const { data: allSessions } = await supabase
         .from("review_sessions")
         .select("id, star_rating, status, feedback_type, customer_contact, optional_text, generated_review, topics_selected, private_feedback_status, private_feedback_handled_at, parent_private_feedback_session_id, replied_at, created_at, updated_at, review_links!inner(business_id, customer_name, customer_contact, services(name), employees(name))")
@@ -327,16 +325,13 @@ export default function Dashboard() {
 
       const sessions = allSessions || [];
 
-      // ── Stats ──
-      const completedSessions = sessions.filter((s) => s.status === "copied");
-      const reviewsThisMonth = completedSessions.filter(
-        (s) => s.created_at >= monthStart
-      ).length;
+      const completedSessions = sessions.filter((session) => session.status === "copied");
+      const reviewsThisMonth = completedSessions.filter((session) => session.created_at >= monthStart).length;
       const ratings = completedSessions
-        .map((s) => s.star_rating)
-        .filter((r): r is number => r !== null);
+        .map((session) => session.star_rating)
+        .filter((rating): rating is number => rating !== null);
       const avgRating = ratings.length > 0
-        ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length
+        ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
         : 0;
       const completionRate = linkCount > 0
         ? Math.round((completedSessions.length / linkCount) * 100)
@@ -346,13 +341,13 @@ export default function Dashboard() {
 
       const privateFeedback = sessions
         .filter(
-          (s) =>
-            s.feedback_type === "private" &&
-            typeof s.optional_text === "string" &&
-            s.optional_text.trim().length > 0,
+          (session) =>
+            session.feedback_type === "private" &&
+            typeof session.optional_text === "string" &&
+            session.optional_text.trim().length > 0,
         )
-        .map((s) => {
-          const link = s.review_links as unknown as {
+        .map((session) => {
+          const link = session.review_links as unknown as {
             customer_name: string;
             customer_contact: string | null;
             services: { name: string } | null;
@@ -360,96 +355,91 @@ export default function Dashboard() {
           };
 
           return {
-            sessionId: s.id,
+            sessionId: session.id,
             name: link.customer_name,
-            time: timeAgo(s.updated_at),
-            stars: s.star_rating,
-            message: s.optional_text,
+            time: timeAgo(session.updated_at),
+            stars: session.star_rating,
+            message: session.optional_text,
             employeeName: link.employees?.name ?? null,
             serviceType: link.services?.name ?? null,
-            customerContact: s.customer_contact ?? link.customer_contact ?? null,
+            customerContact: session.customer_contact ?? link.customer_contact ?? null,
             status:
-              (s.private_feedback_status as "new" | "handled" | null) ?? "new",
-            handledAt: s.private_feedback_handled_at ?? null,
+              (session.private_feedback_status as "new" | "handled" | null) ?? "new",
+            handledAt: session.private_feedback_handled_at ?? null,
           } satisfies PrivateFeedbackItem;
         })
-        .sort((a, b) => {
-          if (a.status === b.status) return 0;
-          return a.status === "new" ? -1 : 1;
+        .sort((left, right) => {
+          if (left.status === right.status) return 0;
+          return left.status === "new" ? -1 : 1;
         });
 
       setPrivateFeedbackItems(privateFeedback);
 
-      // ── Needs Attention ──
-      // Sessions that are stalled: drafted but not posted, or in_progress/created but not finished
       const attentionSessions = sessions.filter(
-        (s) =>
-          s.feedback_type !== "private" &&
-          (s.status === "drafted" ||
-            s.status === "in_progress" ||
-            s.status === "created")
+        (session) =>
+          session.feedback_type !== "private" &&
+          (session.status === "drafted" ||
+            session.status === "in_progress" ||
+            session.status === "created"),
       ).slice(0, 5);
 
       setAttention(
-        attentionSessions.map((s) => {
-          const link = s.review_links as unknown as { customer_name: string };
+        attentionSessions.map((session) => {
+          const link = session.review_links as unknown as { customer_name: string };
           return {
             name: link.customer_name,
-            detail: statusToAttentionDetail(s.status, s.updated_at),
-            status: s.status,
-            sessionId: s.id,
+            detail: statusToAttentionDetail(session.status, session.updated_at),
+            status: session.status,
+            sessionId: session.id,
           };
-        })
+        }),
       );
 
-      // ── Activity Feed ──
       const recentActivity = sessions.slice(0, 15);
       setActivityItems(
-        recentActivity.map((s) => {
-          const link = s.review_links as unknown as {
+        recentActivity.map((session) => {
+          const link = session.review_links as unknown as {
             customer_name: string;
             customer_contact: string | null;
             services: { name: string } | null;
             employees: { name: string } | null;
           };
+
           return {
-            sessionId: s.id,
+            sessionId: session.id,
             name: link.customer_name,
             action: statusToAction(
-              s.status,
-              s.star_rating,
-              s.feedback_type ?? "public",
-              s.parent_private_feedback_session_id ?? null,
+              session.status,
+              session.star_rating,
+              session.feedback_type ?? "public",
+              session.parent_private_feedback_session_id ?? null,
             ),
-            time: timeAgo(s.updated_at),
+            time: timeAgo(session.updated_at),
             status:
-              s.feedback_type === "private" && s.status === "drafted"
+              session.feedback_type === "private" && session.status === "drafted"
                 ? "private_feedback"
-                : s.status,
-            feedbackType: s.feedback_type ?? "public",
+                : session.status,
+            feedbackType: session.feedback_type ?? "public",
             privateFeedbackStatus:
-              (s.private_feedback_status as "new" | "handled" | null) ?? null,
-            privateFeedbackHandledAt: s.private_feedback_handled_at ?? null,
-            stars: s.star_rating,
+              (session.private_feedback_status as "new" | "handled" | null) ?? null,
+            privateFeedbackHandledAt: session.private_feedback_handled_at ?? null,
+            stars: session.star_rating,
             snippet:
-              s.feedback_type === "private"
-                ? s.optional_text
-                : s.generated_review,
-            repliedAt: s.replied_at ?? null,
+              session.feedback_type === "private"
+                ? session.optional_text
+                : session.generated_review,
+            repliedAt: session.replied_at ?? null,
             employeeName: link.employees?.name ?? null,
             serviceType: link.services?.name ?? null,
-            customerContact: s.customer_contact ?? link.customer_contact ?? null,
-            topicsSelected: s.topics_selected as { label: string; follow_up_answer: string }[] | null,
-            parentPrivateFeedbackSessionId:
-              s.parent_private_feedback_session_id ?? null,
+            customerContact: session.customer_contact ?? link.customer_contact ?? null,
+            topicsSelected: session.topics_selected as { label: string; follow_up_answer: string }[] | null,
+            parentPrivateFeedbackSessionId: session.parent_private_feedback_session_id ?? null,
           };
-        })
+        }),
       );
 
       if (feedbackParam) {
-        const matchingFeedback = privateFeedback.find(
-          (item) => item.sessionId === feedbackParam,
-        );
+        const matchingFeedback = privateFeedback.find((item) => item.sessionId === feedbackParam);
 
         if (matchingFeedback) {
           setPrivateFeedbackModal(matchingFeedback);
@@ -463,7 +453,6 @@ export default function Dashboard() {
     fetchAll();
   }, [business, feedbackParam]);
 
-  // ── Funnel (separate effect so time filter can re-trigger) ──
   useEffect(() => {
     if (!business) return;
     const businessId = business.id;
@@ -471,40 +460,46 @@ export default function Dashboard() {
     async function fetchFunnel() {
       setFunnelLoading(true);
 
-      // Determine date filter
       let dateFrom: string | null = null;
       const now = new Date();
+
       if (funnelFilter === "month") {
         dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       } else if (funnelFilter === "week") {
-        const d = new Date(now);
-        d.setDate(d.getDate() - d.getDay()); // start of week (Sunday)
-        d.setHours(0, 0, 0, 0);
-        dateFrom = d.toISOString();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        dateFrom = startOfWeek.toISOString();
       }
 
-      // Count sent links
       let linksQuery = supabase
         .from("review_links")
         .select("*", { count: "exact", head: true })
         .eq("business_id", businessId);
-      if (dateFrom) linksQuery = linksQuery.gte("created_at", dateFrom);
+
+      if (dateFrom) {
+        linksQuery = linksQuery.gte("created_at", dateFrom);
+      }
+
       const { count: sentCount } = await linksQuery;
       const sent = sentCount ?? 0;
 
-      // Get sessions
       let sessionsQuery = supabase
         .from("review_sessions")
         .select("status, review_links!inner(business_id)")
         .eq("review_links.business_id", businessId);
-      if (dateFrom) sessionsQuery = sessionsQuery.gte("created_at", dateFrom);
-      const { data: funnelSessions } = await sessionsQuery;
-      const ss = funnelSessions || [];
 
-      const opened = ss.filter((s) => isAtOrBeyond(s.status, "created")).length;
-      const started = ss.filter((s) => isAtOrBeyond(s.status, "in_progress")).length;
-      const drafted = ss.filter((s) => isAtOrBeyond(s.status, "drafted")).length;
-      const posted = ss.filter((s) => s.status === "copied").length;
+      if (dateFrom) {
+        sessionsQuery = sessionsQuery.gte("created_at", dateFrom);
+      }
+
+      const { data: funnelSessions } = await sessionsQuery;
+      const sessions = funnelSessions || [];
+
+      const opened = sessions.filter((session) => isAtOrBeyond(session.status, "created")).length;
+      const started = sessions.filter((session) => isAtOrBeyond(session.status, "in_progress")).length;
+      const drafted = sessions.filter((session) => isAtOrBeyond(session.status, "drafted")).length;
+      const posted = sessions.filter((session) => session.status === "copied").length;
 
       setFunnel({ sent, opened, started, drafted, posted });
       setFunnelLoading(false);
@@ -538,6 +533,7 @@ export default function Dashboard() {
         }),
       });
       const data = await res.json();
+
       if (data.reply_text) {
         setReplyText(data.reply_text);
         setReplyError("");
@@ -548,37 +544,38 @@ export default function Dashboard() {
     } catch {
       setReplyError("Failed to generate reply. Please try again.");
     }
+
     setReplyLoading(false);
   }
 
   async function copyReplyAndMark() {
     if (!replyText || !replyModal) return;
+
     try {
       await navigator.clipboard.writeText(replyText);
     } catch {
-      const ta = document.createElement("textarea");
-      ta.value = replyText;
-      document.body.appendChild(ta);
-      ta.select();
+      const textarea = document.createElement("textarea");
+      textarea.value = replyText;
+      document.body.appendChild(textarea);
+      textarea.select();
       document.execCommand("copy");
-      document.body.removeChild(ta);
+      document.body.removeChild(textarea);
     }
+
     setReplyCopied(true);
     capture("reply_copied", { session_id: replyModal.sessionId, star_rating: replyModal.stars });
 
-    // Mark session as replied
     await supabase
       .from("review_sessions")
       .update({ reply_text: replyText, replied_at: new Date().toISOString() })
       .eq("id", replyModal.sessionId);
 
-    // Update local state
-    setActivityItems((prev) =>
-      prev.map((a) =>
-        a.sessionId === replyModal.sessionId
-          ? { ...a, repliedAt: new Date().toISOString() }
-          : a
-      )
+    setActivityItems((current) =>
+      current.map((item) =>
+        item.sessionId === replyModal.sessionId
+          ? { ...item, repliedAt: new Date().toISOString() }
+          : item,
+      ),
     );
 
     setTimeout(() => setReplyCopied(false), 3000);
@@ -610,23 +607,18 @@ export default function Dashboard() {
         throw new Error(body.error || "Couldn’t mark feedback as handled.");
       }
 
-      const handledAt =
-        body.private_feedback_handled_at ?? new Date().toISOString();
+      const handledAt = body.private_feedback_handled_at ?? new Date().toISOString();
 
-      setPrivateFeedbackItems((prev) =>
-        prev.map((item) =>
+      setPrivateFeedbackItems((current) =>
+        current.map((item) =>
           item.sessionId === sessionId
-            ? {
-                ...item,
-                status: "handled",
-                handledAt,
-              }
+            ? { ...item, status: "handled", handledAt }
             : item,
         ),
       );
 
-      setActivityItems((prev) =>
-        prev.map((item) =>
+      setActivityItems((current) =>
+        current.map((item) =>
           item.sessionId === sessionId
             ? {
                 ...item,
@@ -637,33 +629,19 @@ export default function Dashboard() {
         ),
       );
 
-      setPrivateFeedbackModal((prev) =>
-        prev && prev.sessionId === sessionId
-          ? {
-              ...prev,
-              status: "handled",
-              handledAt,
-            }
-          : prev,
+      setPrivateFeedbackModal((current) =>
+        current && current.sessionId === sessionId
+          ? { ...current, status: "handled", handledAt }
+          : current,
       );
     } catch (error) {
       setPrivateFeedbackActionError(
-        error instanceof Error
-          ? error.message
-          : "Couldn’t mark feedback as handled.",
+        error instanceof Error ? error.message : "Couldn’t mark feedback as handled.",
       );
     } finally {
       setPrivateFeedbackActionLoading(false);
     }
   }
-
-  const FUNNEL_STAGES: { key: keyof FunnelData; label: string }[] = [
-    { key: "sent", label: "Sent" },
-    { key: "opened", label: "Opened" },
-    { key: "started", label: "Started" },
-    { key: "drafted", label: "Drafted" },
-    { key: "posted", label: "Copied" },
-  ];
 
   const FILTER_OPTIONS: { key: FunnelFilter; label: string }[] = [
     { key: "week", label: "This week" },
@@ -671,21 +649,72 @@ export default function Dashboard() {
     { key: "all", label: "All time" },
   ];
 
+  const newPrivateFeedback = privateFeedbackItems.filter((item) => item.status === "new").slice(0, 3);
+  const replyQueue = activityItems.filter(
+    (item) =>
+      item.feedbackType !== "private" &&
+      item.status === "copied" &&
+      !item.repliedAt,
+  ).slice(0, 3);
+  const stalledRequests = attention.slice(0, 3);
+  const recentActivityPreview = activityItems.slice(0, 8);
+  const openedRate = funnel.sent > 0 ? Math.round((funnel.opened / funnel.sent) * 100) : 0;
+  const copiedRate = funnel.opened > 0 ? Math.round((funnel.posted / funnel.opened) * 100) : 0;
+  const dashboardHighlights = [
+    {
+      label: "Sent",
+      value: funnel.sent,
+      detail: funnelFilter === "week" ? "This week" : funnelFilter === "month" ? "This month" : "All time",
+    },
+    {
+      label: "Opened",
+      value: funnel.opened,
+      detail: funnel.sent > 0 ? `${openedRate}% of sent` : "No sends yet",
+    },
+    {
+      label: "Copied",
+      value: funnel.posted,
+      detail: funnel.opened > 0 ? `${copiedRate}% of opened` : "No handoffs yet",
+    },
+  ];
+
   return (
     <main className="min-h-dvh bg-[var(--dash-bg)] sm:pl-[220px]">
       <div className="dash-page-enter mx-auto max-w-[960px] px-5 pb-32 pt-8 sm:pb-16">
-
-        {/* ─── Welcome Header ─── */}
-        <div className="mb-6">
-          <h1 className="font-heading text-[24px] font-semibold text-[var(--dash-text)]">
-            {getGreeting()}{business?.name ? `, ${business.name}` : "!"}
-          </h1>
-          <p className="mt-1 text-[13px] text-[var(--dash-muted)]">
-            Here&rsquo;s how your reviews are doing
-          </p>
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+              Home
+            </p>
+            <h1 className="mt-2 text-balance font-heading text-[30px] font-semibold leading-[1.02] tracking-tight text-[var(--dash-text)] sm:text-[34px]">
+              {getGreeting()}
+              {business?.name ? `, ${business.name}` : ""}
+            </h1>
+            <p className="mt-2 max-w-[46ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
+              Start with what needs attention, then scan the rest. This version is built to feel calm on a phone instead of cramming every status into one row.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link
+              href="/dashboard/send"
+              className="inline-flex items-center justify-center rounded-full bg-[var(--dash-primary)] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_8px_24px_rgba(224,90,61,0.18)] transition-all hover:brightness-95 active:scale-[0.98]"
+            >
+              Send request
+            </Link>
+            <Link
+              href="/dashboard/inbox"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--dash-border)] bg-white px-5 py-3 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+            >
+              Open inbox
+              {newPrivateFeedback.length > 0 ? (
+                <span className="rounded-full bg-[#EFF6FF] px-2 py-0.5 text-[11px] font-semibold text-[#2563EB]">
+                  {newPrivateFeedback.length}
+                </span>
+              ) : null}
+            </Link>
+          </div>
         </div>
 
-        {/* ─── Stat Cards ─── */}
         {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <SkeletonCard />
@@ -694,302 +723,285 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <StatCard
-              icon={<CalendarIcon />}
-              label="Copied This Month"
-              value={stats.reviewsThisMonth}
-            />
+            <StatCard icon={<CalendarIcon />} label="Copied this month" value={stats.reviewsThisMonth} />
             <StatCard
               icon={<StarIcon />}
-              label="Average Rating"
+              label="Average rating"
               value={stats.avgRating > 0 ? stats.avgRating.toFixed(1) : "\u2014"}
               detail={stats.avgRating > 0 ? <MiniStars rating={stats.avgRating} /> : undefined}
             />
             <StatCard
               icon={<ChartIcon />}
-              label="Completion Rate"
+              label="Completion rate"
               value={stats.totalLinks > 0 ? `${stats.completionRate}%` : "\u2014"}
               detail={stats.totalLinks > 0 ? <ProgressRing percentage={stats.completionRate} /> : undefined}
             />
           </div>
         )}
 
-        {/* ─── Conversion Funnel ─── */}
-        <div className="mt-8">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-[15px] font-semibold text-[var(--dash-text)]">Conversion Funnel</h2>
-            <div className="flex gap-1 rounded-[var(--dash-radius-sm)] bg-[var(--dash-border)]/40 p-1">
-              {FILTER_OPTIONS.map((opt) => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => setFunnelFilter(opt.key)}
-                  className={`rounded-[6px] px-3 py-1.5 text-[12px] font-medium transition-all duration-150 ${
-                    funnelFilter === opt.key
-                      ? "bg-[var(--dash-surface)] text-[var(--dash-text)] shadow-sm"
-                      : "text-[var(--dash-muted)] hover:text-[var(--dash-text)]"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+        <section className="mt-6 rounded-[var(--dash-radius)] border border-[#F6D9A8] bg-[#FFF8EA] p-5 shadow-[var(--dash-shadow)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#A16207]">
+                Needs attention
+              </p>
+              <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
+                What needs a real response today
+              </h2>
+            </div>
+            <div className="flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-[12px] font-medium text-[var(--dash-muted)]">
+              <span className="h-2 w-2 rounded-full bg-[#E05A3D]" />
+              {newPrivateFeedback.length + replyQueue.length + stalledRequests.length} open items
             </div>
           </div>
 
-          <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-5 shadow-[var(--dash-shadow)] sm:p-6">
-            {(() => {
-              const hasData = !funnelLoading && funnel.sent > 0;
-              const isEmpty = !funnelLoading && funnel.sent === 0;
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-[var(--dash-radius-sm)] border border-white/60 bg-white/80 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#2563EB]">
+                    Private feedback
+                  </p>
+                  <p className="mt-1 text-[22px] font-semibold tracking-tight text-[var(--dash-text)]">
+                    {newPrivateFeedback.length}
+                  </p>
+                </div>
+                <Link href="/dashboard/inbox" className="text-[12px] font-semibold text-[#2563EB]">
+                  Open inbox
+                </Link>
+              </div>
+              <p className="mt-3 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                {newPrivateFeedback[0]
+                  ? `${newPrivateFeedback[0].name}: ${newPrivateFeedback[0].message}`
+                  : "No new private feedback waiting on you right now."}
+              </p>
+            </div>
 
-              // Coral gradient: lightest at Sent → full coral at Posted
-              const STAGE_FILLS = [
-                "bg-[#E05A3D]/[0.06]",
-                "bg-[#E05A3D]/[0.12]",
-                "bg-[#E05A3D]/[0.20]",
-                "bg-[#E05A3D]/[0.35]",
-                "bg-[#E05A3D] text-white shadow-[0_0_20px_rgba(224,90,61,0.25)]",
-              ];
-              const STAGE_TEXT_COLORS = [
-                "text-[var(--dash-text)]",
-                "text-[var(--dash-text)]",
-                "text-[var(--dash-text)]",
-                "text-[var(--dash-text)]",
-                "text-white",
-              ];
-              const STAGE_LABEL_COLORS = [
-                "text-[var(--dash-muted)]",
-                "text-[var(--dash-muted)]",
-                "text-[var(--dash-muted)]",
-                "text-[var(--dash-muted)]",
-                "text-white/70",
-              ];
+            <div className="rounded-[var(--dash-radius-sm)] border border-white/60 bg-white/80 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#059669]">
+                    Reply queue
+                  </p>
+                  <p className="mt-1 text-[22px] font-semibold tracking-tight text-[var(--dash-text)]">
+                    {replyQueue.length}
+                  </p>
+                </div>
+                <Link href="/dashboard/replies" className="text-[12px] font-semibold text-[#059669]">
+                  Open replies
+                </Link>
+              </div>
+              <p className="mt-3 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                {replyQueue[0]
+                  ? `${replyQueue[0].name}: ${replyQueue[0].snippet ?? "Star-only review waiting on a reply."}`
+                  : "Nothing is waiting on a public reply right now."}
+              </p>
+            </div>
 
-              return (
-                <>
-                  {/* Desktop: horizontal */}
-                  <div className="hidden sm:block">
-                    <div className="flex items-start">
-                      {FUNNEL_STAGES.map((stage, i) => {
-                        const value = funnel[stage.key];
-                        const prevValue = i > 0 ? funnel[FUNNEL_STAGES[i - 1].key] : null;
-                        const pct = prevValue && prevValue > 0 ? Math.round((value / prevValue) * 100) : null;
-                        const dropOff = prevValue !== null ? prevValue - value : null;
-                        const isLast = i === FUNNEL_STAGES.length - 1;
-
-                        return (
-                          <div key={stage.key} className="flex flex-1 items-start">
-                            {/* Arrow + conversion between stages */}
-                            {i > 0 && (
-                              <div className="flex flex-col items-center justify-center pt-5" style={{ width: 48 }}>
-                                <span className="text-[11px] font-semibold text-[var(--dash-muted)]">
-                                  {funnelLoading ? "\u2014" : pct !== null ? `${pct}%` : ""}
-                                </span>
-                                <svg width={24} height={14} viewBox="0 0 24 14" fill="none" className="my-0.5">
-                                  <path d="M0 7h20M16 3l4 4-4 4" stroke="var(--dash-border)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                                {hasData && dropOff !== null && dropOff > 0 && (
-                                  <span className="text-[10px] font-medium text-[#DC2626]">
-                                    {dropOff} lost
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Stage card */}
-                            <div
-                              className={`flex flex-1 flex-col items-center rounded-[var(--dash-radius)] px-3 py-5 transition-all duration-200 ${
-                                funnelLoading ? "bg-[var(--dash-border)]/30 animate-pulse" : STAGE_FILLS[i]
-                              }`}
-                            >
-                              <span className={`flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide ${funnelLoading ? "text-transparent" : STAGE_LABEL_COLORS[i]}`}>
-                                {stage.label}
-                                {isLast && !funnelLoading && (
-                                  <span className="group relative cursor-help">
-                                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <circle cx="12" cy="12" r="10" />
-                                      <path d="M12 16v-4" />
-                                      <path d="M12 8h.01" />
-                                    </svg>
-                                    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-[200px] -translate-x-1/2 rounded-lg bg-[var(--dash-text)] px-3 py-2 text-[10px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                                      Copied to clipboard and opened Google &mdash; we can&rsquo;t confirm posting yet.
-                                    </span>
-                                  </span>
-                                )}
-                              </span>
-                              <span className={`mt-1 text-[24px] font-bold leading-none ${funnelLoading ? "text-transparent" : STAGE_TEXT_COLORS[i]}`}>
-                                {funnelLoading ? "0" : value}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Mobile: vertical */}
-                  <div className="sm:hidden">
-                    <div className="flex flex-col">
-                      {FUNNEL_STAGES.map((stage, i) => {
-                        const value = funnel[stage.key];
-                        const prevValue = i > 0 ? funnel[FUNNEL_STAGES[i - 1].key] : null;
-                        const pct = prevValue && prevValue > 0 ? Math.round((value / prevValue) * 100) : null;
-                        const dropOff = prevValue !== null ? prevValue - value : null;
-                        const isLast = i === FUNNEL_STAGES.length - 1;
-
-                        return (
-                          <div key={stage.key}>
-                            {/* Arrow + stats between stages */}
-                            {i > 0 && (
-                              <div className="flex items-center gap-3 py-2 pl-6">
-                                <svg width={14} height={20} viewBox="0 0 14 20" fill="none">
-                                  <path d="M7 0v16M3 12l4 4 4-4" stroke="var(--dash-border)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                                <span className="text-[11px] font-semibold text-[var(--dash-muted)]">
-                                  {funnelLoading ? "" : pct !== null ? `${pct}%` : ""}
-                                </span>
-                                {hasData && dropOff !== null && dropOff > 0 && (
-                                  <span className="text-[10px] font-medium text-[#DC2626]">
-                                    {dropOff} lost
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Stage bar */}
-                            <div
-                              className={`flex items-center justify-between rounded-[var(--dash-radius)] px-5 py-4 transition-all duration-200 ${
-                                funnelLoading ? "bg-[var(--dash-border)]/30 animate-pulse" : STAGE_FILLS[i]
-                              }`}
-                            >
-                              <span className={`text-[12px] font-medium uppercase tracking-wide ${funnelLoading ? "text-transparent" : STAGE_LABEL_COLORS[i]}`}>
-                                {stage.label}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <span className={`text-[22px] font-bold leading-none ${funnelLoading ? "text-transparent" : STAGE_TEXT_COLORS[i]}`}>
-                                  {funnelLoading ? "0" : value}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Empty state message */}
-                  {isEmpty && (
-                    <p className="mt-4 text-center text-[13px] text-[var(--dash-muted)]">
-                      Send your first review link to start tracking conversions.
-                    </p>
-                  )}
-                </>
-              );
-            })()}
+            <div className="rounded-[var(--dash-radius-sm)] border border-white/60 bg-white/80 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#D97706]">
+                    Stalled requests
+                  </p>
+                  <p className="mt-1 text-[22px] font-semibold tracking-tight text-[var(--dash-text)]">
+                    {stalledRequests.length}
+                  </p>
+                </div>
+                <Link href="/dashboard/send" className="text-[12px] font-semibold text-[#D97706]">
+                  Open send
+                </Link>
+              </div>
+              <p className="mt-3 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                {stalledRequests[0]
+                  ? `${stalledRequests[0].name}: ${stalledRequests[0].detail}`
+                  : "No stalled requests are crowding the queue."}
+              </p>
+            </div>
           </div>
+        </section>
+
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+          <section className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-5 shadow-[var(--dash-shadow)]">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+                  New private feedback
+                </p>
+                <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
+                  Hear it first
+                </h2>
+              </div>
+              <Link href="/dashboard/inbox" className="text-[12px] font-semibold text-[var(--dash-primary)]">
+                View all
+              </Link>
+            </div>
+
+            {loading ? (
+              <div className="space-y-3">
+                <SkeletonRow />
+                <SkeletonRow />
+              </div>
+            ) : newPrivateFeedback.length > 0 ? (
+              <div className="space-y-3">
+                {newPrivateFeedback.map((item) => (
+                  <button
+                    key={item.sessionId}
+                    type="button"
+                    onClick={() => {
+                      setPrivateFeedbackModal(item);
+                      setPrivateFeedbackActionError("");
+                    }}
+                    className="w-full rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[#FCFAF6] p-4 text-left transition-colors hover:border-[#E05A3D]/30 hover:bg-white"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[14px] font-semibold text-[var(--dash-text)]">{item.name}</p>
+                      <StatusPill status="private_feedback" />
+                      {item.stars ? <RatingBadge rating={item.stars} /> : null}
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                      {item.message}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-[var(--dash-muted)]">
+                      {item.serviceType ? <span>{item.serviceType}</span> : null}
+                      {item.employeeName ? <span>{item.employeeName}</span> : null}
+                      <span>{item.time}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={
+                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+                    <path d="M3 8l7.2 5.4a3 3 0 0 0 3.6 0L21 8" />
+                  </svg>
+                }
+                title="No fresh complaints"
+                description="If someone chooses the private path, it will land here first."
+              />
+            )}
+          </section>
+
+          <section className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-5 shadow-[var(--dash-shadow)]">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+                  Reply queue
+                </p>
+                <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
+                  Public reviews waiting on you
+                </h2>
+              </div>
+              <Link href="/dashboard/replies" className="text-[12px] font-semibold text-[var(--dash-primary)]">
+                View all
+              </Link>
+            </div>
+
+            {loading ? (
+              <div className="space-y-3">
+                <SkeletonRow />
+                <SkeletonRow />
+              </div>
+            ) : replyQueue.length > 0 ? (
+              <div className="space-y-3">
+                {replyQueue.map((item) => (
+                  <div key={item.sessionId} className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[#FCFAF6] p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[14px] font-semibold text-[var(--dash-text)]">{item.name}</p>
+                      <StatusPill status="copied" />
+                      {item.stars ? <RatingBadge rating={item.stars} /> : null}
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                      {item.snippet ?? "Star-only review copied to the Google handoff."}
+                    </p>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <span className="text-[12px] text-[var(--dash-muted)]">{item.time}</span>
+                      <button
+                        type="button"
+                        onClick={() => generateReplyForItem(item)}
+                        className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-3 py-1.5 text-[12px] font-semibold text-[var(--dash-primary)] transition-colors hover:bg-[var(--dash-primary)]/5"
+                      >
+                        Draft reply
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={
+                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    <path d="M8 9h8" />
+                    <path d="M8 13h5" />
+                  </svg>
+                }
+                title="No replies waiting"
+                description="Copied public reviews that still need a reply will show up here."
+              />
+            )}
+          </section>
         </div>
 
-        {/* ─── Private Feedback ─── */}
-        {!loading && privateFeedbackItems.length > 0 && (
-          <div className="mt-6">
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-[15px] font-semibold text-[var(--dash-text)]">
-                Private Feedback
+        <section className="mt-6 rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-5 shadow-[var(--dash-shadow)]">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+                Recent activity
+              </p>
+              <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
+                The latest customer movement
               </h2>
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#EFF6FF] px-1.5 text-[10px] font-semibold text-[#2563EB]">
-                {privateFeedbackItems.filter((item) => item.status === "new").length}
-              </span>
             </div>
-
-            <div className="space-y-3">
-              {privateFeedbackItems.slice(0, 5).map((item) => (
-                <button
-                  key={item.sessionId}
-                  type="button"
-                  onClick={() => {
-                    setPrivateFeedbackModal(item);
-                    setPrivateFeedbackActionError("");
-                  }}
-                  className="w-full rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-4 text-left shadow-[var(--dash-shadow)] transition-colors hover:border-[#E05A3D]/40"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-[14px] font-semibold text-[var(--dash-text)]">
-                          {item.name}
-                        </p>
-                        <StatusPill
-                          status={
-                            item.status === "new" ? "private_feedback" : "handled"
-                          }
-                        />
-                        {item.stars ? <RatingBadge rating={item.stars} /> : null}
-                      </div>
-                      <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
-                        {item.message}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[var(--dash-muted)]">
-                        {item.serviceType ? <span>{item.serviceType}</span> : null}
-                        {item.employeeName ? <span>{item.employeeName}</span> : null}
-                        <span>{item.time}</span>
-                      </div>
-                    </div>
-                    <span className="shrink-0 text-[12px] font-medium text-[var(--dash-primary)]">
-                      Review
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+            <Link href="/dashboard/send" className="text-[12px] font-semibold text-[var(--dash-primary)]">
+              Open send
+            </Link>
           </div>
-        )}
 
-        {/* ─── Two-Column Layout ─── */}
-        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-5">
+          {loading ? (
+            <div className="space-y-3">
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </div>
+          ) : recentActivityPreview.length > 0 ? (
+            <div className="space-y-3">
+              {recentActivityPreview.map((item) => {
+                const isPrivateFeedback = item.feedbackType === "private";
+                const isCopied = item.status === "copied" && item.feedbackType !== "private";
+                const isReplied = !!item.repliedAt;
 
-          {/* ─── Left Column: Recent Activity ─── */}
-          <div className="sm:col-span-3">
-            <h2 className="mb-3 text-[15px] font-semibold text-[var(--dash-text)] font-dashboard">
-              Recent Activity
-            </h2>
-            <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]">
-              {loading ? (
-                <>
-                  <SkeletonRow />
-                  <SkeletonRow />
-                  <SkeletonRow />
-                  <SkeletonRow />
-                  <SkeletonRow />
-                </>
-              ) : activityItems.length > 0 ? (
-                activityItems.map((item, i) => {
-                  const initial = item.name.charAt(0).toUpperCase();
-                  const isCopied =
-                    item.status === "copied" && item.feedbackType !== "private";
-                  const isPrivateFeedback = item.feedbackType === "private";
-                  const hasReplied = !!item.repliedAt;
-                  return (
-                    <div
-                      key={item.sessionId}
-                      className={`flex items-center gap-3 px-4 py-3.5 ${
-                        i < activityItems.length - 1 ? "border-b border-[var(--dash-border)]" : ""
-                      }`}
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--dash-border)]/60">
-                        <span className="text-[12px] font-semibold text-[var(--dash-muted)]">{initial}</span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[13px] font-medium text-[var(--dash-text)]">{item.name}</span>
+                return (
+                  <div key={item.sessionId} className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[#FCFAF6] p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-[14px] font-semibold text-[var(--dash-text)]">{item.name}</p>
                           <StatusPill status={item.status} />
-                          {isPrivateFeedback && item.privateFeedbackStatus === "handled" && (
-                            <span className="text-[10px] font-medium text-[#2563EB]">Handled</span>
-                          )}
-                          {hasReplied && (
-                            <span className="text-[10px] font-medium text-[#059669]">Replied &#10003;</span>
-                          )}
+                          {item.stars ? <RatingBadge rating={item.stars} /> : null}
+                          {isReplied ? (
+                            <span className="rounded-full bg-[#ECFDF5] px-2 py-0.5 text-[11px] font-semibold text-[#059669]">
+                              Replied
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-[13px] leading-relaxed text-[var(--dash-text)]">
+                          {item.action}
+                        </p>
+                        {item.snippet ? (
+                          <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                            {item.snippet}
+                          </p>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[var(--dash-muted)]">
+                          {item.serviceType ? <span>{item.serviceType}</span> : null}
+                          {item.employeeName ? <span>{item.employeeName}</span> : null}
+                          <span>{item.time}</span>
                         </div>
                       </div>
-                      {isPrivateFeedback && (
+                      {isPrivateFeedback ? (
                         <button
                           type="button"
                           onClick={() => {
@@ -1007,110 +1019,110 @@ export default function Dashboard() {
                             });
                             setPrivateFeedbackActionError("");
                           }}
-                          className="shrink-0 rounded-[var(--dash-radius-sm)] border border-[#2563EB] px-2.5 py-1 text-[11px] font-semibold text-[#2563EB] transition-colors hover:bg-[#2563EB]/5 active:scale-[0.97]"
+                          className="shrink-0 rounded-[var(--dash-radius-sm)] border border-[#2563EB] px-3 py-2 text-[12px] font-semibold text-[#2563EB] transition-colors hover:bg-[#2563EB]/5"
                         >
-                          Review
+                          View
                         </button>
-                      )}
-                      {isCopied && !hasReplied && (
+                      ) : isCopied && !isReplied ? (
                         <button
                           type="button"
                           onClick={() => generateReplyForItem(item)}
-                          className="shrink-0 rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-2.5 py-1 text-[11px] font-semibold text-[var(--dash-primary)] transition-colors hover:bg-[var(--dash-primary)]/5 active:scale-[0.97]"
+                          className="shrink-0 rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-primary)] transition-colors hover:bg-[var(--dash-primary)]/5"
                         >
-                          Draft Reply
+                          Draft reply
                         </button>
-                      )}
-                      {item.stars && <RatingBadge rating={item.stars} />}
-                      <span className="shrink-0 text-[11px] text-[var(--dash-muted)]">{item.time}</span>
+                      ) : null}
                     </div>
-                  );
-                })
-              ) : (
-                <EmptyState
-                  icon={
-                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                    </svg>
-                  }
-                  title="No activity yet"
-                  description="Send your first review link to see activity here"
-                />
-              )}
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          ) : (
+            <EmptyState
+              icon={
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                </svg>
+              }
+              title="No activity yet"
+              description="Send your first review request to start filling this in."
+            />
+          )}
+        </section>
 
-          {/* ─── Right Column: Needs Attention ─── */}
-          <div className="sm:col-span-2">
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-[15px] font-semibold text-[var(--dash-text)] font-dashboard">
-                Needs Attention
+        <section className="mt-6 rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-5 shadow-[var(--dash-shadow)]">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+                Request flow
+              </p>
+              <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
+                Keep the top numbers light on mobile
               </h2>
-              {attention.length > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#E05A3D] text-[10px] font-semibold text-white">
-                  {attention.length}
-                </span>
-              )}
             </div>
-
-            {loading ? (
-              <div className="space-y-3">
-                <SkeletonCard />
-                <SkeletonCard />
-              </div>
-            ) : attention.length > 0 ? (
-              <div className="flex flex-col gap-3">
-                {attention.map((item) => {
-                  const initial = item.name.charAt(0).toUpperCase();
-                  return (
-                    <div
-                      key={item.sessionId}
-                      className="rounded-[var(--dash-radius)] border border-[#FEF3C7] bg-[#FFFBEB] p-4"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FEF3C7]">
-                          <span className="text-[12px] font-semibold text-[#D97706]">{initial}</span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-medium text-[var(--dash-text)]">{item.name}</p>
-                          <p className="mt-0.5 text-[12px] text-[var(--dash-muted)]">{item.detail}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex justify-end">
-                        <button
-                          type="button"
-                          className="rounded-[var(--dash-radius-sm)] border border-[#E05A3D] px-3 py-1 text-[11px] font-semibold text-[#E05A3D] transition-colors hover:bg-[#E05A3D]/5 active:scale-[0.97]"
-                        >
-                          Nudge
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">
-                <div className="flex flex-col items-center gap-2 text-center">
-                  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                  </svg>
-                  <p className="text-[13px] font-medium text-[#059669]">All caught up</p>
-                </div>
-              </div>
-            )}
+            <div className="flex gap-1 rounded-full bg-[#EFEAE2] p-1">
+              {FILTER_OPTIONS.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setFunnelFilter(option.key)}
+                  className={`rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all ${
+                    funnelFilter === option.key
+                      ? "bg-white text-[var(--dash-text)] shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
+                      : "text-[var(--dash-muted)]"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
+          {funnelLoading ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          ) : funnel.sent > 0 ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {dashboardHighlights.map((highlight) => (
+                <div key={highlight.label} className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[#FCFAF6] p-4">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+                    {highlight.label}
+                  </p>
+                  <p className="mt-2 text-[28px] font-semibold tracking-tight text-[var(--dash-text)]">
+                    {highlight.value}
+                  </p>
+                  <p className="mt-1 text-[12px] text-[var(--dash-muted)]">{highlight.detail}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 2L11 13" />
+                  <path d="M22 2L15 22l-4-9-9-4 20-7z" />
+                </svg>
+              }
+              title="No request data yet"
+              description="Once you send requests, this strip will show sent, opened, and copied counts."
+            />
+          )}
+
+          <p className="mt-4 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+            Until Google review sync is live, <span className="font-semibold text-[var(--dash-text)]">Copied</span> is the last confirmed step. It means the customer copied the review and opened the Google handoff. It does not mean we can confirm they posted it.
+          </p>
+        </section>
       </div>
 
-      {/* ─── Private Feedback Modal ─── */}
-      {privateFeedbackModal && (
+      {privateFeedbackModal ? (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
           onClick={closePrivateFeedbackModal}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") closePrivateFeedbackModal();
+          onKeyDown={(event) => {
+            if (event.key === "Escape") closePrivateFeedbackModal();
           }}
         >
           <div
@@ -1118,7 +1130,7 @@ export default function Dashboard() {
             aria-modal="true"
             aria-label="Private feedback"
             className="w-full max-w-[560px] rounded-t-[16px] bg-white p-6 shadow-xl sm:mx-4 sm:rounded-[var(--dash-radius)]"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
@@ -1126,16 +1138,8 @@ export default function Dashboard() {
                   <h3 className="text-[18px] font-bold text-[var(--dash-text)]">
                     {privateFeedbackModal.name}
                   </h3>
-                  <StatusPill
-                    status={
-                      privateFeedbackModal.status === "new"
-                        ? "private_feedback"
-                        : "handled"
-                    }
-                  />
-                  {privateFeedbackModal.stars ? (
-                    <RatingBadge rating={privateFeedbackModal.stars} />
-                  ) : null}
+                  <StatusPill status={privateFeedbackModal.status === "new" ? "private_feedback" : "handled"} />
+                  {privateFeedbackModal.stars ? <RatingBadge rating={privateFeedbackModal.stars} /> : null}
                 </div>
                 <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
                   {privateFeedbackModal.time}
@@ -1155,7 +1159,7 @@ export default function Dashboard() {
             </div>
 
             <div className="space-y-3 text-[13px] text-[var(--dash-muted)]">
-              {(privateFeedbackModal.serviceType || privateFeedbackModal.employeeName) && (
+              {(privateFeedbackModal.serviceType || privateFeedbackModal.employeeName) ? (
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {privateFeedbackModal.serviceType ? (
                     <span>
@@ -1170,26 +1174,19 @@ export default function Dashboard() {
                     </span>
                   ) : null}
                 </div>
-              )}
+              ) : null}
 
-              {privateFeedbackModal.customerContact &&
-                (() => {
-                  const contact = formatCustomerContact(
-                    privateFeedbackModal.customerContact,
-                  );
-
-                  return contact ? (
-                    <div>
-                      <strong className="text-[var(--dash-text)]">Customer contact:</strong>{" "}
-                      <a
-                        href={contact.href}
-                        className="font-medium text-[var(--dash-primary)] underline underline-offset-2"
-                      >
-                        {contact.label}
-                      </a>
-                    </div>
-                  ) : null;
-                })()}
+              {privateFeedbackModal.customerContact ? (() => {
+                const contact = formatCustomerContact(privateFeedbackModal.customerContact);
+                return contact ? (
+                  <div>
+                    <strong className="text-[var(--dash-text)]">Customer contact:</strong>{" "}
+                    <a href={contact.href} className="font-medium text-[var(--dash-primary)] underline underline-offset-2">
+                      {contact.label}
+                    </a>
+                  </div>
+                ) : null;
+              })() : null}
             </div>
 
             <div className="mt-5 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] p-4">
@@ -1201,18 +1198,17 @@ export default function Dashboard() {
               </p>
             </div>
 
-            {privateFeedbackActionError && (
+            {privateFeedbackActionError ? (
               <div className="mt-4 rounded-[var(--dash-radius-sm)] border border-[#DC2626]/20 bg-[#FEF2F2] px-4 py-3 text-[13px] text-[#DC2626]">
                 {privateFeedbackActionError}
               </div>
-            )}
+            ) : null}
 
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-[12px] text-[var(--dash-muted)]">
-                {privateFeedbackModal.status === "handled" &&
-                privateFeedbackModal.handledAt
+                {privateFeedbackModal.status === "handled" && privateFeedbackModal.handledAt
                   ? `Marked handled ${timeAgo(privateFeedbackModal.handledAt)}`
-                  : "Private feedback should be handled in your own workflow — small Talk just keeps the record straight."}
+                  : "Handle the follow-up in your normal channel, then keep the record clean here."}
               </div>
               <div className="flex gap-2">
                 <button
@@ -1222,7 +1218,7 @@ export default function Dashboard() {
                 >
                   Close
                 </button>
-                {privateFeedbackModal.status !== "handled" && (
+                {privateFeedbackModal.status !== "handled" ? (
                   <button
                     type="button"
                     onClick={() => markPrivateFeedbackHandled(privateFeedbackModal.sessionId)}
@@ -1231,26 +1227,35 @@ export default function Dashboard() {
                   >
                     {privateFeedbackActionLoading ? "Saving..." : "Mark handled"}
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* ─── Reply Modal ─── */}
-      {replyModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setReplyModal(null)} onKeyDown={(e) => { if (e.key === "Escape") setReplyModal(null); }}>
+      {replyModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+          onClick={() => setReplyModal(null)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setReplyModal(null);
+          }}
+        >
           <div
             role="dialog"
             aria-modal="true"
             aria-label="Draft reply"
             className="w-full max-w-[520px] rounded-t-[16px] bg-white p-6 shadow-xl sm:mx-4 sm:rounded-[var(--dash-radius)]"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
-            {/* Header */}
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[16px] font-bold text-[var(--dash-text)]">Draft Reply</h3>
+              <div>
+                <h3 className="text-[16px] font-bold text-[var(--dash-text)]">Draft reply</h3>
+                <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
+                  We help with the wording. You still paste the reply on Google yourself.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setReplyModal(null)}
@@ -1264,18 +1269,16 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {/* Original review */}
             <div className="mb-4 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] p-4">
               <div className="mb-2 flex items-center gap-2">
                 <span className="text-[13px] font-semibold text-[var(--dash-text)]">{replyModal.name}</span>
-                {replyModal.stars && <MiniStars rating={replyModal.stars} />}
+                {replyModal.stars ? <MiniStars rating={replyModal.stars} /> : null}
               </div>
               <p className="text-[13px] leading-relaxed text-[var(--dash-muted)]">
                 {replyModal.snippet || <em>Star-only review — no text</em>}
               </p>
             </div>
 
-            {/* Reply area */}
             {replyLoading ? (
               <div className="space-y-2">
                 <div className="h-4 w-full animate-pulse rounded bg-[var(--dash-border)]" />
@@ -1289,13 +1292,12 @@ export default function Dashboard() {
             ) : (
               <textarea
                 value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
+                onChange={(event) => setReplyText(event.target.value)}
                 rows={5}
                 className="w-full resize-none rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-white px-3 py-2.5 text-[13px] leading-relaxed text-[var(--dash-text)] focus:border-[var(--dash-primary)] focus:outline-none"
               />
             )}
 
-            {/* Actions */}
             <div className="mt-4 flex items-center justify-between">
               <button
                 type="button"
@@ -1310,23 +1312,21 @@ export default function Dashboard() {
                 onClick={copyReplyAndMark}
                 disabled={replyLoading || !replyText}
                 className={`rounded-[var(--dash-radius-sm)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all active:scale-[0.97] disabled:opacity-50 ${
-                  replyCopied
-                    ? "bg-[#059669]"
-                    : "bg-[var(--dash-primary)] hover:brightness-95"
+                  replyCopied ? "bg-[#059669]" : "bg-[var(--dash-primary)] hover:brightness-95"
                 }`}
               >
-                {replyCopied ? "Copied! Paste on Google" : "Copy Reply"}
+                {replyCopied ? "Copied" : "Copy reply"}
               </button>
             </div>
 
-            {!replyCopied && !replyLoading && (
+            {!replyCopied && !replyLoading ? (
               <p className="mt-3 text-center text-[11px] text-[var(--dash-muted)]">
-                Paste this reply on your Google Business page
+                Paste this reply on your Google Business page manually.
               </p>
-            )}
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
     </main>
   );
 }

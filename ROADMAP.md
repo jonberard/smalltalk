@@ -1,367 +1,549 @@
-# Small Talk — Product Roadmap
+# small Talk — Product Roadmap
 
 > "Your customers want to help you. They just need the right words."
 
-Last updated: March 31, 2026
+Last updated: April 21, 2026
 
 ---
 
-## The Mission
+## Purpose
 
-Small Talk is the only review tool that eliminates the blank box. We don't send customers to a blank Google review page and hope for the best. We guide the entire experience — stars, topics, follow-ups, AI-drafted text — so every customer leaves a detailed, genuine review that sounds like they spent 10 minutes writing it. In 30 seconds.
+This is the working build guide for small Talk.
 
-We are not a review management platform. We are not an SEO suite. We are a **review writing tool** — the only one that exists.
+We use it for:
+- pre-launch priorities
+- post-launch priorities
+- founder operations
+- deciding what **not** to build yet
 
----
-
-## Competitive Landscape
-
-| Company | What They Do | Price | Their Weakness |
-|---------|-------------|-------|----------------|
-| Birdeye | All-in-one reputation platform | $299-449/mo | Sends link to blank box. No writing help. |
-| Podium | Customer communication + reviews | $399-599/mo | Same blank box. Overkill for small biz. |
-| NiceJob | Review generation + referrals | $75-125/mo | Asks for reviews. Doesn't write them. |
-| Merchynt | SEO suite + review feature | $50-99/mo | Reviews are a bolt-on feature, not the focus. Open-ended "what did you like" prompt. |
-| Spokk | Feedback → AI reviews + loyalty + referrals | $49-166/mo | Two-step process (feedback THEN review). Open text feedback form. Review gates negative feedback with "smart skip logic." Jack of all trades. |
-| **Small Talk** | **Guided flow → AI review in one step** | **$79-149/mo** | **We're new. No brand recognition yet.** |
-
-### Our Advantages Over Every Competitor
-
-1. **One flow, not two.** Competitors collect feedback, THEN generate a review. Two interactions. We do both in one continuous 30-second guided experience. Less friction, less drop-off.
-
-2. **Structured input beats open text.** Topic chips + spectrum follow-ups = zero typing. The AI gets richer input from our structured taps than from anyone's blank feedback form.
-
-3. **15 voice styles.** Every review sounds genuinely different. Competitors use one prompt — every review from the same business sounds the same.
-
-4. **Honest reviews by design.** Our adaptive flow handles 1-5 stars with equal care. The public/private fork for negative reviews is genuinely fair — not review gating. We're the only truly Google-compliant review tool.
-
-5. **Negative review alerts.** We don't hide bad reviews. We make sure the business sees them first and can respond fast. The fastest response wins the narrative.
+Legend:
+- `[x]` done
+- `[ ]` not done yet
 
 ---
 
-## Phase 1 — Launch (Current)
+## North Star
 
-**Goal:** Ship the MVP. Get 10-20 founding customers in Austin. Prove the product works with real businesses.
+small Talk should be the cleanest way for a local service business to:
+- get more detailed Google reviews
+- hear unhappy customers before the situation gets worse
+- follow up quickly
+- run the whole process from a phone without friction
 
-### Product (Complete or In Progress)
+We are not trying to become a bloated reputation suite.
+We win by owning the writing step, the recovery step, and the follow-through.
 
-- [x] Consumer review flow — adaptive branching by star rating
-- [x] Three rating tiers with tier-specific topic chips
-- [x] Follow-up spectrum per topic with optional detail text
-- [x] Public/private fork for 1-2 star reviews
-- [x] 15 AI writing styles with tone-by-rating modulation
-- [x] Multi-LLM architecture (Anthropic implemented, OpenAI/Gemini placeholders)
-- [x] Model configurable via ANTHROPIC_MODEL env var
-- [x] Business dashboard — Home (stats, funnel, activity, needs attention), Send, Settings
-- [x] Supabase database with RLS policies
-- [x] Auth (signup, login, protected routes)
-- [x] Dynamic consumer flow reading from database
-- [x] Review session tracking through entire funnel
-- [x] Marketing landing page
-- [x] Deployed to Vercel
-- [x] Interstitial handoff screen (visual paste coaching before Google opens)
+---
+
+## Build Principles
+
+1. **Honest reviews, not filtered reviews**
+Every customer gets a real choice. No review gating. No suppression.
+
+2. **The owner experience matters as much as the customer experience**
+Capturing feedback is only half the product. The business owner needs to act on it.
+
+3. **Mobile is not optional**
+Many owners will live in the dashboard from their phone. If mobile feels cramped or confusing, the product feels unfinished.
+
+4. **Reliability before feature breadth**
+If the AI provider goes down, review generation cannot go down with it. Same for sends, reminders, and notifications.
+
+5. **Customer pull beats founder imagination**
+Anything big and complicated needs to earn its way onto the roadmap through real usage.
+
+---
+
+## Current State
+
+### Core product
+
+- [x] Adaptive consumer review flow
+- [x] Public/private fork for low ratings
+- [x] Structured topic + follow-up flow
+- [x] AI-generated review draft flow
+- [x] Google handoff flow with interstitial guidance
+- [x] Private feedback recourse: customers can still post publicly later
+- [x] Generic QR flow starts fresh after completion
+- [x] Optional contact info for QR/private feedback
+- [x] Reminder sequence MVP
+- [x] Authentication, billing gates, and basic dashboard
+- [x] Server-controlled public flow hardening
+- [x] Legacy public endpoints retired
+
+### Website and analytics
+
+- [x] Landing page messaging cleanup
+- [x] Industry pages + shared template refactor
+- [x] PostHog instrumentation
+
+### Owner-side basics
+
+- [x] Private feedback email notification
+- [x] Deep link from private feedback email to the dashboard
+- [x] Mark private feedback as handled
+- [x] Contact info shown when available
+
+### Still true right now
+
+- [x] Basic owner dashboard exists
+- [ ] The owner dashboard is not yet a fully polished action center
+- [ ] The admin dashboard does not exist yet
+- [ ] Multi-provider AI failover does not exist yet
+
+---
+
+## How To Use This Roadmap
+
+This roadmap now combines:
+- the original broad product vision
+- what we have actually built
+- what we now know matters most before launch
+
+So nothing important is supposed to disappear.
+Instead, every item should live in one of these buckets:
+- `Pre-Launch — Must Do Next`
+- `Post-Launch — Should Do Soon`
+- `Later — Only If Customers Pull It Out Of Us`
+- `Not Important Right Now`
+
+If an older idea is missing, it either:
+- got intentionally deprioritized
+- got folded into a broader section
+- or needs to be added back explicitly
+
+---
+
+## Pre-Launch — Must Do Next (0-30 Days)
+
+These are the highest-leverage items before pushing harder on acquisition and paid growth.
+
+### 1. Owner Dashboard V2 — Highest Product Priority
+
+The customer flow is getting strong. The owner experience is the biggest remaining gap.
+
+- [ ] **Mobile dashboard cleanup**
+  - Fix cramped activity rows on small screens
+  - Move secondary actions out of crowded inline rows
+  - Improve spacing, tap targets, safe-area padding, and status hierarchy
+  - Rework mobile nav around actual daily use
+
+- [ ] **Private feedback inbox**
+  - New vs Handled filters
+  - Cleaner private feedback cards
+  - Clear contact, service, employee, rating, and message display
+
+- [ ] **Actionable owner workflow**
+  - Call
+  - Email
+  - Mark handled
+  - Internal note field like "Called customer", "Resolved", or "No response"
+
+- [ ] **Request detail / timeline view**
+  - sent
+  - opened
+  - started
+  - reminder events
+  - private feedback sent
+  - handled
+  - public review drafted/copied later
+  - reply drafted/copied later
+
+- [ ] **Manual send/share tools before full Twilio rollout**
+  - Copy personalized link
+  - Copy ready-to-send SMS text
+  - Copy ready-to-send email text
+  - Copy link again / resend workflow
+
+- [ ] **Reply center foundation**
+  - unreplied review list
+  - draft reply
+  - copy reply
+  - mark replied
+
+- [ ] **Owner dashboard information architecture**
+  - home overview
+  - private feedback inbox
+  - request detail view
+  - replies area
+  - cleaner mobile navigation
+
+- [ ] **Screen-by-screen mobile QA**
+  - dashboard home
+  - send page
+  - private feedback modal
+  - request detail/timeline
+  - settings
+  - billing
+
+Why this is top priority:
+If the owner cannot comfortably work through feedback and review activity from their phone, the product still feels incomplete.
+
+---
+
+### 2. AI Reliability and Provider Failover — Highest Technical Priority
+
+small Talk depends on AI generation. That means provider resilience is a launch requirement, not a luxury.
+
+- [x] Anthropic review generation is live
+- [ ] OpenAI provider implementation
+- [ ] Gemini provider implementation
+- [ ] Automatic provider fallback chain
+  - Anthropic → OpenAI → Gemini
+  - Customer only sees an error if all providers fail
+
+- [ ] Admin control for model/provider selection
+  - default mode
+  - forced provider mode
+  - emergency provider override
+
+- [ ] Provider health logging
+  - failures
+  - latency
+  - model used
+  - cost estimates
+
+- [ ] Internal usage + cost tracker
+  - provider
+  - model
+  - tokens
+  - estimated cost
+
+- [ ] Smart routing preserved across providers
+  - cheaper model for straightforward positive reviews
+  - more nuanced model for negative reviews
+
+- [ ] Admin provider selector moved out of env-only control and into app-managed settings
+
+- [ ] Review quality log
+  - recent generated reviews
+  - voice used
+  - provider used
+  - model used
+
+Why this is top priority:
+If one provider goes down and review generation dies, the product stops being dependable. This has to be solved before scale.
+
+---
+
+### 3. Founder Admin Dashboard V1 — Highest Internal Ops Priority
+
+This is for running small Talk itself, not for business owners.
+
+- [ ] **Business list**
+  - search
+  - business status
+  - trial / paid
+  - onboarding complete / stuck
+
+- [ ] **Business detail page**
+  - send volume
+  - review volume
+  - recent private feedback
+  - reminder state
+  - owner contact info
+
+- [ ] **Support / dispute queue**
+  - private feedback issues
+  - angry customer edge cases
+  - businesses needing help
+  - support escalations
+  - founder follow-up list
+
+- [ ] **System health**
+  - failed sends
+  - failed reminders
+  - Resend errors
+  - Twilio errors
+  - AI provider failures
+
+- [ ] **Founder notes**
+  - support notes per business
+  - follow-up state
+  - quick context before replying
+
+Why this is top priority:
+Before you have a team, you need one clean place to handle communication, data, edge cases, and support without digging through raw systems.
+
+---
+
+### 4. Google Review Sync + Truthful Statuses
+
+The dashboard should only claim what we truly know.
+
+- [ ] **Keep pre-sync labels honest**
+  - Use states like `Copied review`, `Opened Google`, and `Completed handoff`
+  - Do **not** say `Posted on Google` unless we have direct confirmation
+
+- [ ] **Google Business Profile review sync**
+  - connect the correct Google Business Profile account/location
+  - fetch real review data after it appears on Google
+  - detect new and updated reviews through Google Business Profile APIs / notifications
+
+- [ ] **Upgrade dashboard states after sync**
+  - `Review detected on Google`
+  - `New Google review received`
+  - `Review updated on Google`
+
+- [ ] **Keep handoff vs confirmed review separate**
+  - one state for what happened inside small Talk
+  - a different state for what Google actually confirmed later
+
+Why this matters:
+Trust is part of the product. If we overstate what happened, the dashboard feels sloppy. If we stay precise, owners trust the system more.
+
+---
+
+### 5. Launch Operations and Business Readiness
+
+- [ ] Twilio A2P / 10DLC registration approved
+- [ ] Native SMS share flow polished as fallback until A2P is fully live
+- [ ] Resend domain verification complete
+- [ ] Live Stripe setup fully verified
+- [ ] Mobile QA pass across owner dashboard and customer flow
+- [ ] Business onboarding / intake flow completed
+  - business name
+  - Google Place ID
+  - services
+  - employees
+  - topics
+  - logo
+
 - [ ] Mobile deep link to Google Maps app with fallback
-- [x] Stripe integration ($79/mo Starter, $149/mo Growth)
-- [x] 7-day free trial with 10 review requests
-- [x] Subscription gating on Send functionality
-- [x] CSV bulk sends locked behind paid plan
-- [ ] Twilio 10DLC registration (submit and wait for approval)
-- [ ] Native SMS share as interim (pre-fills message, business owner sends from their phone)
-- [x] Resend email notifications for negative public reviews
-- [ ] Resend domain verification (usesmalltalk.com)
-- [ ] Point usesmalltalk.com DNS to Vercel
-- [ ] Debug label removed from review draft screen (voice_id + model)
-- [ ] Business intake workflow after signup (business name, Google Place ID, services, employees, topics, logo — populates dashboard)
-- [x] Add SEO keyword injection to AI review generation — business name, service type, and city woven naturally into every generated review
-- [ ] Account deletion flow (UI placeholder built — needs backend implementation: delete business, cascade services/employees/topics/review_links, revoke Stripe subscription, delete Supabase auth user)
-- [ ] Voice-to-text input as alternative to topic chips on the consumer flow. Add a microphone icon option on the topic selection screen: "Or just tell us what happened." Customer taps the mic, speaks for 10-15 seconds, Web Speech API transcribes it, AI cleans it into a polished review — removes ums, ahs, and rambling while keeping their genuine sentiment and specific details. This gives the customer TWO paths: tap through chips (structured, fast) or talk (natural, richer input). Both feed into the same 15-voice AI generation system.
+- [ ] Voice-to-text path in customer flow refined and production-ready
+- [ ] Safe fallback when business has zero services or zero employees
+- [ ] Account deletion flow completed
+- [ ] Monitoring / alerting in place
+- [ ] Debug/developer labels removed from customer-facing review draft experience
 
-### Landing Page Updates
-
-- [ ] Update headline positioning: "Your customers want to help you. They just need the right words."
-- [ ] Add competitor comparison section: "Other tools send a link to a blank box. Small Talk eliminates the blank box entirely."
-- [ ] Add the honest review angle prominently: "The only review tool that handles negative feedback honestly — because your reputation depends on trust, not suppression."
-- [ ] Update pricing to $79/$149 with founding customer rate ($49/$99 for first 20-30 customers)
-- [ ] Add FAQ: "How is this different from Birdeye/Podium?" — "They charge $300-500/mo to send a link to a blank text box. We guide the entire writing experience for a fraction of the cost."
-- [ ] Add FAQ: "How is this different from Spokk/Merchynt?" — "They collect feedback first, then generate a review — two steps. Small Talk does it in one 30-second flow. And we handle negative reviews honestly instead of filtering them out."
-- [ ] Social proof: replace fake "500+ businesses" with "Built for pool companies, landscapers, contractors, and local pros" until we have real numbers
-- [ ] Add "As seen working with" section once first 5 customers are active (with permission)
-- [ ] Add SEO value proposition section to landing page. Headline: "Every review boosts your Google ranking." Explain that Small Talk's AI naturally weaves in the business name, service type, and city — the exact keywords Google indexes for local Map Pack results. Position as: "Other tools get you reviews. Small Talk gets you reviews AND rankings." Key differentiator against Spokk and Merchynt — neither explicitly optimize review text for local SEO.
-- [ ] Update the hero subheadline or add a secondary benefit line that mentions the SEO angle: "Turn happy clients into detailed Google reviews that boost your ranking."
-- [ ] Add a stat or visual to the SEO section: "Google reviews with specific keywords rank 2x higher in local search results" (research and verify this claim before publishing)
-
-### Go-To-Market
-
-- [ ] Pool guy (first customer) — free forever as case study
-- [ ] 5 Austin-area service businesses — personal outreach, founding rate $49/mo
-- [ ] Collect before/after data: review count, average length, star rating before and after Small Talk
-- [ ] Get 3 video testimonials from founding customers
-- [ ] Document the "12 words to 85 words" stat with real data
-- [ ] Create a one-page PDF sales sheet for in-person pitches
-
-### Business Setup
-
-- [ ] Meet with CPA (FERS medical retirement + business income structure)
-- [ ] Meet with business attorney (entity formation — LLC vs S-Corp)
-- [ ] Form business entity
-- [ ] Business bank account
-- [ ] Register Twilio 10DLC under business entity
-- [ ] Request Twilio A2P 10DLC campaign approval
-- [ ] Stripe account (live mode, not test mode)
-- [ ] Configure Stripe (products, prices, webhook endpoint, customer portal)
-- [ ] Configure Resend (API key, domain verification, sender address)
-- [ ] Configure Twilio (phone number, messaging service, env vars)
-- [ ] Google Places API key (enable Places API in Google Cloud Console)
+Why this matters:
+These are the quiet launch blockers. The product can look good and still break trust if ops are messy.
 
 ---
 
-## Phase 2 — The Features That Kill Spokk (Month 2-3)
+### 6. Real Usage Validation
 
-**Goal:** Match and exceed Spokk's feature set while maintaining our core advantage (one-flow, structured input, honest reviews).
+- [ ] 1-3 beta businesses actively using small Talk every week
+- [ ] Before/after data captured
+  - review count
+  - review length
+  - private feedback volume
+  - completion rate
 
-### Automated SMS Sequences
+- [ ] 1-2 real testimonials or case studies
+- [ ] Sales one-pager / case-study PDF
 
-- [ ] "Set and forget" automation mode
-- [ ] Business owner marks job complete → Small Talk sends review request automatically
-- [ ] Timing sequence: review request at 2 hours, gentle reminder at 24 hours if no response
-- [ ] Smart skip: don't remind if already completed
-- [ ] Configurable timing in Settings (default 2hr/24hr, adjustable)
-
-### Staff Performance Dashboard
-
-- [ ] Dashboard view: employee name, average star rating, total reviews, topic breakdown
-- [ ] "Marcus: 4.8 avg across 23 reviews. Top qualities: On Time, Quality, Professionalism"
-- [ ] "David: 4.2 avg across 15 reviews. Lowest: Communication, Timeliness"
-- [ ] Data already exists in review_sessions → review_links → employees. Just needs a UI.
-- [ ] Monthly email summary to business owner: "Your team's review performance this month"
-
-### Multi-Platform Review Support
-
-- [ ] Add Yelp as a secondary review target
-- [ ] Add industry-specific platforms:
-  - Angi / HomeAdvisor (contractors, plumbers, HVAC)
-  - Healthgrades (dentists, doctors)
-  - Avvo (lawyers)
-  - TripAdvisor (restaurants, hospitality)
-- [ ] Business owner selects their platforms in Settings
-- [ ] Consumer flow shows platform options on the draft screen: "Post to Google" (primary) + "Also post to Yelp" (secondary)
-- [ ] Track which platforms each review was posted to
-
-### SEO-Optimized Review Generation
-
-- [ ] Add business city and service category to the AI generation prompt
-- [ ] AI naturally weaves in local SEO keywords: "best pool cleaning in Austin" or "reliable HVAC repair in Cedar Park"
-- [ ] Don't make it obvious — the keywords should feel natural, not stuffed
-- [ ] Track which keywords appear in generated reviews for reporting
-
-### Referral Nudge (Light Version)
-
-- [ ] After a 4-5 star review is posted, show: "Know someone who could use [Business Name]? Share their link."
-- [ ] Pre-filled text message with the business's review link
-- [ ] Track referral source in review_links table
-- [ ] Don't build a full referral program yet — just the nudge
-
-### Landing Page Updates
-
-- [ ] Add staff performance screenshot to features section
-- [ ] Add multi-platform logos (Google, Yelp, Angi, Healthgrades)
-- [ ] Add SEO benefit messaging: "Every review boosts your Google ranking"
-- [ ] Real social proof: actual customer count, actual review stats
-- [ ] Case study page: "How Crystal Clear Pools went from 4.2 to 4.8 stars in 60 days"
+Why this matters:
+The roadmap should start bending around real customer behavior as fast as possible.
 
 ---
 
-## Phase 3 — The Distribution That Kills Merchynt (Month 4-6)
+## Post-Launch — Should Do Soon (30-90 Days)
 
-**Goal:** Open the agency distribution channel and CRM integrations. Shift from direct sales to scalable distribution.
+These matter, but they come after the pre-launch items above.
 
-### White-Label Program for Marketing Agencies
+### 1. Owner Product Expansion
 
-- [ ] Agency pricing: $30-40/location wholesale (agencies mark up to whatever they want)
-- [ ] Custom branding: agency's logo, colors, and domain on the consumer flow
-- [ ] Agency dashboard: manage multiple client businesses from one login
-- [ ] Onboarding kit: sales scripts, pitch deck, demo account for agencies
-- [ ] Agency portal: billing, client management, white-label settings
-- [ ] Target: 5 agencies managing 10+ locations each = 50+ accounts from 5 sales conversations
+- [ ] Staff performance dashboard
+  - by employee
+  - by service
+  - rating trends
+  - common praise / complaint themes
 
-### CRM Integrations
+- [ ] Reminder controls
+  - pause reminders
+  - send reminder now
+  - resend link
+  - clearer reminder status
 
-- [ ] ServiceTitan (pool, HVAC, plumbing, electrical)
-- [ ] Jobber (landscaping, cleaning, general contracting)
-- [ ] Housecall Pro (home services)
-- [ ] HubSpot (general CRM)
-- [ ] Salesforce (larger businesses)
-- [ ] Integration pattern: when job is marked "complete" in CRM → auto-create review_link → trigger SMS sequence
-- [ ] Prioritize based on which CRMs actual customers use — don't build speculatively
-- [ ] Zapier integration as a catch-all for CRMs we don't directly support
+- [ ] Better filtering in owner dashboard
+  - private feedback
+  - unreplied reviews
+  - low ratings
+  - stalled requests
 
-### AI Review Response Suggestions
+- [ ] Google review sync / monitoring
+  - recent review visibility
+  - response tracking
+  - trend visibility
+  - rating trend over time
+  - "since you started using small Talk" benchmarks
 
-- [ ] When a new Google review appears (via Places API monitoring), show it in the dashboard
-- [ ] AI generates a suggested reply using the same Claude/GPT infrastructure
-- [ ] Business owner approves, edits, or writes their own
-- [ ] One-click post reply to Google (Google Business Profile API supports this for responses, unlike reviews)
-- [ ] Handles both positive and negative review responses with appropriate tone
-
-### Google Places API Integration
-
-- [ ] Pull live Google rating, review count, and recent reviews into dashboard Home
-- [ ] Show rating trend over time: "Your rating this month: 4.7 → 4.8 (+0.1)"
-- [ ] "Since you started using Small Talk" benchmark line on the trend chart
-- [ ] Review monitoring: alert when new Google reviews appear (not just Small Talk reviews)
-
-### Admin Dashboard
-
-- [ ] Route: /admin (protected by admin email check)
-- [ ] Current state: smart routing sends 4-5 star reviews to Haiku (cheap) and 1-3 star reviews to Sonnet (nuanced). ANTHROPIC_MODEL env var overrides this when set.
-- [ ] Admin dashboard model selector should let me switch between: smart routing (default), force all to Haiku, force all to Sonnet, force all to a specific OpenAI or Gemini model
-- [ ] Implement OpenAI provider: install SDK, write callOpenAI function, add API key. Same prompt system, different API call.
-- [ ] Implement Gemini provider: install SDK, write callGemini function, add API key. Same prompt system, different API call.
-- [ ] Build automatic fallback chain: Anthropic → OpenAI → Gemini. If primary fails, try next provider automatically. Customer never sees an error unless ALL providers are down.
-- [ ] Log every provider failure with timestamp and error so I can see reliability patterns
-- [ ] The smart rating-based routing should work WITHIN each provider too — if we're on OpenAI, use GPT-4o-mini for positive reviews and GPT-4o for negative reviews. Same cost-saving logic, different models.
-- [ ] All of this saves to site_settings table in Supabase, not env vars. Changes take effect immediately without redeployment.
-- [ ] Cost tracker: log every API call with provider, model, tokens, estimated cost
-- [ ] Review quality log: last 50 generated reviews with voice, provider, model metadata
-- [ ] System health: Twilio status, Resend status, Supabase status, API response times
-
-### Pricing Update
-
-- [ ] Add Pro tier: $249/mo, up to 10 locations, custom branding, dedicated onboarding
-- [ ] Based on validation from Phase 2 — only add if multi-location demand exists
-- [ ] Consider annual pricing: 2 months free (like Spokk does)
+- [ ] SEO reporting layer
+  - keyword coverage in generated reviews
+  - business/service/city usage visibility
+  - lightweight ranking-impact storytelling without overclaiming
 
 ---
 
-## Phase 4 — The Moat Nobody Can Copy (Month 6-12)
+### 2. Growth and Conversion
 
-**Goal:** Build defensible advantages through data, intelligence, and brand positioning that competitors can't replicate quickly.
+- [ ] Comparison pages
+  - Podium alternative
+  - NiceJob alternative
+  - Birdeye alternative
+  - Spokk alternative
 
-### Industry-Specific Voice Packs
+- [ ] More industry pages based on demand
+  - roofers
+  - electricians
+  - cleaning companies
+  - auto repair
 
-- [ ] Expand from 15 to 25+ writing styles
-- [ ] Industry-tuned voices: dental review voices use different language than plumbing review voices
-- [ ] "The Dental Patient" voice knows to mention things like "gentle," "painless," "explained everything"
-- [ ] "The Homeowner" voice knows to mention things like "showed up on time," "cleaned up after," "fair estimate"
-- [ ] Business owner can preview and select preferred voices in Settings
-- [ ] AI learns which voices convert best for each industry over time
+- [ ] Proof and trust upgrades
+  - real customer logos
+  - real stats
+  - customer stories
 
-### Review Intelligence & Analytics
-
-- [ ] Topic analysis: "Your reviews mention 'on time' 47% of the time but never mention 'clean.' Tell your team to focus on cleanliness."
-- [ ] Sentiment trending: which topics are improving vs declining month over month
-- [ ] Competitor benchmarking: "Businesses like yours in Austin average 4.6 stars. You're at 4.8."
-- [ ] Review velocity: "You're getting 12 reviews/month. Top performers in your industry get 20+."
-- [ ] Actionable insights email: monthly digest with specific recommendations
-
-### The Honest Review Brand
-
-- [ ] Publish the "Honest Review Manifesto" — a public document explaining why review gating is harmful and how Small Talk handles every rating with equal care
-- [ ] Blog content: "Is AI Review Generation Legal? The FTC's Definitive Answer"
-- [ ] Blog content: "What Birdeye and Podium Don't Tell You About Review Gating"
-- [ ] Blog content: "Why Your 4-Star Reviews Are Worth More Than Your 5-Star Reviews"
-- [ ] Seek coverage in local business publications and podcasts
-- [ ] Position as thought leader in honest review practices
-- [ ] Apply for Google Business Profile partnership or certification if available
-
-### Loyalty Program (If Validated)
-
-- [ ] Only build if founding customers request it
-- [ ] QR code check-in at point of service
-- [ ] Visit tracking with customizable reward milestones
-- [ ] Automated SMS reward notification when earned
-- [ ] Integrate with the review flow: loyalty check-in triggers review request after the visit
-- [ ] This competes directly with Spokk's loyalty feature
-
-### Referral Program (Full Version)
-
-- [ ] Only build if the Phase 2 referral nudge shows traction
-- [ ] Unique referral link per customer
-- [ ] Both sides rewarded (referrer and new customer)
-- [ ] Full referral tracking dashboard
-- [ ] Automated SMS referral link sent after positive review
-
-### Multi-Location Support
-
-- [ ] Add locations table to Supabase
-- [ ] Move google_review_url and business name from businesses to locations
-- [ ] Location switcher in dashboard header
-- [ ] Per-location stats, funnel, and activity feed
-- [ ] "All Locations" combined view
-- [ ] Per-location custom topics and employees
-- [ ] This is the architectural refactor we planned — Option A from the earlier discussion
-
-### The Public API — "Stripe of Review Generation"
-
-The long game. Stop being a tool businesses log into. Become the infrastructure layer that every other tool plugs into.
-
-- [ ] Build a public REST API: POST /api/v1/generate-review with API key authentication
-- [ ] Any platform — Jobber, NiceJob, ServiceTitan, Housecall Pro, even Spokk — can send customer feedback data to Small Talk and get back a polished, SEO-optimized, voice-varied review
-- [ ] Pricing: per-generation (e.g., $0.10-0.25 per review) or monthly API tier
-- [ ] Small Talk becomes the "Intel Inside" of review generation — our engine, their interface
-- [ ] This means we don't have to beat Spokk on loyalty programs or Birdeye on feature breadth. We become the engine they all depend on.
-- [ ] Developer documentation, SDKs, and a "Powered by Small Talk" badge
-- [ ] The moat: our 15+ voice system, tone-by-rating modulation, SEO keyword injection, and industry-specific tuning are hard to replicate. The API packages all of it into one call.
+- [ ] Search Console and SEO hygiene
+- [ ] Blog content around honest reviews, review gating, AI review legality, and review response strategy
+- [ ] Better landing-page comparison and differentiation blocks
+- [ ] Real case study pages
+- [ ] Industry proof once enough customer data exists
 
 ---
 
-## Technical Debt & Infrastructure (Ongoing)
+### 3. Integrations and Workflow Automation
 
-- [ ] Implement OpenAI provider in review-generator.ts
-- [ ] Implement Gemini provider in review-generator.ts
-- [ ] A/B test review quality across providers
-- [ ] Move from env var model selection to site_settings table (admin dashboard)
-- [ ] Automatic fallback chain across providers
-- [ ] Rate limiting on API routes (prevent abuse)
-- [ ] Soft caps on review requests (500/mo Starter, 1500/mo Growth, 5000/mo Pro — internal circuit breakers, not customer-facing limits)
-- [ ] Monitoring and alerting (Sentry or similar for error tracking)
-- [ ] Database backups strategy (Supabase handles this but verify)
-- [ ] Performance optimization: review generation response time
-- [ ] Accessibility audit on consumer flow (WCAG compliance)
-- [ ] Unit tests for critical paths (review generation, billing, auth)
+- [ ] Public webhook / Zapier-style setup documented cleanly
+- [ ] First CRM integration based on actual customer demand
+  - ServiceTitan
+  - Jobber
+  - Housecall Pro
+  - not all at once
+
+- [ ] Better automatic review-request triggers from completed jobs
+- [ ] CRM-triggered send flow uses the same billing and eligibility rules as manual sends
 
 ---
 
-## Key Metrics to Track
+### 4. Commercial and Pricing Expansion
 
-| Metric | What It Tells Us | Target |
-|--------|-----------------|--------|
-| Funnel completion rate | % of customers who finish the flow | >60% |
-| Paste-through rate | % who actually paste to Google | >40% |
-| Average review word count | Are we solving the blank box problem | >50 words |
-| Review voice diversity | Are the 15 voices producing varied output | No two identical |
-| Trial to paid conversion | Is the product sticky enough | >25% |
-| Monthly churn rate | Are businesses staying | <5% |
-| Average revenue per customer | Are we priced right | >$70/mo |
-| Customer acquisition cost | How much to get a new customer | <$100 |
-| Net Promoter Score | Would they recommend us | >50 |
-| Time to first review | How fast does a new customer see value | <24 hours |
+- [ ] Validate whether Growth / Pro tier changes are actually needed
+- [ ] Consider annual pricing only after churn and retention are understood
+- [ ] Revisit multi-location pricing only after single-location value is proven
 
 ---
 
-## The North Star
+## Later — Only If Customers Clearly Pull It Out Of Us
 
-Every competitor in this space sends customers to a blank text box and says "good luck." We are the only product that turns that blank box into a guided, 30-second experience that produces genuine, detailed, varied reviews.
+These are real possibilities, but not now.
 
-The business isn't "we auto-submit to Google." The business is "we turn a 5-minute writing task into a 30-second tapping task." That's worth $79-149/month to any business that depends on Google reviews for customers.
+### Bigger platform expansion
 
-The company that owns the writing step owns the review market.
+- [ ] Multi-location support
+- [ ] Agency / white-label program
+- [ ] Multi-platform review support beyond Google
+- [ ] Dedicated Pro / multi-location pricing
 
-We own the writing step.
+### Growth loops
+
+- [ ] Referral nudge improvements
+- [ ] Full referral program
+- [ ] Loyalty / rewards
+
+### Infrastructure moat
+
+- [ ] Public API
+- [ ] Industry-specific voice packs
+- [ ] Review intelligence / benchmarking
+- [ ] Industry-specific tuning and insights
+- [ ] Expanded voice system beyond current set
+
+These only matter after single-location owner workflow is excellent.
 
 ---
 
-*This roadmap is a living document. Update it as we learn from real customers and real data. Every feature decision after Phase 1 should be validated by customer demand, not speculation.*
+## Not Important Right Now
+
+These are the easiest places to waste time.
+
+- Do **not** build an in-app owner/customer messaging thread yet
+- Do **not** turn small Talk into a generic all-in-one reputation platform
+- Do **not** overbuild multi-location before single-location usage is strong
+- Do **not** chase agency features before direct customer value is proven
+- Do **not** overbuild analytics before enough real volume exists
+- Do **not** expand hard into Yelp/Angi/etc. before Google is fully nailed
+
+---
+
+## Definition of "Launch Ready"
+
+We are ready to lean harder into launch when these are true:
+
+- [ ] Owner dashboard works cleanly on mobile
+- [ ] Private feedback is easy for owners to review and act on
+- [ ] Personalized and generic send flows both feel usable
+- [ ] Twilio path is approved or the manual send fallback is excellent
+- [ ] AI provider failover exists
+- [ ] Founder admin dashboard can surface operational issues quickly
+- [ ] 1-3 real businesses are actively using the product
+
+---
+
+## Owner Dashboard V2 — Specific Build Scope
+
+This is the concrete scope for the next major product build.
+
+- [ ] **Mobile home cleanup**
+  - reduce crowded row layouts
+  - make one primary status visually dominant
+  - move secondary actions into expandable detail or dedicated screens
+
+- [ ] **Private feedback inbox**
+  - New
+  - Handled
+  - tap to open full detail
+  - call/email actions
+  - internal owner notes
+
+- [ ] **Request detail view**
+  - customer info
+  - service
+  - employee
+  - reminders sent
+  - funnel status
+  - generated review
+  - private feedback/public follow-up relationship
+
+- [ ] **Replies area**
+  - unreplied public reviews
+  - AI draft reply
+  - copy
+  - mark replied
+
+- [ ] **Settings cleanup**
+  - reminders
+  - timezone
+  - business info
+  - review destinations
+
+- [ ] **Bottom nav re-evaluation for mobile**
+  - current nav should reflect most-used owner actions, not just placeholder sections
+
+---
+
+## Why The Priorities Changed
+
+The old roadmap leaned too far toward feature breadth.
+
+What matters most right now is:
+1. mobile owner usability
+2. operational follow-through after feedback comes in
+3. reliability when a provider or delivery service fails
+4. founder visibility into the whole system
+
+That is how small Talk becomes a dependable business tool instead of just a clever review demo.
 
 ---
 
 ## The Vision
 
-Phase 1: We're the best review writing tool.
-Phase 2: We're the best review writing tool with automation and intelligence.
-Phase 3: We're the engine that agencies use to manage reviews at scale.
-Phase 4: We're the infrastructure that the entire review industry runs on.
+Phase 1: We become the best way to turn real customer experiences into better-written Google reviews.
 
-Every phase builds on the last. Every feature compounds. The company that owns the writing step owns the review market. Then it owns the review infrastructure. Then it's the Stripe of reviews.
+Phase 2: We become the best way for local service businesses to capture reviews **and** handle unhappy customers quickly.
 
----
+Phase 3: We become the operating layer that helps owners, teams, and eventually agencies run review workflow without chaos.
+
+The company that owns the writing step can eventually own much more.
+But first, we need to own the customer flow, the owner workflow, and the operational reliability around both.

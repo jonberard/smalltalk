@@ -235,7 +235,7 @@ export async function sendOwnerNotification({
   }
 
   const dashboardUrl = isPrivate && sessionId
-    ? `${getAppBaseUrl()}/dashboard?feedback=${encodeURIComponent(sessionId)}`
+    ? `${getAppBaseUrl()}/dashboard/inbox?feedback=${encodeURIComponent(sessionId)}`
     : `${getAppBaseUrl()}/dashboard`;
   const resend = new Resend(apiKey);
   const subject = isPrivate
