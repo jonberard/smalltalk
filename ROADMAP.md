@@ -182,6 +182,8 @@ The customer flow is getting strong. The owner experience is the biggest remaini
   - plain-English explanation of private feedback and reminders
   - direct founder message form from inside the dashboard
   - Still to do:
+    - turn it into a real owner help center, not just a support page
+    - add workflow-first help home and article pages
     - land messages in the founder admin inbox, not just email
     - add richer FAQs based on real owner confusion
     - consider attaching screenshots or screen recordings later

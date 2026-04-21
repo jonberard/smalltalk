@@ -126,8 +126,8 @@ export default function MorePage() {
             />
             <ShortcutCard
               href="/dashboard/support"
-              title="Support"
-              description="See how the product works, what statuses mean, and message the founder directly with questions or suggestions."
+              title="Help Center"
+              description="Learn how the product works, what statuses mean, and message the founder directly if you still get stuck."
             />
           </div>
 
