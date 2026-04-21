@@ -182,6 +182,7 @@ The customer flow is getting strong. The owner experience is the biggest remaini
   - plain-English explanation of private feedback and reminders
   - direct founder message form from inside the dashboard
   - Still to do:
+    - land messages in the founder admin inbox, not just email
     - add richer FAQs based on real owner confusion
     - consider attaching screenshots or screen recordings later
 
@@ -213,6 +214,8 @@ small Talk depends on AI generation. That means provider resilience is a launch 
   - default mode
   - forced provider mode
   - emergency provider override
+  - system-tab visibility into live provider health and fallback status
+  - quick manual provider switch if Anthropic is degraded or down
 
 - [ ] Provider health logging
   - failures
@@ -294,6 +297,7 @@ This is for running small Talk itself, not for business owners.
 
 - [ ] **Support / Risk queue**
   - make this a first-class screen, not just a card on Home
+  - owner support inbox with unread state and close/review workflow
   - private feedback issues
   - businesses stuck in onboarding
   - businesses with no recent activity

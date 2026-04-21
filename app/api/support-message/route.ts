@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import type { SupportMessageCategory } from "@/lib/types";
 
 const SUPPORT_CATEGORIES = [
   "setup_help",
@@ -11,9 +12,7 @@ const SUPPORT_CATEGORIES = [
   "billing",
 ] as const;
 
-type SupportCategory = (typeof SUPPORT_CATEGORIES)[number];
-
-const CATEGORY_LABELS: Record<SupportCategory, string> = {
+const CATEGORY_LABELS: Record<SupportMessageCategory, string> = {
   setup_help: "Setup help",
   feature_question: "Feature question",
   bug_report: "Bug report",
@@ -29,8 +28,8 @@ function escapeHtml(str: string) {
     .replace(/"/g, "&quot;");
 }
 
-function isSupportCategory(value: string): value is SupportCategory {
-  return SUPPORT_CATEGORIES.includes(value as SupportCategory);
+function isSupportCategory(value: string): value is SupportMessageCategory {
+  return SUPPORT_CATEGORIES.includes(value as SupportMessageCategory);
 }
 
 export async function POST(req: NextRequest) {
@@ -91,18 +90,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
+  const categoryLabel = CATEGORY_LABELS[body.category];
+  const ownerEmail = business.owner_email ?? user.email ?? null;
 
-  if (!apiKey) {
+  const { data: insertedMessage, error: insertError } = await supabaseAdmin
+    .from("support_messages")
+    .insert({
+      business_id: business.id,
+      owner_user_id: user.id,
+      owner_email: ownerEmail,
+      category: body.category,
+      message,
+      status: "new",
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !insertedMessage) {
     return NextResponse.json(
-      { error: "Support email is not configured right now." },
-      { status: 503 },
+      { error: insertError?.message || "Could not save your support message." },
+      { status: 500 },
     );
   }
-
-  const founderEmail = process.env.FOUNDER_SUPPORT_EMAIL || "jon@usesmalltalk.com";
-  const resend = new Resend(apiKey);
-  const categoryLabel = CATEGORY_LABELS[body.category];
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -122,7 +131,7 @@ export async function POST(req: NextRequest) {
             <p style="margin:0 0 8px;font-size:12px;color:#5E7268;text-transform:uppercase;letter-spacing:0.12em;font-weight:600;">Details</p>
             <p style="margin:0;font-size:14px;color:#1A2E25;line-height:1.7;">
               <strong>Business:</strong> ${escapeHtml(business.name)}<br />
-              <strong>Owner email:</strong> ${escapeHtml(business.owner_email ?? user.email ?? "No email on file")}<br />
+              <strong>Owner email:</strong> ${escapeHtml(ownerEmail ?? "No email on file")}<br />
               <strong>Category:</strong> ${escapeHtml(categoryLabel)}
             </p>
           </div>
@@ -136,25 +145,54 @@ export async function POST(req: NextRequest) {
 </body>
 </html>`;
 
-  try {
-    const { error } = await resend.emails.send({
-      from: "small Talk <hello@usesmalltalk.com>",
-      to: founderEmail,
-      replyTo: business.owner_email ?? user.email ?? undefined,
-      subject: `[Owner support] ${business.name} — ${categoryLabel}`,
-      html,
-    });
+  const apiKey = process.env.RESEND_API_KEY;
+  const founderEmail = process.env.FOUNDER_SUPPORT_EMAIL || "jon@usesmalltalk.com";
+  let founderEmailSentAt: string | null = null;
+  let founderEmailError: string | null = null;
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+  if (apiKey) {
+    const resend = new Resend(apiKey);
+
+    try {
+      const { error } = await resend.emails.send({
+        from: "small Talk <hello@usesmalltalk.com>",
+        to: founderEmail,
+        replyTo: ownerEmail ?? undefined,
+        subject: `[Owner support] ${business.name} — ${categoryLabel}`,
+        html,
+      });
+
+      if (error) {
+        founderEmailError = error.message;
+      } else {
+        founderEmailSentAt = new Date().toISOString();
+      }
+    } catch (error) {
+      founderEmailError =
+        error instanceof Error ? error.message : "Failed to send founder email.";
     }
+  } else {
+    founderEmailError = "RESEND_API_KEY is not configured.";
+  }
 
-    return NextResponse.json({ success: true });
+  try {
+    await supabaseAdmin
+      .from("support_messages")
+      .update({
+        founder_email_sent_at: founderEmailSentAt,
+        founder_email_error: founderEmailError,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", insertedMessage.id);
+
+    return NextResponse.json({
+      success: true,
+      emailDelivered: Boolean(founderEmailSentAt),
+    });
   } catch (error) {
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "Failed to send support message.",
+        error: error instanceof Error ? error.message : "Failed to save support state.",
       },
       { status: 500 },
     );

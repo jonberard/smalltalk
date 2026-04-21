@@ -65,7 +65,7 @@ export default function DashboardSupportPage() {
 
       setMessage("");
       setTopic("setup_help");
-      toast("Message sent to Jon.", "success");
+      toast("Message sent. It’s in the founder inbox and email backup.", "success");
     } catch (error) {
       toast(
         error instanceof Error ? error.message : "Could not send your message.",

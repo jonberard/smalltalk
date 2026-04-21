@@ -1,5 +1,9 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import type { AdminBusinessFollowUpStatus } from "@/lib/types";
+import type {
+  AdminBusinessFollowUpStatus,
+  SupportMessageCategory,
+  SupportMessageStatus,
+} from "@/lib/types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const THIRTY_DAYS_AGO = () => new Date(Date.now() - 30 * DAY_MS);
@@ -52,6 +56,7 @@ type RawBusiness = {
   created_at: string;
   review_links?: RawReviewLink[] | null;
   admin_business_notes?: RawAdminBusinessNote[] | RawAdminBusinessNote | null;
+  support_messages?: RawSupportMessage[] | null;
 };
 
 type RawAdminBusinessNote = {
@@ -64,10 +69,23 @@ type RawAdminBusinessNote = {
   updated_at: string;
 };
 
+type RawSupportMessage = {
+  id: string;
+  owner_email: string | null;
+  category: SupportMessageCategory;
+  message: string;
+  status: SupportMessageStatus;
+  founder_email_sent_at: string | null;
+  founder_email_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AdminAttentionReasonKey =
   | "past_due"
   | "onboarding_stuck"
   | "new_private_feedback"
+  | "new_owner_message"
   | "failed_deliveries"
   | "inactive"
   | "reminder_due"
@@ -95,6 +113,8 @@ export type AdminBusinessSummary = {
   publicCopied30d: number;
   publicFlowCompletion30d: number;
   privateFeedbackNewCount: number;
+  newSupportMessagesCount: number;
+  totalSupportMessagesCount: number;
   privateFeedback30d: number;
   failedDeliveries30d: number;
   failedReminders30d: number;
@@ -127,6 +147,7 @@ export type AdminOverviewData = {
     failedDeliveries30d: number;
     remindersDue: number;
     remindersOverdue: number;
+    newSupportMessages: number;
   };
   attention: Array<{
     businessId: string;
@@ -161,6 +182,23 @@ export type AdminOverviewData = {
     reminderUrgency: "upcoming" | "today" | "tomorrow" | "overdue";
     founderNotePreview: string | null;
   }>;
+};
+
+export type AdminSupportMessageSummary = {
+  id: string;
+  businessId: string;
+  businessName: string;
+  ownerEmail: string | null;
+  category: SupportMessageCategory;
+  categoryLabel: string;
+  message: string;
+  status: SupportMessageStatus;
+  createdAt: string;
+  createdLabel: string;
+  updatedLabel: string;
+  founderEmailSent: boolean;
+  founderEmailError: string | null;
+  founderFollowUpStatus: AdminBusinessFollowUpStatus;
 };
 
 export type AdminBusinessDetail = {
@@ -326,6 +364,14 @@ function founderNotePreview(note: string | null) {
   return trimmed.length > 120 ? `${trimmed.slice(0, 117)}...` : trimmed;
 }
 
+const SUPPORT_MESSAGE_CATEGORY_LABELS: Record<SupportMessageCategory, string> = {
+  setup_help: "Setup help",
+  feature_question: "Feature question",
+  bug_report: "Bug report",
+  suggestion: "Suggestion",
+  billing: "Billing",
+};
+
 function getFounderFollowUpReason(
   status: AdminBusinessFollowUpStatus,
 ): AdminAttentionReason | null {
@@ -383,6 +429,17 @@ function getAttentionReasons(summary: Omit<AdminBusinessSummary, "attentionReaso
     });
   }
 
+  if (summary.newSupportMessagesCount > 0) {
+    reasons.push({
+      key: "new_owner_message",
+      label:
+        summary.newSupportMessagesCount === 1
+          ? "1 new owner support message"
+          : `${summary.newSupportMessagesCount} new owner support messages`,
+      tone: "warning",
+    });
+  }
+
   if (summary.failedDeliveries30d > 0) {
     reasons.push({
       key: "failed_deliveries",
@@ -430,6 +487,7 @@ function getAttentionScore(reasons: AdminAttentionReason[]) {
     reminder_due: 90,
     onboarding_stuck: 80,
     new_private_feedback: 70,
+    new_owner_message: 72,
     failed_deliveries: 60,
     inactive: 40,
     founder_follow_up: 75,
@@ -474,6 +532,7 @@ function summarizeBusiness(raw: RawBusiness): AdminBusinessSummary {
   const note = getAdminBusinessNote(raw);
   const reminder = getReminderMeta(note?.reminder_due_at ?? null);
   const sessions = links.flatMap((link) => link.review_sessions ?? []);
+  const supportMessages = raw.support_messages ?? [];
   const publicSessions = sessions.filter((session) => session.feedback_type === "public");
   const privateSessions = sessions.filter((session) => session.feedback_type === "private");
   const deliveries = links.flatMap((link) => link.review_message_deliveries ?? []);
@@ -504,6 +563,10 @@ function summarizeBusiness(raw: RawBusiness): AdminBusinessSummary {
     (session) => session.private_feedback_status === "new",
   ).length;
 
+  const newSupportMessagesCount = supportMessages.filter(
+    (message) => message.status === "new",
+  ).length;
+
   const failedDeliveries30d = deliveries.filter(
     (delivery) =>
       delivery.status === "failed" &&
@@ -521,6 +584,7 @@ function summarizeBusiness(raw: RawBusiness): AdminBusinessSummary {
     ...links.map((link) => link.created_at),
     ...sessions.map((session) => session.updated_at),
     ...deliveries.map((delivery) => delivery.sent_at ?? delivery.created_at),
+    ...supportMessages.map((message) => message.updated_at),
   ]);
 
   const inactiveThreshold = lastActivityAt
@@ -547,6 +611,8 @@ function summarizeBusiness(raw: RawBusiness): AdminBusinessSummary {
     publicFlowCompletion30d:
       publicStarts30d > 0 ? Math.round((publicCopied30d / publicStarts30d) * 100) : 0,
     privateFeedbackNewCount,
+    newSupportMessagesCount,
+    totalSupportMessagesCount: supportMessages.length,
     privateFeedback30d,
     failedDeliveries30d,
     failedReminders30d,
@@ -576,7 +642,7 @@ async function fetchBusinessesRaw(filterBusinessId?: string) {
   let query = supabaseAdmin
     .from("businesses")
     .select(
-      "id, name, owner_email, subscription_status, onboarding_completed, trial_requests_remaining, trial_ends_at, created_at, admin_business_notes(business_id, follow_up_status, note, reminder_due_at, updated_by, created_at, updated_at), review_links(id, customer_name, customer_contact, unique_code, source, is_generic, created_at, review_sessions(id, customer_contact, star_rating, optional_text, status, feedback_type, private_feedback_status, updated_at, created_at), review_message_deliveries(id, channel, kind, status, created_at, sent_at, last_error, to_address))",
+      "id, name, owner_email, subscription_status, onboarding_completed, trial_requests_remaining, trial_ends_at, created_at, admin_business_notes(business_id, follow_up_status, note, reminder_due_at, updated_by, created_at, updated_at), support_messages(id, owner_email, category, message, status, founder_email_sent_at, founder_email_error, created_at, updated_at), review_links(id, customer_name, customer_contact, unique_code, source, is_generic, created_at, review_sessions(id, customer_contact, star_rating, optional_text, status, feedback_type, private_feedback_status, updated_at, created_at), review_message_deliveries(id, channel, kind, status, created_at, sent_at, last_error, to_address))",
     )
     .order("created_at", { ascending: false });
 
@@ -621,6 +687,10 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
     failedDeliveries30d: businesses.reduce((total, business) => total + business.failedDeliveries30d, 0),
     remindersDue: businesses.filter((business) => business.reminderUrgency !== "none").length,
     remindersOverdue: businesses.filter((business) => business.reminderUrgency === "overdue").length,
+    newSupportMessages: businesses.reduce(
+      (total, business) => total + business.newSupportMessagesCount,
+      0,
+    ),
   };
 
   return {
@@ -672,6 +742,93 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
         founderNotePreview: business.founderNotePreview,
       })),
   };
+}
+
+export async function countNewSupportMessages() {
+  const { count, error } = await supabaseAdmin
+    .from("support_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "new");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
+export async function listAdminSupportMessages(): Promise<AdminSupportMessageSummary[]> {
+  const { data, error } = await supabaseAdmin
+    .from("support_messages")
+    .select(
+      "id, business_id, owner_email, category, message, status, founder_email_sent_at, founder_email_error, created_at, updated_at, businesses(name, admin_business_notes(follow_up_status))",
+    )
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  type RawSupportRow = {
+    id: string;
+    business_id: string;
+    owner_email: string | null;
+    category: SupportMessageCategory;
+    message: string;
+    status: SupportMessageStatus;
+    founder_email_sent_at: string | null;
+    founder_email_error: string | null;
+    created_at: string;
+    updated_at: string;
+    businesses:
+      | Array<{
+          name: string;
+          admin_business_notes:
+            | { follow_up_status: AdminBusinessFollowUpStatus }[]
+            | { follow_up_status: AdminBusinessFollowUpStatus }
+            | null;
+        }>
+      | null;
+  };
+
+  const rows = ((data as RawSupportRow[] | null) ?? []).map((row) => {
+    const business = row.businesses?.[0] ?? null;
+    const rawNote = business?.admin_business_notes;
+    const note = Array.isArray(rawNote) ? rawNote[0] : rawNote;
+
+    return {
+      id: row.id,
+      businessId: row.business_id,
+      businessName: business?.name ?? "Unknown business",
+      ownerEmail: row.owner_email,
+      category: row.category,
+      categoryLabel: SUPPORT_MESSAGE_CATEGORY_LABELS[row.category],
+      message: row.message,
+      status: row.status,
+      createdAt: row.created_at,
+      createdLabel: formatRelative(row.created_at),
+      updatedLabel: formatRelative(row.updated_at),
+      founderEmailSent: Boolean(row.founder_email_sent_at),
+      founderEmailError: row.founder_email_error,
+      founderFollowUpStatus: note?.follow_up_status ?? "none",
+    } satisfies AdminSupportMessageSummary;
+  });
+
+  return rows.sort((a, b) => {
+    const statusOrder: Record<SupportMessageStatus, number> = {
+      new: 0,
+      reviewed: 1,
+      closed: 2,
+    };
+
+    const byStatus = statusOrder[a.status] - statusOrder[b.status];
+
+    if (byStatus !== 0) {
+      return byStatus;
+    }
+
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 }
 
 export async function getAdminBusinessDetail(

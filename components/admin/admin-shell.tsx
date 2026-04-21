@@ -107,7 +107,8 @@ function AdminAccessDenied({
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { admin, userEmail, loading, error, refreshAdmin, signOut } = useAdminAccess();
+  const { admin, userEmail, counts, loading, error, refreshAdmin, signOut } =
+    useAdminAccess();
 
   if (loading) {
     return <AdminLoadingState />;
@@ -144,7 +145,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 }`}
               >
                 <span>{item.label}</span>
-                {active && <span className="h-1.5 w-1.5 rounded-full bg-[#E05A3D]" />}
+                <div className="flex items-center gap-2">
+                  {item.href === "/admin/support" && counts.newSupportMessages > 0 && (
+                    <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#E05A3D] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                      {counts.newSupportMessages > 9 ? "9+" : counts.newSupportMessages}
+                    </span>
+                  )}
+                  {active && <span className="h-1.5 w-1.5 rounded-full bg-[#E05A3D]" />}
+                </div>
               </Link>
             );
           })}
@@ -195,13 +203,22 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`rounded-full px-3.5 py-2 text-[12px] font-semibold transition-colors ${
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold transition-colors ${
                     active
                       ? "bg-[#E05A3D] text-white"
                       : "border border-[var(--dash-border)] bg-white text-[var(--dash-muted)]"
                   }`}
                 >
                   {item.label}
+                  {item.href === "/admin/support" && counts.newSupportMessages > 0 && (
+                    <span
+                      className={`inline-flex min-w-4 items-center justify-center rounded-full px-1 py-[1px] text-[10px] font-semibold leading-none ${
+                        active ? "bg-white/20 text-white" : "bg-[#E05A3D] text-white"
+                      }`}
+                    >
+                      {counts.newSupportMessages > 9 ? "9+" : counts.newSupportMessages}
+                    </span>
+                  )}
                 </Link>
               );
             })}

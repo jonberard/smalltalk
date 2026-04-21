@@ -87,6 +87,29 @@ export type AdminBusinessNote = {
   updated_at: string;
 };
 
+export type SupportMessageCategory =
+  | "setup_help"
+  | "feature_question"
+  | "bug_report"
+  | "suggestion"
+  | "billing";
+
+export type SupportMessageStatus = "new" | "reviewed" | "closed";
+
+export type SupportMessage = {
+  id: string;
+  business_id: string;
+  owner_user_id: string | null;
+  owner_email: string | null;
+  category: SupportMessageCategory;
+  message: string;
+  status: SupportMessageStatus;
+  founder_email_sent_at: string | null;
+  founder_email_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // ═══════════════════════════════════════════
 // SERVICES
 // ═══════════════════════════════════════════
