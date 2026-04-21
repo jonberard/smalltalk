@@ -691,7 +691,7 @@ export default function Dashboard() {
               {business?.name ? `, ${business.name}` : ""}
             </h1>
             <p className="mt-2 max-w-[46ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
-              Start with what needs attention, then scan the rest. This version is built to feel calm on a phone instead of cramming every status into one row.
+              Start with what needs your attention, then check private feedback, replies, and recent request activity.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
