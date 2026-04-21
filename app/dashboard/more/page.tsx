@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { StatusPill } from "@/components/dashboard/status-pill";
+import { fetchWithAuth } from "@/lib/supabase";
 
 function ShortcutCard({
   href,
@@ -35,6 +37,37 @@ function ShortcutCard({
 
 export default function MorePage() {
   const { business, signOut } = useAuth();
+  const [isFounderAdmin, setIsFounderAdmin] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkFounderAccess() {
+      try {
+        const res = await fetchWithAuth("/api/admin/me");
+
+        if (!res.ok) {
+          return;
+        }
+
+        const body = (await res.json().catch(() => ({}))) as {
+          admin?: { user_id: string } | null;
+        };
+
+        if (!cancelled && body.admin) {
+          setIsFounderAdmin(true);
+        }
+      } catch {
+        // Founder admin is optional here — fail quietly.
+      }
+    }
+
+    checkFounderAccess();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <main className="min-h-dvh bg-[var(--dash-bg)] sm:pl-[220px]">
@@ -74,6 +107,13 @@ export default function MorePage() {
           </div>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            {isFounderAdmin && (
+              <ShortcutCard
+                href="/admin"
+                title="Founder Admin"
+                description="Open the internal founder dashboard for business health, support issues, and operational visibility."
+              />
+            )}
             <ShortcutCard
               href="/dashboard/settings"
               title="Settings"

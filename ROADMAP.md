@@ -122,24 +122,27 @@ These are the highest-leverage items before pushing harder on acquisition and pa
 
 The customer flow is getting strong. The owner experience is the biggest remaining gap.
 
-- [ ] **Mobile dashboard cleanup**
-  - Fix cramped activity rows on small screens
-  - Move secondary actions out of crowded inline rows
-  - Improve spacing, tap targets, safe-area padding, and status hierarchy
-  - Rework mobile nav around actual daily use
+- [x] **Mobile dashboard cleanup — foundation shipped**
+  - Cramped activity rows were replaced with calmer stacked sections
+  - Secondary actions were moved out of crowded inline rows
+  - Mobile nav now reflects real owner workflows more closely
+  - Still to do:
+    - final spacing/tap-target QA pass
+    - tighten a few remaining desktop modal/button layouts
 
-- [ ] **Private feedback inbox**
+- [x] **Private feedback inbox — foundation shipped**
   - New vs Handled filters
   - Cleaner private feedback cards
   - Clear contact, service, employee, rating, and message display
+  - Still to do:
+    - internal owner notes
+    - richer filtering and bulk triage later if needed
 
 - [ ] **Actionable owner workflow**
-  - Call
-  - Email
-  - Mark handled
-  - Internal note field like "Called customer", "Resolved", or "No response"
+  - [x] Call / Email / Mark handled
+  - [ ] Internal note field like "Called customer", "Resolved", or "No response"
 
-- [ ] **Request detail / timeline view**
+- [x] **Request detail / timeline view — foundation shipped**
   - sent
   - opened
   - started
@@ -148,20 +151,26 @@ The customer flow is getting strong. The owner experience is the biggest remaini
   - handled
   - public review drafted/copied later
   - reply drafted/copied later
+  - Still to do:
+    - deepen linked context between inbox, replies, and send history
+    - keep labels truthful until Google sync exists
 
 - [ ] **Manual send/share tools before full Twilio rollout**
-  - Copy personalized link
-  - Copy ready-to-send SMS text
-  - Copy ready-to-send email text
-  - Copy link again / resend workflow
+  - [x] Copy personalized link
+  - [ ] Copy ready-to-send SMS text
+  - [ ] Copy ready-to-send email text
+  - [ ] Copy link again / resend workflow
 
-- [ ] **Reply center foundation**
+- [x] **Reply center foundation — foundation shipped**
   - unreplied review list
   - draft reply
   - copy reply
   - mark replied
+  - Still to do:
+    - better reply status grouping
+    - richer request linking and follow-through states
 
-- [ ] **Owner dashboard information architecture**
+- [x] **Owner dashboard information architecture — foundation shipped**
   - home overview
   - private feedback inbox
   - request detail view
@@ -230,40 +239,218 @@ If one provider goes down and review generation dies, the product stops being de
 
 This is for running small Talk itself, not for business owners.
 
-- [ ] **Business list**
+- [ ] **Admin shell + navigation**
+  - Desktop-first founder layout
+  - Tabs:
+    - Home
+    - Businesses
+    - Support / Risk
+    - Revenue
+    - AI / System
+  - Warm small Talk visual language, but more utilitarian than the owner dashboard
+
+- [ ] **Founder home — operations first**
+  - Chosen direction from wireframes: **operations-first**, not revenue-first
+  - Lead with `Needs attention now`
+  - businesses past due
+  - onboarding stuck
+  - failed sends / failed reminders
+  - AI/provider failures
+  - support/dispute queue preview
+  - lighter summary metrics below that
+  - keep it calm and actionable, not a vanity dashboard
+
+- [ ] **Businesses list**
   - search
+  - sort by:
+    - needs attention
+    - alphabetical
+    - MRR later, once reliable
   - business status
-  - trial / paid
+  - trial / paid / canceled / past due
   - onboarding complete / stuck
+  - recent activity / inactivity
+  - quick way to open business detail
 
 - [ ] **Business detail page**
-  - send volume
+  - owner contact
+  - subscription / trial state
+  - onboarding state
+  - request volume
   - review volume
-  - recent private feedback
-  - reminder state
-  - owner contact info
+  - private feedback volume
+  - reminder health
+  - recent activity
+  - failed sends / errors
+  - founder notes
 
-- [ ] **Support / dispute queue**
+- [ ] **Support / Risk queue**
+  - make this a first-class screen, not just a card on Home
   - private feedback issues
-  - angry customer edge cases
-  - businesses needing help
-  - support escalations
-  - founder follow-up list
+  - businesses stuck in onboarding
+  - businesses with no recent activity
+  - failed reminder sends
+  - failed message deliveries
+  - angry-customer edge cases
+  - support escalations / founder follow-up list
 
-- [ ] **System health**
-  - failed sends
-  - failed reminders
-  - Resend errors
-  - Twilio errors
-  - AI provider failures
+- [ ] **Revenue tab**
+  - MRR
+  - new MRR
+  - churned MRR
+  - net MRR change
+  - past due count
+  - trial-to-paid conversion
+  - cancellations
+  - restrained trends, not a finance cockpit
+  - revenue is important, but still secondary to operational attention on the founder home screen
+
+- [ ] **AI / System health**
+  - provider usage
+  - provider failures
+  - failover events
+  - delivery failures
+  - estimated AI cost
+  - recent system issues
 
 - [ ] **Founder notes**
   - support notes per business
   - follow-up state
   - quick context before replying
 
+- [ ] **Founder mobile / narrow-screen fallback**
+  - home priority stack
+  - compact businesses list
+  - usable business detail
+  - support queue that stays scannable
+
 Why this is top priority:
 Before you have a team, you need one clean place to handle communication, data, edge cases, and support without digging through raw systems.
+
+#### Founder Admin V1 — Build order
+
+1. Admin shell + navigation
+2. Founder home
+3. Businesses list
+4. Business detail page
+5. Support / Risk queue
+6. Revenue tab
+7. AI / System health tab
+
+#### Founder Admin V1 — Screen-by-screen scope from wireframes
+
+- [ ] **Screen 01 · Founder home**
+  - `Needs attention now` at the top
+  - quick cards for:
+    - active
+    - trialing
+    - past due
+    - canceled
+  - operational alerts below:
+    - onboarding stuck
+    - failed reminder sends
+    - failed message deliveries
+    - AI/provider failures
+  - short previews for:
+    - support / risk queue
+    - newest signups
+    - businesses with no recent activity
+
+- [ ] **Screen 02 · Businesses**
+  - searchable list
+  - urgency-first default sort
+  - status pills:
+    - trial
+    - active
+    - canceled
+    - past due
+  - onboarding state
+  - recent activity / inactivity
+  - quick link into business detail
+
+- [ ] **Screen 03 · Business detail**
+  - business profile summary
+  - owner contact
+  - subscription / trial state
+  - onboarding state
+  - review request volume
+  - private feedback volume
+  - reminder health
+  - failed sends / errors
+  - founder notes
+  - quick links into owner-facing dashboard context when useful
+
+- [ ] **Screen 04 · Support / Risk**
+  - businesses stuck in onboarding
+  - failed reminders
+  - failed deliveries
+  - no recent activity
+  - private-feedback / dispute edge cases
+  - severity grouping so the ugliest issues rise first
+
+- [ ] **Screen 05 · Revenue**
+  - MRR
+  - net MRR change
+  - new MRR
+  - churned MRR
+  - past due count
+  - conversion snapshots
+  - simple trend views only
+
+- [ ] **Screen 06 · AI / System**
+  - provider failures
+  - failover events
+  - delivery failures
+  - estimated AI cost later, once real tracking exists
+  - reliability first, engineering-console noise second
+
+- [ ] **Screen 07 · Narrow-screen fallback**
+  - founder home stays useful on tablet / narrow laptop
+  - support queue remains scannable
+  - business detail does not collapse into a mess
+
+#### Founder Admin V1 — Metrics we can ship truthfully now
+
+- [ ] Active businesses
+- [ ] Trialing businesses
+- [ ] Canceled businesses
+- [ ] Past due businesses
+- [ ] New signups
+- [ ] Onboarding complete / stuck
+- [ ] Businesses with no recent activity
+- [ ] Review requests sent
+- [ ] Completion rate
+- [ ] Private feedback count / rate
+- [ ] Failed sends
+- [ ] Failed reminders
+- [ ] AI/provider failures
+
+These are the numbers we can feel good about putting in front of you early, because they come from states we already own or can query directly without inventing math.
+
+#### Founder Admin V1 — Needs plumbing before it is trustworthy
+
+- [ ] MRR
+- [ ] New MRR
+- [ ] Churned MRR
+- [ ] Net MRR change
+- [ ] Trial-to-paid conversion trend
+- [ ] Reactivated MRR
+- [ ] Past-due dollars at risk
+- [ ] Estimated AI cost
+- [ ] Provider usage by cost and token volume
+
+These are important, but they should not show up in the founder dashboard until the underlying reporting is stable enough that you would trust them when making a decision.
+
+#### Founder Admin V1 — Plumbing required for those metrics
+
+- [ ] Normalize Stripe subscription and revenue snapshots into app-owned reporting tables
+- [ ] Record billing state changes with timestamps so MRR movement is historical, not guessed
+- [ ] Add cancellation / churn reason tracking if we want useful churn analytics later
+- [ ] Persist AI generation provider, model, latency, and estimated token/cost data
+- [ ] Add delivery event summaries that are easy to aggregate by day/business/channel
+- [ ] Decide which metrics live in raw views first vs materialized rollups later
+- [ ] Add a churn / cancellation event model so `net MRR change` and `churned MRR` are based on real deltas, not best guesses
+- [ ] Add a founder-reporting definition doc so terms like `active`, `past due`, `conversion`, and `churned` mean the same thing everywhere
 
 ---
 

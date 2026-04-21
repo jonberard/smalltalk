@@ -57,6 +57,20 @@ export type BusinessInsert = {
 export type BusinessUpdate = Partial<Omit<BusinessInsert, "id">>;
 
 // ═══════════════════════════════════════════
+// ADMIN USERS
+// ═══════════════════════════════════════════
+
+export type AdminRole = "founder" | "operator" | "support";
+
+export type AdminUser = {
+  user_id: string;
+  email: string;
+  role: AdminRole;
+  is_active: boolean;
+  created_at: string;
+};
+
+// ═══════════════════════════════════════════
 // SERVICES
 // ═══════════════════════════════════════════
 

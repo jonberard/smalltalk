@@ -11,6 +11,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
   private_feedback: { bg: "bg-[#EFF6FF]", text: "text-[#2563EB]", label: "Private Feedback" },
   handled: { bg: "bg-[#F3F4F6]", text: "text-[#4B5563]", label: "Handled" },
   trialing: { bg: "bg-[#FFFBEB]", text: "text-[#D97706]", label: "Trialing" },
+  trial: { bg: "bg-[#FFFBEB]", text: "text-[#D97706]", label: "Trialing" },
   in_progress: { bg: "bg-[#FEF2F2]", text: "text-[#E05A3D]", label: "In Progress" },
   past_due: { bg: "bg-[#FEF2F2]", text: "text-[#E05A3D]", label: "Past Due" },
   sent: { bg: "bg-[#F3F4F6]", text: "text-[#6B7280]", label: "Sent" },

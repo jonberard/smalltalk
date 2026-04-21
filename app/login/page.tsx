@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { fetchWithAuth, supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,6 +34,17 @@ export default function LoginPage() {
       }
       setLoading(false);
       return;
+    }
+
+    try {
+      const adminRes = await fetchWithAuth("/api/admin/me");
+
+      if (adminRes.ok) {
+        router.push("/admin");
+        return;
+      }
+    } catch (adminError) {
+      console.error("[login] Could not check founder admin access:", adminError);
     }
 
     router.push("/dashboard");
