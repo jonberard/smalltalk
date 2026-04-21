@@ -6,6 +6,8 @@ import { fetchWithAuth } from "@/lib/supabase";
 import { SkeletonRow } from "@/components/dashboard/skeleton";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { StatusPill } from "@/components/dashboard/status-pill";
+import { FounderFollowUpPill } from "@/components/admin/founder-follow-up-pill";
+import type { AdminBusinessFollowUpStatus } from "@/lib/types";
 
 type AttentionReason = {
   key: string;
@@ -19,6 +21,9 @@ type BusinessSummary = {
   ownerEmail: string | null;
   subscriptionStatus: string;
   lastActivityLabel: string;
+  founderFollowUpStatus: AdminBusinessFollowUpStatus;
+  founderNotePreview: string | null;
+  founderNoteUpdatedLabel: string | null;
   attentionReasons: AttentionReason[];
 };
 
@@ -126,9 +131,20 @@ export default function FounderSupportPage() {
                     <div className="flex flex-wrap items-center gap-2.5">
                       <p className="text-[16px] font-semibold text-[var(--dash-text)]">{business.name}</p>
                       <StatusPill status={business.subscriptionStatus} />
+                      <FounderFollowUpPill status={business.founderFollowUpStatus} />
                     </div>
                     {business.ownerEmail && (
                       <p className="mt-1 text-[13px] text-[var(--dash-muted)]">{business.ownerEmail}</p>
+                    )}
+                    {business.founderNotePreview && (
+                      <p className="mt-2 text-[13px] leading-relaxed text-[var(--dash-text)]">
+                        {business.founderNotePreview}
+                        {business.founderNoteUpdatedLabel && (
+                          <span className="ml-2 text-[12px] text-[var(--dash-muted)]">
+                            Updated {business.founderNoteUpdatedLabel}
+                          </span>
+                        )}
+                      </p>
                     )}
                     <div className="mt-3 flex flex-wrap gap-2">
                       {business.attentionReasons.map((reason) => (

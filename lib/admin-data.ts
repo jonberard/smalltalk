@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import type { AdminBusinessFollowUpStatus } from "@/lib/types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const THIRTY_DAYS_AGO = () => new Date(Date.now() - 30 * DAY_MS);
@@ -50,6 +51,16 @@ type RawBusiness = {
   trial_ends_at: string | null;
   created_at: string;
   review_links?: RawReviewLink[] | null;
+  admin_business_notes?: RawAdminBusinessNote[] | RawAdminBusinessNote | null;
+};
+
+type RawAdminBusinessNote = {
+  business_id: string;
+  follow_up_status: AdminBusinessFollowUpStatus;
+  note: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type AdminAttentionReasonKey =
@@ -57,7 +68,8 @@ export type AdminAttentionReasonKey =
   | "onboarding_stuck"
   | "new_private_feedback"
   | "failed_deliveries"
-  | "inactive";
+  | "inactive"
+  | "founder_follow_up";
 
 export type AdminAttentionReason = {
   key: AdminAttentionReasonKey;
@@ -87,6 +99,10 @@ export type AdminBusinessSummary = {
   inactive: boolean;
   trialRequestsRemaining: number;
   trialEndsAt: string | null;
+  founderFollowUpStatus: AdminBusinessFollowUpStatus;
+  founderNotePreview: string | null;
+  founderNoteUpdatedAt: string | null;
+  founderNoteUpdatedLabel: string | null;
   attentionReasons: AdminAttentionReason[];
   attentionScore: number;
 };
@@ -132,6 +148,12 @@ export type AdminOverviewData = {
 
 export type AdminBusinessDetail = {
   summary: AdminBusinessSummary;
+  founderNote: {
+    followUpStatus: AdminBusinessFollowUpStatus;
+    note: string;
+    updatedAt: string | null;
+    updatedLabel: string | null;
+  };
   recentRequests: Array<{
     reviewLinkId: string;
     customerName: string;
@@ -199,6 +221,58 @@ function maxDate(values: Array<string | null | undefined>) {
   return new Date(Math.max(...timestamps)).toISOString();
 }
 
+function getAdminBusinessNote(raw: RawBusiness) {
+  const note = raw.admin_business_notes;
+
+  if (!note) {
+    return null;
+  }
+
+  return (Array.isArray(note) ? note[0] : note) ?? null;
+}
+
+function trimFounderNote(note: string | null) {
+  const trimmed = note?.trim() ?? "";
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function founderNotePreview(note: string | null) {
+  const trimmed = trimFounderNote(note);
+
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.length > 120 ? `${trimmed.slice(0, 117)}...` : trimmed;
+}
+
+function getFounderFollowUpReason(
+  status: AdminBusinessFollowUpStatus,
+): AdminAttentionReason | null {
+  switch (status) {
+    case "watching":
+      return {
+        key: "founder_follow_up",
+        label: "Founder is watching this account",
+        tone: "info",
+      };
+    case "follow_up":
+      return {
+        key: "founder_follow_up",
+        label: "Founder follow-up in progress",
+        tone: "warning",
+      };
+    case "blocked":
+      return {
+        key: "founder_follow_up",
+        label: "Founder follow-up is blocked",
+        tone: "critical",
+      };
+    default:
+      return null;
+  }
+}
+
 function getAttentionReasons(summary: Omit<AdminBusinessSummary, "attentionReasons" | "attentionScore">) {
   const reasons: AdminAttentionReason[] = [];
 
@@ -248,6 +322,12 @@ function getAttentionReasons(summary: Omit<AdminBusinessSummary, "attentionReaso
     });
   }
 
+  const followUpReason = getFounderFollowUpReason(summary.founderFollowUpStatus);
+
+  if (followUpReason) {
+    reasons.push(followUpReason);
+  }
+
   return reasons;
 }
 
@@ -258,6 +338,7 @@ function getAttentionScore(reasons: AdminAttentionReason[]) {
     new_private_feedback: 70,
     failed_deliveries: 60,
     inactive: 40,
+    founder_follow_up: 75,
   };
 
   return reasons.reduce((total, reason) => total + weight[reason.key], 0);
@@ -296,6 +377,7 @@ function getCurrentStateLabel(link: RawReviewLink) {
 
 function summarizeBusiness(raw: RawBusiness): AdminBusinessSummary {
   const links = raw.review_links ?? [];
+  const note = getAdminBusinessNote(raw);
   const sessions = links.flatMap((link) => link.review_sessions ?? []);
   const publicSessions = sessions.filter((session) => session.feedback_type === "public");
   const privateSessions = sessions.filter((session) => session.feedback_type === "private");
@@ -377,6 +459,10 @@ function summarizeBusiness(raw: RawBusiness): AdminBusinessSummary {
       inactiveThreshold && (raw.subscription_status === "active" || isTrialStatus(raw.subscription_status)),
     trialRequestsRemaining: raw.trial_requests_remaining,
     trialEndsAt: raw.trial_ends_at,
+    founderFollowUpStatus: note?.follow_up_status ?? "none",
+    founderNotePreview: founderNotePreview(note?.note ?? null),
+    founderNoteUpdatedAt: note?.updated_at ?? null,
+    founderNoteUpdatedLabel: note?.updated_at ? formatRelative(note.updated_at) : null,
   };
 
   const attentionReasons = getAttentionReasons(baseSummary);
@@ -392,7 +478,7 @@ async function fetchBusinessesRaw(filterBusinessId?: string) {
   let query = supabaseAdmin
     .from("businesses")
     .select(
-      "id, name, owner_email, subscription_status, onboarding_completed, trial_requests_remaining, trial_ends_at, created_at, review_links(id, customer_name, customer_contact, unique_code, source, is_generic, created_at, review_sessions(id, customer_contact, star_rating, optional_text, status, feedback_type, private_feedback_status, updated_at, created_at), review_message_deliveries(id, channel, kind, status, created_at, sent_at, last_error, to_address))",
+      "id, name, owner_email, subscription_status, onboarding_completed, trial_requests_remaining, trial_ends_at, created_at, admin_business_notes(business_id, follow_up_status, note, updated_by, created_at, updated_at), review_links(id, customer_name, customer_contact, unique_code, source, is_generic, created_at, review_sessions(id, customer_contact, star_rating, optional_text, status, feedback_type, private_feedback_status, updated_at, created_at), review_message_deliveries(id, channel, kind, status, created_at, sent_at, last_error, to_address))",
     )
     .order("created_at", { ascending: false });
 
@@ -485,6 +571,7 @@ export async function getAdminBusinessDetail(
   }
 
   const summary = summarizeBusiness(raw);
+  const note = getAdminBusinessNote(raw);
   const links = raw.review_links ?? [];
   const sessionsByLink = links.flatMap((link) =>
     (link.review_sessions ?? []).map((session) => ({ link, session })),
@@ -536,6 +623,12 @@ export async function getAdminBusinessDetail(
 
   return {
     summary,
+    founderNote: {
+      followUpStatus: note?.follow_up_status ?? "none",
+      note: trimFounderNote(note?.note ?? null) ?? "",
+      updatedAt: note?.updated_at ?? null,
+      updatedLabel: note?.updated_at ? formatRelative(note.updated_at) : null,
+    },
     recentRequests,
     recentPrivateFeedback,
     failedDeliveries,

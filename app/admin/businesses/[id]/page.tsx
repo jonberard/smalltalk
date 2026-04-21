@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { fetchWithAuth } from "@/lib/supabase";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { SkeletonCard } from "@/components/dashboard/skeleton";
 import { StatusPill } from "@/components/dashboard/status-pill";
+import { useToast } from "@/components/dashboard/toast";
+import { FounderFollowUpPill } from "@/components/admin/founder-follow-up-pill";
+import type { AdminBusinessFollowUpStatus } from "@/lib/types";
 
 type AttentionReason = {
   key: string;
@@ -33,6 +36,16 @@ type BusinessDetail = {
     attentionReasons: AttentionReason[];
     trialRequestsRemaining: number;
     trialEndsAt: string | null;
+    founderFollowUpStatus: AdminBusinessFollowUpStatus;
+    founderNotePreview: string | null;
+    founderNoteUpdatedAt: string | null;
+    founderNoteUpdatedLabel: string | null;
+  };
+  founderNote: {
+    followUpStatus: AdminBusinessFollowUpStatus;
+    note: string;
+    updatedAt: string | null;
+    updatedLabel: string | null;
   };
   recentRequests: Array<{
     reviewLinkId: string;
@@ -60,6 +73,17 @@ type BusinessDetail = {
     toAddress: string | null;
   }>;
 };
+
+const FOLLOW_UP_OPTIONS: Array<{
+  value: AdminBusinessFollowUpStatus;
+  label: string;
+}> = [
+  { value: "none", label: "No founder follow-up" },
+  { value: "watching", label: "Watching" },
+  { value: "follow_up", label: "Follow up in progress" },
+  { value: "blocked", label: "Blocked" },
+  { value: "resolved", label: "Resolved" },
+];
 
 function PersonIcon() {
   return (
@@ -91,9 +115,14 @@ function WarningIcon() {
 
 export default function FounderBusinessDetailPage() {
   const params = useParams<{ id: string }>();
+  const { toast } = useToast();
   const [detail, setDetail] = useState<BusinessDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [followUpStatus, setFollowUpStatus] =
+    useState<AdminBusinessFollowUpStatus>("none");
+  const [savingNote, setSavingNote] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,6 +159,15 @@ export default function FounderBusinessDetailPage() {
     };
   }, [params.id]);
 
+  useEffect(() => {
+    if (!detail) {
+      return;
+    }
+
+    setNoteDraft(detail.founderNote.note);
+    setFollowUpStatus(detail.founderNote.followUpStatus);
+  }, [detail]);
+
   if (loading) {
     return (
       <>
@@ -155,6 +193,50 @@ export default function FounderBusinessDetailPage() {
   }
 
   const { summary } = detail;
+  const hasNoteChanges =
+    noteDraft !== detail.founderNote.note ||
+    followUpStatus !== detail.founderNote.followUpStatus;
+  const noteUpdatedCopy = useMemo(() => {
+    if (!detail.founderNote.updatedLabel) {
+      return "Founder notes help you remember context before you step back into a business.";
+    }
+
+    return `Last updated ${detail.founderNote.updatedLabel}.`;
+  }, [detail.founderNote.updatedLabel]);
+
+  async function saveFounderNote() {
+    try {
+      setSavingNote(true);
+      const res = await fetchWithAuth(`/api/admin/businesses/${params.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          note: noteDraft,
+          followUpStatus,
+        }),
+      });
+
+      const body = (await res.json().catch(() => ({}))) as BusinessDetail & {
+        error?: string;
+      };
+
+      if (!res.ok) {
+        throw new Error(body.error || "Could not save founder notes.");
+      }
+
+      setDetail(body);
+      toast("Founder notes saved.", "success");
+    } catch (err) {
+      toast(
+        err instanceof Error ? err.message : "Could not save founder notes.",
+        "error",
+      );
+    } finally {
+      setSavingNote(false);
+    }
+  }
 
   return (
     <>
@@ -183,6 +265,7 @@ export default function FounderBusinessDetailPage() {
         <div className="flex flex-wrap gap-2">
           <StatusPill status={summary.subscriptionStatus} />
           {summary.onboardingStuck && <StatusPill status="in_progress" />}
+          <FounderFollowUpPill status={summary.founderFollowUpStatus} />
         </div>
       </div>
 
@@ -240,6 +323,19 @@ export default function FounderBusinessDetailPage() {
               </div>
             </div>
           )}
+
+          <div className="mt-6 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[#FCFAF6] p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[var(--dash-muted)]">
+                Founder follow-up
+              </p>
+              <FounderFollowUpPill status={summary.founderFollowUpStatus} />
+            </div>
+            <p className="mt-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+              {summary.founderNotePreview ??
+                "No founder note yet. Use notes below to track follow-up, edge cases, or support context."}
+            </p>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -325,6 +421,70 @@ export default function FounderBusinessDetailPage() {
         </div>
 
         <div className="space-y-6">
+          <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+                  Founder notes
+                </p>
+                <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
+                  Keep your support context attached to the business.
+                </h2>
+              </div>
+              <FounderFollowUpPill status={followUpStatus} />
+            </div>
+
+            <div className="mt-4 grid gap-4">
+              <label className="grid gap-2">
+                <span className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[var(--dash-muted)]">
+                  Follow-up state
+                </span>
+                <select
+                  value={followUpStatus}
+                  onChange={(event) =>
+                    setFollowUpStatus(
+                      event.target.value as AdminBusinessFollowUpStatus,
+                    )
+                  }
+                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-2.5 text-[13px] text-[var(--dash-text)] outline-none transition-colors focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
+                >
+                  {FOLLOW_UP_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[var(--dash-muted)]">
+                  Notes
+                </span>
+                <textarea
+                  value={noteDraft}
+                  onChange={(event) => setNoteDraft(event.target.value)}
+                  rows={7}
+                  placeholder="Write what happened, what you promised, or what to check next."
+                  className="min-h-[180px] rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-3 text-[13px] leading-relaxed text-[var(--dash-text)] outline-none transition-colors placeholder:text-[var(--dash-muted)] focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[12px] leading-relaxed text-[var(--dash-muted)]">
+                {noteUpdatedCopy}
+              </p>
+              <button
+                type="button"
+                onClick={() => void saveFounderNote()}
+                disabled={!hasNoteChanges || savingNote}
+                className="inline-flex items-center justify-center rounded-full bg-[var(--dash-primary)] px-4 py-2.5 text-[13px] font-semibold text-white shadow-[0_8px_24px_rgba(224,90,61,0.18)] transition-all hover:brightness-95 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savingNote ? "Saving..." : "Save founder note"}
+              </button>
+            </div>
+          </div>
+
           <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
               Private feedback

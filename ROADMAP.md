@@ -313,10 +313,10 @@ This is for running small Talk itself, not for business owners.
   - estimated AI cost
   - recent system issues
 
-- [ ] **Founder notes**
-  - support notes per business
-  - follow-up state
-  - quick context before replying
+- [x] **Founder notes**
+  - [x] support notes per business
+  - [x] follow-up state
+  - [x] quick context before replying
 
 - [ ] **Founder mobile / narrow-screen fallback**
   - home priority stack
@@ -377,7 +377,7 @@ Before you have a team, you need one clean place to handle communication, data, 
   - private feedback volume
   - reminder health
   - failed sends / errors
-  - founder notes
+  - [x] founder notes
   - quick links into owner-facing dashboard context when useful
 
 - [ ] **Screen 04 · Support / Risk**

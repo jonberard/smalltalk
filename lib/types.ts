@@ -70,6 +70,22 @@ export type AdminUser = {
   created_at: string;
 };
 
+export type AdminBusinessFollowUpStatus =
+  | "none"
+  | "watching"
+  | "follow_up"
+  | "blocked"
+  | "resolved";
+
+export type AdminBusinessNote = {
+  business_id: string;
+  follow_up_status: AdminBusinessFollowUpStatus;
+  note: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // ═══════════════════════════════════════════
 // SERVICES
 // ═══════════════════════════════════════════
