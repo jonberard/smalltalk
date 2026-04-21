@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { fetchWithAuth } from "@/lib/supabase";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -196,13 +196,9 @@ export default function FounderBusinessDetailPage() {
   const hasNoteChanges =
     noteDraft !== detail.founderNote.note ||
     followUpStatus !== detail.founderNote.followUpStatus;
-  const noteUpdatedCopy = useMemo(() => {
-    if (!detail.founderNote.updatedLabel) {
-      return "Founder notes help you remember context before you step back into a business.";
-    }
-
-    return `Last updated ${detail.founderNote.updatedLabel}.`;
-  }, [detail.founderNote.updatedLabel]);
+  const noteUpdatedCopy = !detail.founderNote.updatedLabel
+    ? "Founder notes help you remember context before you step back into a business."
+    : `Last updated ${detail.founderNote.updatedLabel}.`;
 
   async function saveFounderNote() {
     try {
