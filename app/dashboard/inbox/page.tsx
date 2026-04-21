@@ -266,7 +266,7 @@ export default function InboxPage() {
                     </div>
                   </div>
                   <span className="shrink-0 rounded-full bg-[#E05A3D]/10 px-3 py-1 text-[11px] font-semibold text-[#E05A3D]">
-                    View
+                    View feedback
                   </span>
                 </div>
               </button>
@@ -376,11 +376,11 @@ export default function InboxPage() {
               </div>
             ) : null}
 
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-5 border-t border-[var(--dash-border)] pt-4">
               <p className="max-w-[34ch] text-[12px] leading-relaxed text-[var(--dash-muted)]">
                 Follow up in your normal channel, then mark this handled so your inbox stays clean.
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap justify-end gap-2">
                 <Link
                   href={`/dashboard/requests/${selected.reviewLinkId}`}
                   className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"

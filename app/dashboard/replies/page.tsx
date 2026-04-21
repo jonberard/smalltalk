@@ -390,34 +390,33 @@ export default function RepliesPage() {
               />
             )}
 
-            <div className="mt-4 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => generateReplyForItem(selected)}
-                disabled={replyLoading}
-                className="text-[12px] font-medium text-[var(--dash-muted)] underline underline-offset-2 hover:no-underline disabled:opacity-50"
-              >
-                {selected.replyText ? "Regenerate" : "Generate"}
-              </button>
-              <button
-                type="button"
-                onClick={copyReplyAndMark}
-                disabled={replyLoading || !replyText}
-                className={`rounded-[var(--dash-radius-sm)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all active:scale-[0.97] disabled:opacity-50 ${
-                  replyCopied ? "bg-[#059669]" : "bg-[var(--dash-primary)] hover:brightness-95"
-                }`}
-              >
-                {replyCopied ? "Copied" : "Copy reply"}
-              </button>
-            </div>
-
-            <div className="mt-3 flex justify-end">
-              <Link
-                href={`/dashboard/requests/${selected.reviewLinkId}`}
-                className="text-[12px] font-semibold text-[var(--dash-primary)] underline underline-offset-2 hover:no-underline"
-              >
-                Open request detail
-              </Link>
+            <div className="mt-4 border-t border-[var(--dash-border)] pt-4">
+              <div className="flex flex-wrap justify-end gap-2">
+                <Link
+                  href={`/dashboard/requests/${selected.reviewLinkId}`}
+                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                >
+                  Open request
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => generateReplyForItem(selected)}
+                  disabled={replyLoading}
+                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)] disabled:opacity-50"
+                >
+                  {selected.replyText ? "Regenerate" : "Generate"}
+                </button>
+                <button
+                  type="button"
+                  onClick={copyReplyAndMark}
+                  disabled={replyLoading || !replyText}
+                  className={`rounded-[var(--dash-radius-sm)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all active:scale-[0.97] disabled:opacity-50 ${
+                    replyCopied ? "bg-[#059669]" : "bg-[var(--dash-primary)] hover:brightness-95"
+                  }`}
+                >
+                  {replyCopied ? "Copied" : "Copy reply"}
+                </button>
+              </div>
             </div>
 
             {!replyCopied && !replyLoading ? (

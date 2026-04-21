@@ -852,10 +852,9 @@ export default function SendPage() {
           ) : (
             <div className="overflow-hidden rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)]">
               {recentLinks.map((link, i) => (
-                <Link
+                <div
                   key={link.id}
-                  href={`/dashboard/requests/${link.id}`}
-                  className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--dash-bg)] ${i < recentLinks.length - 1 ? "border-b border-[var(--dash-border)]" : ""}`}
+                  className={`flex items-center gap-3 px-4 py-3 ${i < recentLinks.length - 1 ? "border-b border-[var(--dash-border)]" : ""}`}
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-medium text-[var(--dash-text)]">{link.customer_name}</p>
@@ -874,9 +873,15 @@ export default function SendPage() {
                       </span>
                     )}
                     <StatusPill status={link.status} />
+                    <Link
+                      href={`/dashboard/requests/${link.id}`}
+                      className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-3 py-1.5 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                    >
+                      Open request
+                    </Link>
                   </div>
                   <span className="shrink-0 text-[11px] text-[var(--dash-muted)]">{timeAgo(link.created_at)}</span>
-                </Link>
+                </div>
               ))}
             </div>
           )}
