@@ -930,7 +930,7 @@ function ReviewRequestMessagingSection({
               value={smsTemplate}
               onChange={(event) => setSmsTemplate(event.target.value)}
               rows={4}
-              placeholder="Hi {{customer_name}} - thanks again for choosing {{business_name}}. If you have a minute, we'd love your feedback."
+              placeholder="Hi {{customer_name}} - {{business_name}} here. Mind leaving us a quick review? No typing - just tap through a few questions: {{review_link}}"
               className="w-full resize-none rounded-[10px] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-3 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-colors focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
             />
             <p className="mt-2 text-[12px] leading-relaxed text-[var(--dash-muted)]">

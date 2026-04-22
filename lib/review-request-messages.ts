@@ -92,7 +92,7 @@ export function buildInitialSmsMessage({
   const rendered =
     normalizeTemplate(smsTemplate)
       ? renderReviewRequestTemplate(smsTemplate!, context)
-      : `Hi ${customerName} - ${businessName} would love your feedback. Share how we did: ${reviewLinkUrl}`;
+      : `Hi ${customerName} - ${businessName} here. Mind leaving us a quick review? No typing - just tap through a few questions: ${reviewLinkUrl}`;
 
   return toGsmSafeText(ensureStopLanguage(ensureReviewLink(rendered, reviewLinkUrl)));
 }
