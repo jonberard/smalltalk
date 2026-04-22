@@ -67,6 +67,105 @@ function RatingBadge({ rating }: { rating: number }) {
   );
 }
 
+function ReplyStateBadge({ replied }: { replied: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+        replied ? "bg-[#ECFDF5] text-[#059669]" : "bg-[#FFF7ED] text-[#B45309]"
+      }`}
+    >
+      {replied ? "Replied" : "Needs reply"}
+    </span>
+  );
+}
+
+function RepliesMetricCard({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+  tone: "amber" | "green" | "red";
+}) {
+  const toneClasses =
+    tone === "green"
+      ? "bg-[#ECFDF5] text-[#059669]"
+      : tone === "red"
+        ? "bg-[#FEF2F2] text-[#DC2626]"
+        : "bg-[#FFF7ED] text-[#B45309]";
+
+  return (
+    <div className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+            {label}
+          </p>
+          <p className="mt-2 text-[28px] font-semibold tracking-tight text-[var(--dash-text)]">
+            {value}
+          </p>
+        </div>
+        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${toneClasses}`}>
+          {label}
+        </span>
+      </div>
+      <p className="mt-2 text-[12px] leading-relaxed text-[var(--dash-muted)]">{detail}</p>
+    </div>
+  );
+}
+
+function RepliesGuideCard() {
+  return (
+    <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+        Reply Rhythm
+      </p>
+      <h2 className="mt-2 text-[22px] font-semibold leading-tight text-[var(--dash-text)]">
+        Draft fast, paste manually, keep it human.
+      </h2>
+      <div className="mt-4 space-y-3">
+        {[
+          "Open the copied review and generate a response that sounds like the owner.",
+          "Copy the text, then paste it on Google yourself so the product stays truthful about what happened.",
+          "Use lower-star reviews to show accountability, not defensiveness.",
+        ].map((step, index) => (
+          <div
+            key={step}
+            className="flex gap-3 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3"
+          >
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#E05A3D]/10 text-[12px] font-semibold text-[var(--dash-primary)]">
+              {index + 1}
+            </span>
+            <p className="text-[13px] leading-relaxed text-[var(--dash-text)]">{step}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 rounded-[var(--dash-radius-sm)] border border-dashed border-[var(--dash-border)] bg-[var(--dash-bg)] px-4 py-3">
+        <p className="text-[12px] leading-relaxed text-[var(--dash-muted)]">
+          <span className="font-semibold text-[var(--dash-text)]">Copied</span> means the customer reached the Google handoff. It still does not confirm the review was posted, so this queue is best for public reviews we know they drafted and copied.
+        </p>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link
+          href="/dashboard/more/review-flow/voice"
+          className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-4 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+        >
+          Adjust reply voice
+        </Link>
+        <Link
+          href="/dashboard/support/what-copied-means"
+          className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-4 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+        >
+          Review copied status
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function RepliesPage() {
   const { business } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -208,119 +307,196 @@ export default function RepliesPage() {
 
   const needsReplyCount = items.filter((item) => !item.repliedAt).length;
   const repliedCount = items.filter((item) => !!item.repliedAt).length;
+  const lowRatingCount = items.filter((item) => (item.stars ?? 5) <= 3).length;
 
   return (
     <main className="min-h-dvh bg-[var(--dash-bg)] sm:pl-[220px]">
       <div className="dash-page-enter mx-auto max-w-[960px] px-5 pb-32 pt-8 sm:pb-16">
-        <div className="mb-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
-            Replies
-          </p>
-          <h1 className="mt-2 text-balance font-heading text-[28px] font-semibold leading-[1.05] text-[var(--dash-text)]">
-            Stay on top of every public review
-          </h1>
-          <p className="mt-2 max-w-[50ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
-            Keep this simple: draft, copy, paste on Google, then mark it done. We should never imply we posted the reply for them.
-          </p>
-        </div>
-
-        <div className="mb-5 flex gap-2 rounded-full bg-[#EFEAE2] p-1">
-          {[
-            { key: "needs_reply" as const, label: "Needs reply", count: needsReplyCount },
-            { key: "replied" as const, label: "Replied", count: repliedCount },
-          ].map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => setFilter(option.key)}
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold transition-all ${
-                filter === option.key
-                  ? "bg-white text-[var(--dash-text)] shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
-                  : "text-[var(--dash-muted)]"
-              }`}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+              Replies
+            </p>
+            <h1 className="mt-2 text-balance font-heading text-[30px] font-semibold leading-[1.02] tracking-tight text-[var(--dash-text)] sm:text-[34px]">
+              Keep public replies timely, calm, and worth reading.
+            </h1>
+            <p className="mt-2 max-w-[52ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
+              Draft fast, paste on Google yourself, and keep the response tone aligned with how you want the business to show up.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link
+              href="/dashboard/support"
+              className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-5 py-3 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
             >
-              {option.label}
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] ${
-                  filter === option.key
-                    ? "bg-[#F4EFE8] text-[var(--dash-text)]"
-                    : "bg-white/70 text-[var(--dash-muted)]"
-                }`}
-              >
-                {option.count}
-              </span>
-            </button>
-          ))}
+              Help Center
+            </Link>
+            <Link
+              href="/dashboard/more/review-flow/voice"
+              className="inline-flex items-center justify-center rounded-full bg-[var(--dash-primary)] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_8px_24px_rgba(224,90,61,0.18)] transition-all hover:brightness-95 active:scale-[0.98]"
+            >
+              Reply voice
+            </Link>
+          </div>
         </div>
 
-        <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]">
-          {loading ? (
-            <>
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-            </>
-          ) : filteredItems.length > 0 ? (
-            filteredItems.map((item, index) => (
-              <div
-                key={item.sessionId}
-                className={`px-4 py-4 ${
-                  index < filteredItems.length - 1 ? "border-b border-[var(--dash-border)]" : ""
-                }`}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-[14px] font-semibold text-[var(--dash-text)]">{item.name}</p>
-                      <StatusPill status={item.repliedAt ? "handled" : "copied"} />
-                      {item.stars ? <RatingBadge rating={item.stars} /> : null}
-                    </div>
-                    <p className="mt-2 line-clamp-3 text-[13px] leading-relaxed text-[var(--dash-muted)]">
-                      {item.snippet || "Star-only review — no text was included."}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[var(--dash-muted)]">
-                      {item.serviceType ? <span>{item.serviceType}</span> : null}
-                      {item.employeeName ? <span>{item.employeeName}</span> : null}
-                      <span>{item.time}</span>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 gap-2">
-                    <Link
-                      href={`/dashboard/requests/${item.reviewLinkId}`}
-                      className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
-                    >
-                      Open request
-                    </Link>
+        {loading ? (
+          <div className="mb-6 grid gap-4 sm:grid-cols-3">
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+          </div>
+        ) : (
+          <div className="mb-6 grid gap-4 sm:grid-cols-3">
+            <RepliesMetricCard
+              label="Needs Reply"
+              value={needsReplyCount}
+              detail={
+                needsReplyCount > 0
+                  ? `${needsReplyCount} public review${needsReplyCount === 1 ? "" : "s"} still needs an owner response.`
+                  : "Nothing is waiting on a reply right now."
+              }
+              tone="amber"
+            />
+            <RepliesMetricCard
+              label="Replied"
+              value={repliedCount}
+              detail={
+                repliedCount > 0
+                  ? `${repliedCount} response${repliedCount === 1 ? "" : "s"} already drafted and copied.`
+                  : "Completed replies will stay here as your clean record."
+              }
+              tone="green"
+            />
+            <RepliesMetricCard
+              label="Lower Star"
+              value={lowRatingCount}
+              detail={
+                lowRatingCount > 0
+                  ? `${lowRatingCount} copied review${lowRatingCount === 1 ? "" : "s"} came in at 3 stars or below and deserves extra care.`
+                  : "No lower-star public reviews are sitting in this queue."
+              }
+              tone="red"
+            />
+          </div>
+        )}
+
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_320px]">
+          <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]">
+            <div className="border-b border-[var(--dash-border)] px-4 py-4 sm:px-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+                    Public Reply Queue
+                  </p>
+                  <p className="mt-1 text-[14px] leading-relaxed text-[var(--dash-muted)]">
+                    These are copied public reviews that still need a thoughtful owner response or a saved record of one.
+                  </p>
+                </div>
+                <div className="flex gap-2 rounded-full bg-[#EFEAE2] p-1">
+                  {[
+                    { key: "needs_reply" as const, label: "Needs reply", count: needsReplyCount },
+                    { key: "replied" as const, label: "Replied", count: repliedCount },
+                  ].map((option) => (
                     <button
+                      key={option.key}
                       type="button"
-                      onClick={() => generateReplyForItem(item)}
-                      className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-primary)] transition-colors hover:bg-[var(--dash-primary)]/5"
+                      onClick={() => setFilter(option.key)}
+                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold transition-all ${
+                        filter === option.key
+                          ? "bg-white text-[var(--dash-text)] shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
+                          : "text-[var(--dash-muted)]"
+                      }`}
                     >
-                      {item.repliedAt ? "View reply" : "Draft reply"}
+                      {option.label}
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] ${
+                          filter === option.key
+                            ? "bg-[#F4EFE8] text-[var(--dash-text)]"
+                            : "bg-white/70 text-[var(--dash-muted)]"
+                        }`}
+                      >
+                        {option.count}
+                      </span>
                     </button>
-                  </div>
+                  ))}
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="p-6">
-              <EmptyState
-                icon={
-                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                    <path d="M8 9h8" />
-                    <path d="M8 13h5" />
-                  </svg>
-                }
-                title={filter === "needs_reply" ? "No reviews waiting on a reply" : "No replied reviews yet"}
-                description={
-                  filter === "needs_reply"
-                    ? "When a customer copies a public review, it will show up here if you haven’t replied yet."
-                    : "Once you draft and copy a reply, it will stay here as a clean record."
-                }
-              />
             </div>
-          )}
+
+            {loading ? (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            ) : filteredItems.length > 0 ? (
+              filteredItems.map((item, index) => (
+                <div
+                  key={item.sessionId}
+                  className={`px-4 py-4 ${
+                    index < filteredItems.length - 1 ? "border-b border-[var(--dash-border)]" : ""
+                  }`}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[14px] font-semibold text-[var(--dash-text)]">{item.name}</p>
+                        <ReplyStateBadge replied={!!item.repliedAt} />
+                        <StatusPill status="copied" />
+                        {item.stars ? <RatingBadge rating={item.stars} /> : null}
+                      </div>
+                      <p className="mt-2 line-clamp-3 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                        {item.snippet || "Star-only review — no text was included."}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[var(--dash-muted)]">
+                        {item.serviceType ? <span>{item.serviceType}</span> : null}
+                        {item.employeeName ? <span>{item.employeeName}</span> : null}
+                        <span>{item.time}</span>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Link
+                        href={`/dashboard/requests/${item.reviewLinkId}`}
+                        className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                      >
+                        Open request
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => generateReplyForItem(item)}
+                        className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-primary)] transition-colors hover:bg-[var(--dash-primary)]/5"
+                      >
+                        {item.repliedAt ? "View reply" : "Draft reply"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-6">
+                <EmptyState
+                  icon={
+                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                      <path d="M8 9h8" />
+                      <path d="M8 13h5" />
+                    </svg>
+                  }
+                  title={filter === "needs_reply" ? "No reviews waiting on a reply" : "No replied reviews yet"}
+                  description={
+                    filter === "needs_reply"
+                      ? "When a customer copies a public review, it will show up here if you haven’t replied yet."
+                      : "Once you draft and copy a reply, it will stay here as a clean record."
+                  }
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="lg:pt-0">
+            <RepliesGuideCard />
+          </div>
         </div>
       </div>
 

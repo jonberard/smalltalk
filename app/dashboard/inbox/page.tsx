@@ -59,6 +59,93 @@ function RatingBadge({ rating }: { rating: number }) {
   );
 }
 
+function InboxMetricCard({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+  tone: "blue" | "green" | "amber";
+}) {
+  const toneClasses =
+    tone === "blue"
+      ? "bg-[#EFF6FF] text-[#2563EB]"
+      : tone === "green"
+        ? "bg-[#ECFDF5] text-[#059669]"
+        : "bg-[#FFF7ED] text-[#B45309]";
+
+  return (
+    <div className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+            {label}
+          </p>
+          <p className="mt-2 text-[28px] font-semibold tracking-tight text-[var(--dash-text)]">
+            {value}
+          </p>
+        </div>
+        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${toneClasses}`}>
+          {label}
+        </span>
+      </div>
+      <p className="mt-2 text-[12px] leading-relaxed text-[var(--dash-muted)]">{detail}</p>
+    </div>
+  );
+}
+
+function InboxGuideCard() {
+  return (
+    <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+        What To Do Next
+      </p>
+      <h2 className="mt-2 text-[22px] font-semibold leading-tight text-[var(--dash-text)]">
+        Work the note, then close the loop.
+      </h2>
+      <div className="mt-4 space-y-3">
+        {[
+          "Open the feedback and understand what actually went wrong.",
+          "Reach out in your normal channel if they shared a phone number or email.",
+          "Mark it handled only after the issue is truly addressed.",
+        ].map((step, index) => (
+          <div
+            key={step}
+            className="flex gap-3 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3"
+          >
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#E05A3D]/10 text-[12px] font-semibold text-[var(--dash-primary)]">
+              {index + 1}
+            </span>
+            <p className="text-[13px] leading-relaxed text-[var(--dash-text)]">{step}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 rounded-[var(--dash-radius-sm)] border border-dashed border-[var(--dash-border)] bg-[var(--dash-bg)] px-4 py-3">
+        <p className="text-[12px] leading-relaxed text-[var(--dash-muted)]">
+          QR submissions can be anonymous. If no contact info is shown, use the feedback to coach the team and tighten follow-up rather than chasing the customer.
+        </p>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link
+          href="/dashboard/support"
+          className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-4 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+        >
+          Open Help Center
+        </Link>
+        <Link
+          href="/dashboard/send/qr"
+          className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-4 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+        >
+          Review QR flow
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function InboxPage() {
   const { business } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -183,112 +270,188 @@ export default function InboxPage() {
 
   const newCount = items.filter((item) => item.status === "new").length;
   const handledCount = items.filter((item) => item.status === "handled").length;
+  const contactableCount = items.filter((item) => !!item.customerContact).length;
 
   return (
     <main className="min-h-dvh bg-[var(--dash-bg)] sm:pl-[220px]">
       <div className="dash-page-enter mx-auto max-w-[960px] px-5 pb-32 pt-8 sm:pb-16">
-        <div className="mb-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
-            Inbox
-          </p>
-          <h1 className="mt-2 text-balance font-heading text-[28px] font-semibold leading-[1.05] text-[var(--dash-text)]">
-            Private feedback that needs a human follow-up
-          </h1>
-          <p className="mt-2 max-w-[50ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
-            This is where unhappy customers land. Open a note, reach out in your normal channel, then mark it handled once you’ve dealt with it.
-          </p>
-        </div>
-
-        <div className="mb-5 flex gap-2 rounded-full bg-[#EFEAE2] p-1">
-          {[
-            { key: "new" as const, label: "New", count: newCount },
-            { key: "handled" as const, label: "Handled", count: handledCount },
-          ].map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => setFilter(option.key)}
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold transition-all ${
-                filter === option.key
-                  ? "bg-white text-[var(--dash-text)] shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
-                  : "text-[var(--dash-muted)]"
-              }`}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+              Inbox
+            </p>
+            <h1 className="mt-2 text-balance font-heading text-[30px] font-semibold leading-[1.02] tracking-tight text-[var(--dash-text)] sm:text-[34px]">
+              Hear unhappy customers first, then close the loop cleanly.
+            </h1>
+            <p className="mt-2 max-w-[52ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
+              This is the owner-facing recovery queue. Open a note, follow up in your normal channel, and mark it handled once the issue is actually dealt with.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link
+              href="/dashboard/support"
+              className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-5 py-3 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
             >
-              {option.label}
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] ${
-                  filter === option.key
-                    ? "bg-[#F4EFE8] text-[var(--dash-text)]"
-                    : "bg-white/70 text-[var(--dash-muted)]"
-                }`}
-              >
-                {option.count}
-              </span>
-            </button>
-          ))}
+              Help Center
+            </Link>
+            <Link
+              href="/dashboard/send/jobs"
+              className="inline-flex items-center justify-center rounded-full bg-[var(--dash-primary)] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_8px_24px_rgba(224,90,61,0.18)] transition-all hover:brightness-95 active:scale-[0.98]"
+            >
+              Send request
+            </Link>
+          </div>
         </div>
 
-        <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]">
-          {loading ? (
-            <>
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-            </>
-          ) : filteredItems.length > 0 ? (
-            filteredItems.map((item, index) => (
-              <button
-                key={item.sessionId}
-                type="button"
-                onClick={() => {
-                  setSelected(item);
-                  setActionError("");
-                }}
-                className={`w-full px-4 py-4 text-left transition-colors hover:bg-[#FCFAF6] ${
-                  index < filteredItems.length - 1 ? "border-b border-[var(--dash-border)]" : ""
-                }`}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-[14px] font-semibold text-[var(--dash-text)]">{item.name}</p>
-                      <StatusPill status={item.status === "new" ? "private_feedback" : "handled"} />
-                      {item.stars ? <RatingBadge rating={item.stars} /> : null}
-                    </div>
-                    <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
-                      {item.message}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[var(--dash-muted)]">
-                      {item.serviceType ? <span>{item.serviceType}</span> : null}
-                      {item.employeeName ? <span>{item.employeeName}</span> : null}
-                      {item.customerContact ? <span>{item.customerContact}</span> : null}
-                      <span>{item.time}</span>
-                    </div>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-[#E05A3D]/10 px-3 py-1 text-[11px] font-semibold text-[#E05A3D]">
-                    View feedback
-                  </span>
+        {loading ? (
+          <div className="mb-6 grid gap-4 sm:grid-cols-3">
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+          </div>
+        ) : (
+          <div className="mb-6 grid gap-4 sm:grid-cols-3">
+            <InboxMetricCard
+              label="New"
+              value={newCount}
+              detail={
+                newCount > 0
+                  ? `${newCount} private feedback item${newCount === 1 ? "" : "s"} still needs a human follow-up.`
+                  : "Nothing new is waiting on you right now."
+              }
+              tone="blue"
+            />
+            <InboxMetricCard
+              label="Handled"
+              value={handledCount}
+              detail={
+                handledCount > 0
+                  ? `${handledCount} note${handledCount === 1 ? "" : "s"} already closed out and kept on record.`
+                  : "Handled items will stay here once you mark them complete."
+              }
+              tone="green"
+            />
+            <InboxMetricCard
+              label="Contactable"
+              value={contactableCount}
+              detail={
+                contactableCount > 0
+                  ? `${contactableCount} item${contactableCount === 1 ? "" : "s"} includes a phone or email so you can reach out directly.`
+                  : "QR submissions can be anonymous unless the customer chooses to share contact info."
+              }
+              tone="amber"
+            />
+          </div>
+        )}
+
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_320px]">
+          <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]">
+            <div className="border-b border-[var(--dash-border)] px-4 py-4 sm:px-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+                    Private Feedback Queue
+                  </p>
+                  <p className="mt-1 text-[14px] leading-relaxed text-[var(--dash-muted)]">
+                    Open the note, follow up directly, then keep the record clean once it is resolved.
+                  </p>
                 </div>
-              </button>
-            ))
-          ) : (
-            <div className="p-6">
-              <EmptyState
-                icon={
-                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
-                    <path d="M3 8l7.2 5.4a3 3 0 0 0 3.6 0L21 8" />
-                  </svg>
-                }
-                title={filter === "new" ? "No new private feedback" : "Nothing handled yet"}
-                description={
-                  filter === "new"
-                    ? "When an unhappy customer sends feedback privately, it will show up here first."
-                    : "Handled feedback stays here so you can keep a clean record of what you addressed."
-                }
-              />
+                <div className="flex gap-2 rounded-full bg-[#EFEAE2] p-1">
+                  {[
+                    { key: "new" as const, label: "New", count: newCount },
+                    { key: "handled" as const, label: "Handled", count: handledCount },
+                  ].map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => setFilter(option.key)}
+                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold transition-all ${
+                        filter === option.key
+                          ? "bg-white text-[var(--dash-text)] shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
+                          : "text-[var(--dash-muted)]"
+                      }`}
+                    >
+                      {option.label}
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] ${
+                          filter === option.key
+                            ? "bg-[#F4EFE8] text-[var(--dash-text)]"
+                            : "bg-white/70 text-[var(--dash-muted)]"
+                        }`}
+                      >
+                        {option.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-          )}
+
+            {loading ? (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            ) : filteredItems.length > 0 ? (
+              filteredItems.map((item, index) => (
+                <button
+                  key={item.sessionId}
+                  type="button"
+                  onClick={() => {
+                    setSelected(item);
+                    setActionError("");
+                  }}
+                  className={`w-full px-4 py-4 text-left transition-colors hover:bg-[#FCFAF6] ${
+                    index < filteredItems.length - 1 ? "border-b border-[var(--dash-border)]" : ""
+                  }`}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[14px] font-semibold text-[var(--dash-text)]">{item.name}</p>
+                        <StatusPill status={item.status === "new" ? "private_feedback" : "handled"} />
+                        {item.stars ? <RatingBadge rating={item.stars} /> : null}
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                        {item.message}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[var(--dash-muted)]">
+                        {item.serviceType ? <span>{item.serviceType}</span> : null}
+                        {item.employeeName ? <span>{item.employeeName}</span> : null}
+                        {item.customerContact ? <span>{item.customerContact}</span> : null}
+                        <span>{item.time}</span>
+                      </div>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-[#E05A3D]/10 px-3 py-1 text-[11px] font-semibold text-[#E05A3D]">
+                      View feedback
+                    </span>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="p-6">
+                <EmptyState
+                  icon={
+                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+                      <path d="M3 8l7.2 5.4a3 3 0 0 0 3.6 0L21 8" />
+                    </svg>
+                  }
+                  title={filter === "new" ? "No new private feedback" : "Nothing handled yet"}
+                  description={
+                    filter === "new"
+                      ? "When an unhappy customer sends feedback privately, it will show up here first."
+                      : "Handled feedback stays here so you can keep a clean record of what you addressed."
+                  }
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="lg:pt-0">
+            <InboxGuideCard />
+          </div>
         </div>
       </div>
 
