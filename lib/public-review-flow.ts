@@ -366,6 +366,13 @@ async function createSession(
   return data as SessionRow;
 }
 
+function isCookieBoundToSession(
+  cookie: PublicFlowSessionCookie,
+  session: SessionRow | null,
+) {
+  return !!session && !!session.device_token && session.device_token === cookie.deviceToken;
+}
+
 function buildBootstrapPayload(
   reviewLink: ReviewLinkContext,
   topics: Record<"positive" | "neutral" | "negative", PublicTopicDef[]>,
@@ -495,28 +502,30 @@ export async function bootstrapPublicReviewFlow(
 
   if (existingCookie) {
     const session = await loadSession(existingCookie.sessionId);
+    const cookieMatchesSession = isCookieBoundToSession(existingCookie, session);
+    const trustedSession = cookieMatchesSession ? session : null;
 
     const shouldStartFreshGenericSession =
-      !!session &&
-      session.review_link_id === reviewLink.id &&
+      !!trustedSession &&
+      trustedSession.review_link_id === reviewLink.id &&
       reviewLink.is_generic &&
-      isCompletedSession(session);
+      isCompletedSession(trustedSession);
 
     if (
-      session &&
-      session.review_link_id === reviewLink.id &&
+      trustedSession &&
+      trustedSession.review_link_id === reviewLink.id &&
       !shouldStartFreshGenericSession
     ) {
       if (
         !reviewLink.is_generic &&
-        isCompletedPrivateFeedbackSession(session)
+        isCompletedPrivateFeedbackSession(trustedSession)
       ) {
         return {
           status: "ok",
           payload: buildPrivateFeedbackRecoursePayload(
             reviewLink,
             topics,
-            session,
+            trustedSession,
           ),
           cookiePayload: null,
         };
@@ -524,7 +533,7 @@ export async function bootstrapPublicReviewFlow(
 
       return {
         status: "ok",
-        payload: buildBootstrapPayload(reviewLink, topics, session, false),
+        payload: buildBootstrapPayload(reviewLink, topics, trustedSession, false),
         cookiePayload: existingCookie,
       };
     }
@@ -602,7 +611,11 @@ export async function requirePublicFlowSession(
 
   const session = await loadSession(cookie.sessionId);
 
-  if (!session || session.review_link_id !== reviewLink.id) {
+  if (
+    !session ||
+    session.review_link_id !== reviewLink.id ||
+    !isCookieBoundToSession(cookie, session)
+  ) {
     return { error: "unauthorized" as const };
   }
 
@@ -652,6 +665,10 @@ export async function startPublicFollowupSession(
   const cookieSession = existingCookie
     ? await loadSession(existingCookie.sessionId)
     : null;
+  const trustedCookieSession =
+    existingCookie && isCookieBoundToSession(existingCookie, cookieSession)
+      ? cookieSession
+      : null;
 
   const requestedSourceSession =
     sourceSessionId && sourceSessionId.trim().length > 0
@@ -663,10 +680,10 @@ export async function startPublicFollowupSession(
     requestedSourceSession.review_link_id === reviewLink.id &&
     isCompletedPrivateFeedbackSession(requestedSourceSession)
       ? requestedSourceSession
-      : cookieSession &&
-          cookieSession.review_link_id === reviewLink.id &&
-          isCompletedPrivateFeedbackSession(cookieSession)
-        ? cookieSession
+      : trustedCookieSession &&
+          trustedCookieSession.review_link_id === reviewLink.id &&
+          isCompletedPrivateFeedbackSession(trustedCookieSession)
+        ? trustedCookieSession
         : await loadLatestCompletedPrivateFeedbackSession(reviewLink.id);
 
   if (!sourceSession || sourceSession.review_link_id !== reviewLink.id) {

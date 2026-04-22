@@ -138,3 +138,103 @@ export function SetupInfoStrip({
     </div>
   );
 }
+
+export function SetupTrustBanner({
+  text = "Using recommended defaults - works for most businesses",
+}: {
+  text?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[#FFF8F4] px-4 py-3">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--dash-text)] text-[12px] text-[var(--dash-text)]">
+        ✓
+      </div>
+      <p className="text-[13px] font-medium text-[var(--dash-text)]">{text}</p>
+    </div>
+  );
+}
+
+export function SetupSummarySection({
+  heading,
+  note,
+  children,
+}: {
+  heading?: string;
+  note?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      {heading ? (
+        <p className="mb-2 pl-0.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+          {heading}
+        </p>
+      ) : null}
+      <div className="overflow-hidden rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
+        {children}
+      </div>
+      {note ? (
+        <p className="mt-2 pl-0.5 text-[12px] italic leading-relaxed text-[var(--dash-muted)]">
+          {note}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+export function SetupSummaryRow({
+  label,
+  value,
+  hint,
+  href,
+  actionLabel,
+  accent = false,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  href?: string;
+  actionLabel?: string;
+  accent?: boolean;
+  last?: boolean;
+}) {
+  const content = (
+    <div
+      className={`flex items-start justify-between gap-4 px-4 py-4 transition-colors ${
+        accent ? "bg-[#FFF8F4]" : "bg-white"
+      } ${!last ? "border-b border-[var(--dash-border)]" : ""} ${
+        href ? "group hover:bg-[#FCFAF6]" : ""
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+          {label}
+        </p>
+        <p className="text-[14px] font-medium leading-[1.35] text-[var(--dash-text)]">
+          {value}
+        </p>
+        {hint ? (
+          <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+            {hint}
+          </p>
+        ) : null}
+      </div>
+      {actionLabel ? (
+        <div className="shrink-0 pt-0.5 text-[12px] font-medium text-[var(--dash-muted)] underline decoration-[rgba(94,114,104,0.35)] underline-offset-4 transition-colors group-hover:text-[var(--dash-text)]">
+          {actionLabel}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className="block">
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
+}

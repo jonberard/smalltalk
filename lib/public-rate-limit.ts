@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isIP } from "node:net";
 import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -17,14 +18,54 @@ type ConsumeRateLimitResult = {
   retryAfterSeconds: number;
 };
 
-export function getClientIp(req: NextRequest) {
-  const forwardedFor = req.headers.get("x-forwarded-for");
+function normalizeIpCandidate(value: string) {
+  const trimmed = value.trim();
 
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0].trim();
+  if (!trimmed) {
+    return null;
   }
 
-  return req.headers.get("x-real-ip")?.trim() || "unknown";
+  if (trimmed.startsWith("[")) {
+    const closingIndex = trimmed.indexOf("]");
+    if (closingIndex > 1) {
+      return trimmed.slice(1, closingIndex);
+    }
+  }
+
+  const ipv4WithPort = trimmed.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
+  if (ipv4WithPort) {
+    return ipv4WithPort[1];
+  }
+
+  return trimmed;
+}
+
+function findValidIpInHeader(
+  value: string | null,
+  direction: "first" | "last" = "first",
+) {
+  if (!value) {
+    return null;
+  }
+
+  const candidates = value
+    .split(",")
+    .map(normalizeIpCandidate)
+    .filter((candidate): candidate is string => !!candidate);
+
+  const values = direction === "last" ? [...candidates].reverse() : candidates;
+
+  return values.find((candidate) => isIP(candidate)) ?? null;
+}
+
+export function getClientIp(req: NextRequest) {
+  return (
+    findValidIpInHeader(req.headers.get("x-vercel-forwarded-for")) ||
+    findValidIpInHeader(req.headers.get("cf-connecting-ip")) ||
+    findValidIpInHeader(req.headers.get("x-real-ip")) ||
+    findValidIpInHeader(req.headers.get("x-forwarded-for"), "last") ||
+    "unknown"
+  );
 }
 
 export async function consumePublicRateLimit({

@@ -3,147 +3,212 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { fetchWithAuth } from "@/lib/supabase";
-import { StatusPill } from "@/components/dashboard/status-pill";
-import { SetupCardLink, SetupPageShell } from "@/components/dashboard/setup-shell";
+import { fetchWithAuth, supabase } from "@/lib/supabase";
+import {
+  SetupPageShell,
+  SetupSummaryRow,
+  SetupSummarySection,
+  SetupTrustBanner,
+} from "@/components/dashboard/setup-shell";
 
 export default function MorePage() {
-  const { business, signOut } = useAuth();
+  const { business, session, signOut } = useAuth();
   const [isFounderAdmin, setIsFounderAdmin] = useState(false);
+  const [serviceCount, setServiceCount] = useState<number | null>(null);
+  const [employeeCount, setEmployeeCount] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function checkFounderAccess() {
+    async function loadSetupState() {
       try {
-        const res = await fetchWithAuth("/api/admin/me");
-        if (!res.ok) return;
+        const adminPromise = fetchWithAuth("/api/admin/me");
+        const servicesPromise = business
+          ? supabase
+              .from("services")
+              .select("id", { count: "exact", head: true })
+              .eq("business_id", business.id)
+          : Promise.resolve(null);
+        const employeesPromise = business
+          ? supabase
+              .from("employees")
+              .select("id", { count: "exact", head: true })
+              .eq("business_id", business.id)
+          : Promise.resolve(null);
 
-        const body = (await res.json().catch(() => ({}))) as {
-          admin?: { user_id: string } | null;
-        };
+        const [adminRes, serviceRes, employeeRes] = await Promise.all([
+          adminPromise,
+          servicesPromise,
+          employeesPromise,
+        ]);
 
-        if (!cancelled && body.admin) {
-          setIsFounderAdmin(true);
+        if (adminRes.ok) {
+          const body = (await adminRes.json().catch(() => ({}))) as {
+            admin?: { user_id: string } | null;
+          };
+
+          if (!cancelled && body.admin) {
+            setIsFounderAdmin(true);
+          }
+        }
+
+        if (!cancelled && serviceRes) {
+          setServiceCount(serviceRes.count ?? 0);
+        }
+
+        if (!cancelled && employeeRes) {
+          setEmployeeCount(employeeRes.count ?? 0);
         }
       } catch {
         // Founder access is optional here.
       }
     }
 
-    void checkFounderAccess();
+    void loadSetupState();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [business]);
 
-  const initials = business?.name
-    ? business.name
-        .split(/\s+/)
-        .map((part) => part[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "?";
+  if (!business) return null;
+
+  const serviceAreaCount = business.neighborhoods?.length ?? 0;
+  const teamServicesValue =
+    serviceCount === null || employeeCount === null
+      ? "Loading team and services"
+      : `${employeeCount} ${employeeCount === 1 ? "person" : "people"} · ${serviceCount} ${
+          serviceCount === 1 ? "service" : "services"
+        }`;
+  const teamServicesHint =
+    serviceAreaCount > 0
+      ? `${serviceAreaCount} ${serviceAreaCount === 1 ? "service area" : "service areas"} on file`
+      : "Who you send from and what you offer";
+  const reviewFlowCustomized = Boolean(
+    business.review_request_sms_template ||
+      business.review_request_email_subject_template ||
+      business.review_request_email_intro_template ||
+      business.custom_reply_voice,
+  );
+  const reviewFlowValue = reviewFlowCustomized
+    ? "Some custom edits"
+    : "Using recommended defaults";
+  const planValue =
+    business.subscription_status === "active" || business.subscription_status === "trialing"
+      ? "Active subscription"
+      : business.subscription_status === "trial"
+        ? `Free trial · ${business.trial_requests_remaining} requests left`
+        : business.subscription_status === "past_due"
+          ? "Billing needs attention"
+          : business.subscription_status === "canceled"
+            ? "Canceled"
+            : "No active plan";
 
   return (
     <SetupPageShell
       eyebrow="Setup"
-      title="Keep the business side calm and intentional."
-      description="Daily work lives in Home, Inbox, Send, and Replies. This side is where you shape how small Talk looks, sounds, and runs."
+      title="You're all set up."
+      description="small Talk is running on recommended defaults. Edit anything below - or leave it as is."
       backHref="/dashboard"
       backLabel="Back to dashboard"
-      actions={
-        <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white px-4 py-3 shadow-[var(--dash-shadow)]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#E05A3D] text-[13px] font-bold text-white">
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-[15px] font-semibold text-[var(--dash-text)]">
-                {business?.name ?? "Your business"}
-              </p>
-              <div className="mt-1">
-                <StatusPill status={business?.subscription_status ?? "none"} />
-              </div>
-            </div>
-          </div>
-        </div>
-      }
+      headerTone="detail"
     >
-      <div className="grid gap-5 lg:grid-cols-2">
-        <SetupCardLink
-          href="/dashboard/more/profile"
-          eyebrow="Profile"
-          title="How your business shows up"
-          description="Business name, logo, Google Business Profile, and the details customers already know about you."
-        />
-        <SetupCardLink
-          href="/dashboard/more/team-services"
-          eyebrow="Team & Services"
-          title="Who you send from and what you do"
-          description="Manage services, team members, and the areas you serve so Send stays clean and relevant."
-        />
-        <SetupCardLink
-          href="/dashboard/more/review-flow"
-          eyebrow="Review Flow"
-          title="How the review experience behaves"
-          description="Topics, reminder timing, request message copy, and reply voice all live together here now."
-        />
-        <SetupCardLink
-          href="/dashboard/more/account"
-          eyebrow="Account"
-          title="Plan, billing, and sign-in basics"
-          description="Subscription status, invoices, password changes, and account controls without the old split between Settings and Billing."
-        />
-      </div>
+      <div className="mx-auto max-w-[760px] space-y-6">
+        <SetupTrustBanner />
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr,0.9fr]">
-        <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
-            Support
-          </p>
-          <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
-            Help stays close to setup.
-          </h2>
-          <p className="mt-2 max-w-[42ch] text-[13px] leading-relaxed text-[var(--dash-muted)]">
-            If you&apos;re changing something and want context first, the Help Center and founder contact form are one tap away.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link
-              href="/dashboard/support"
-              className="rounded-[10px] bg-[var(--dash-primary)] px-4 py-2 text-[13px] font-semibold text-white transition-all hover:brightness-95"
-            >
-              Open Help Center
-            </Link>
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="rounded-[10px] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
+        <SetupSummarySection heading="Your business">
+          <SetupSummaryRow
+            href="/dashboard/more/profile"
+            label="Business"
+            value={business.name}
+            hint={`${business.business_city ?? "Location not added yet"} · ${
+              business.logo_url ? "Logo uploaded" : "Logo not added yet"
+            }`}
+          />
+          <SetupSummaryRow
+            href="/dashboard/more/team-services"
+            label="Team & services"
+            value={teamServicesValue}
+            hint={teamServicesHint}
+          />
+          <SetupSummaryRow
+            href="/dashboard/more/profile"
+            label="Google profile"
+            value={business.google_place_id ? "Connected" : "Not connected yet"}
+            hint={
+              business.google_place_id
+                ? "Reviews are pulled in automatically"
+                : "Connect your Google Business Profile"
+            }
+            accent={Boolean(business.google_place_id)}
+            last
+          />
+        </SetupSummarySection>
 
-        <div className="space-y-5">
-          {isFounderAdmin ? (
-            <SetupCardLink
+        <SetupSummarySection
+          heading="How requests work"
+          note="Opens a calmer page with the basics first and optional customization second."
+        >
+          <SetupSummaryRow
+            href="/dashboard/more/review-flow"
+            label="Review flow"
+            value={reviewFlowValue}
+            hint="Message, reminders, topics, and reply voice"
+            last
+          />
+        </SetupSummarySection>
+
+        <SetupSummarySection heading="Account">
+          <SetupSummaryRow
+            href="/dashboard/more/account"
+            label="Plan"
+            value={planValue}
+            hint={
+              business.subscription_status === "trial"
+                ? "Most businesses upgrade only after the trial feels useful"
+                : "Billing, invoices, and plan controls"
+            }
+          />
+          <SetupSummaryRow
+            href="/dashboard/more/account"
+            label="Login"
+            value={session?.user?.email ?? business.owner_email ?? "No login email"}
+            hint="Password, account access, and sign-in basics"
+            last
+          />
+        </SetupSummarySection>
+
+        {isFounderAdmin ? (
+          <SetupSummarySection heading="Internal">
+            <SetupSummaryRow
               href="/admin"
-              eyebrow="Founder Admin"
-              title="Internal operations view"
-              description="Jump into the founder dashboard for support, business health, and system controls."
+              label="Founder admin"
+              value="Internal operations view"
+              hint="Support, business health, and system controls"
+              last
             />
-          ) : null}
-          <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
-              Why this changed
-            </p>
-            <p className="mt-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
-              Setup is now split by job instead of piling everything into one long Settings page. That means less hunting, fewer mixed mental models, and cleaner daily use.
-            </p>
-          </div>
+          </SetupSummarySection>
+        ) : null}
+
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-2 pb-4 text-[13px] text-[var(--dash-muted)]">
+          <Link href="/dashboard/support" className="transition-colors hover:text-[var(--dash-text)]">
+            Help Center
+          </Link>
+          <span aria-hidden="true">·</span>
+          <a
+            href="mailto:hello@usesmalltalk.com"
+            className="transition-colors hover:text-[var(--dash-text)]"
+          >
+            Contact us
+          </a>
+          <span aria-hidden="true">·</span>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="transition-colors hover:text-[var(--dash-text)]"
+          >
+            Sign out
+          </button>
         </div>
       </div>
     </SetupPageShell>

@@ -9,7 +9,12 @@ import {
   DeleteAccountDialog,
   IntegrationsSection,
 } from "@/components/dashboard/setup-sections";
-import { SetupPageShell } from "@/components/dashboard/setup-shell";
+import {
+  SetupPageShell,
+  SetupSummaryRow,
+  SetupSummarySection,
+  SetupTrustBanner,
+} from "@/components/dashboard/setup-shell";
 
 export default function AccountSetupPage() {
   const { business, session, signOut } = useAuth();
@@ -17,24 +22,72 @@ export default function AccountSetupPage() {
 
   if (!business) return null;
 
+  const status = business.subscription_status ?? "none";
+  const planValue =
+    status === "active"
+      ? "small Talk Pro is active."
+      : status === "trial" || status === "trialing"
+        ? "You are on the free trial."
+        : status === "past_due"
+          ? "Payment needs attention."
+          : status === "canceled"
+            ? "Subscription is canceled."
+            : "No paid plan is active yet.";
+  const planHint =
+    business.stripe_customer_id
+      ? "You can manage payment details and invoices in the billing portal."
+      : "Start billing when you're ready. Until then, this just stays informational.";
+
   return (
     <SetupPageShell
       eyebrow="Setup / Account"
-      title="Plan, billing, and sign-in in one place."
-      description="The old split between Settings and Billing is gone here. This page owns subscription controls, invoices, login basics, and account-level cleanup."
+      title="Keep the account side simple."
+      description="This is where billing, login basics, and account cleanup live. Most owners only come here occasionally."
       headerTone="detail"
     >
       <div className="space-y-5">
-        <BillingSummarySection business={business} />
-        <div className="grid gap-5 xl:grid-cols-[1.05fr,0.95fr]">
-          <AccountControlsSection
-            session={session}
-            signOut={signOut}
-            onDeleteRequested={() => setShowDeleteConfirm(true)}
+        <SetupTrustBanner text="Nothing here changes the product day to day unless your billing or login details change." />
+
+        <SetupSummarySection heading="At a glance">
+          <SetupSummaryRow
+            label="Plan"
+            value={planValue}
+            hint={planHint}
+            href="#billing"
+            actionLabel="Open"
           />
+          <SetupSummaryRow
+            label="Sign-in"
+            value={session?.user?.email ?? "No email on file"}
+            hint="You can reset your password or sign out below."
+            href="#login"
+            actionLabel="Open"
+          />
+          <SetupSummaryRow
+            label="Help"
+            value="Help Center and founder support are always available."
+            hint="Good place to check reminders, statuses, and product behavior before reaching out."
+            href="#help"
+            actionLabel="Open"
+            last
+          />
+        </SetupSummarySection>
+
+        <section id="billing" className="scroll-mt-24">
+          <BillingSummarySection business={business} />
+        </section>
+
+        <div className="grid gap-5 xl:grid-cols-[1.05fr,0.95fr]">
+          <section id="login" className="scroll-mt-24">
+            <AccountControlsSection
+              session={session}
+              signOut={signOut}
+              onDeleteRequested={() => setShowDeleteConfirm(true)}
+            />
+          </section>
           <div className="space-y-5">
             <IntegrationsSection />
-            <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
+            <section id="help" className="scroll-mt-24 rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
                 Help
               </p>
@@ -50,7 +103,7 @@ export default function AccountSetupPage() {
               >
                 Open Help Center
               </Link>
-            </div>
+            </section>
           </div>
         </div>
       </div>

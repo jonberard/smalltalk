@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
-import { SetupPageShell } from "@/components/dashboard/setup-shell";
+import {
+  SetupPageShell,
+  SetupSummaryRow,
+  SetupSummarySection,
+  SetupTrustBanner,
+} from "@/components/dashboard/setup-shell";
 import {
   EmployeeRow,
   NeighborhoodsList,
@@ -38,28 +43,77 @@ export default function TeamServicesSetupPage() {
 
   if (!business) return null;
 
+  const neighborhoodCount = business.neighborhoods?.length ?? 0;
+  const serviceAreasValue =
+    neighborhoodCount > 0
+      ? `${neighborhoodCount} service area${neighborhoodCount === 1 ? "" : "s"} added`
+      : business.business_city
+        ? `Serving ${business.business_city}`
+        : "No service areas added yet";
+
   return (
     <SetupPageShell
       eyebrow="Setup / Team & Services"
-      title="Define the real-world pieces behind each request."
-      description="Send works better when your services, people, and service areas are clearly set up. This is the operational backbone behind each review request."
+      title="Keep the real-world details current."
+      description="These are the parts behind every request: what you offer, who does the work, and where you serve. Set them once, then just update them when the business changes."
       headerTone="detail"
     >
-      {loading ? (
-        <div className="grid gap-5 xl:grid-cols-2">
+      <div className="space-y-5">
+        <SetupTrustBanner text="This page only needs occasional updates - most owners leave it alone week to week." />
+
+        {loading ? (
+          <div className="grid gap-5 xl:grid-cols-2">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="h-[120px] animate-pulse rounded-[var(--dash-radius)] bg-[var(--dash-border)]" />
+            ))}
+          </div>
+        ) : (
+          <SetupSummarySection heading="At a glance">
+            <SetupSummaryRow
+              label="Services"
+              value={`${services.length} service${services.length === 1 ? "" : "s"} set up`}
+              hint="These show up in Send when you create a request."
+              href="#services"
+              actionLabel="Edit"
+            />
+            <SetupSummaryRow
+              label="Team"
+              value={`${employees.length} team member${employees.length === 1 ? "" : "s"} added`}
+              hint="Use this if you want requests tied to the person who did the work."
+              href="#team"
+              actionLabel="Edit"
+            />
+            <SetupSummaryRow
+              label="Service areas"
+              value={serviceAreasValue}
+              hint="Useful if you want reviews to reflect where you work."
+              href="#areas"
+              actionLabel="Edit"
+              last
+            />
+          </SetupSummarySection>
+        )}
+
+        {loading ? (
+          <div className="grid gap-5 xl:grid-cols-2">
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="h-[220px] animate-pulse rounded-[var(--dash-radius)] bg-[var(--dash-border)]" />
           ))}
-        </div>
-      ) : (
-        <div className="grid gap-5 xl:grid-cols-2">
-          <ServicesList services={services} businessId={business.id} />
-          <TeamList employees={employees} businessId={business.id} />
-          <div className="xl:col-span-2">
-            <NeighborhoodsList neighborhoods={business.neighborhoods || []} businessId={business.id} />
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="grid gap-5 xl:grid-cols-2">
+            <section id="services" className="scroll-mt-24">
+              <ServicesList services={services} businessId={business.id} />
+            </section>
+            <section id="team" className="scroll-mt-24">
+              <TeamList employees={employees} businessId={business.id} />
+            </section>
+            <section id="areas" className="scroll-mt-24 xl:col-span-2">
+              <NeighborhoodsList neighborhoods={business.neighborhoods || []} businessId={business.id} />
+            </section>
+          </div>
+        )}
+      </div>
     </SetupPageShell>
   );
 }
