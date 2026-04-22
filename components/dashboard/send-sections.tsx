@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Business } from "@/lib/types";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
 import { capture } from "@/lib/posthog";
-import { dashboardButtonClassName, dashboardUtilityLinkClassName } from "@/components/dashboard/button";
+import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { useToast } from "@/components/dashboard/toast";

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { dashboardUtilityLinkClassName } from "@/components/dashboard/button";
+import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { SetupInfoStrip, SetupPageShell } from "@/components/dashboard/setup-shell";
 import {
   Paywall,
@@ -48,7 +48,7 @@ export default function SendJobsPage() {
         <div className="flex justify-end">
           <Link
             href="/dashboard/send/qr"
-            className={dashboardUtilityLinkClassName()}
+            className={dashboardButtonClassName({ size: "md" })}
           >
             Open QR / shared link
           </Link>

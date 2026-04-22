@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
 import { capture } from "@/lib/posthog";
-import { dashboardButtonClassName, dashboardUtilityLinkClassName } from "@/components/dashboard/button";
+import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { SkeletonRow } from "@/components/dashboard/skeleton";
 import { StatusPill } from "@/components/dashboard/status-pill";
@@ -325,16 +325,16 @@ export default function RepliesPage() {
               Draft fast, paste on Google yourself, and keep the response tone aligned with how you want the business to show up.
             </p>
           </div>
-          <div className="flex items-center gap-4 sm:gap-5">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Link
               href="/dashboard/support"
-              className={dashboardUtilityLinkClassName()}
+              className={dashboardButtonClassName({ size: "lg" })}
             >
               Help Center
             </Link>
             <Link
               href="/dashboard/more/review-flow/voice"
-              className={dashboardButtonClassName({ size: "sm" })}
+              className={dashboardButtonClassName({ variant: "accent", size: "lg" })}
             >
               Reply voice
             </Link>

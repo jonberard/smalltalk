@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
-import { dashboardButtonClassName, dashboardUtilityLinkClassName } from "@/components/dashboard/button";
+import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { SkeletonRow } from "@/components/dashboard/skeleton";
 import { StatusPill } from "@/components/dashboard/status-pill";
@@ -291,7 +291,7 @@ export default function InboxPage() {
           <div className="flex flex-col gap-2 sm:flex-row">
             <Link
               href="/dashboard/support"
-              className={dashboardUtilityLinkClassName()}
+              className={dashboardButtonClassName({ size: "lg" })}
             >
               Help Center
             </Link>
