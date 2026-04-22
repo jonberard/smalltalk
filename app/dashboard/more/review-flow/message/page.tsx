@@ -16,6 +16,7 @@ export default function ReviewFlowMessagePage() {
       description="This is the text customers receive before they enter the guided review flow. You can personalize the message without breaking the link or compliance language."
       backHref="/dashboard/more/review-flow"
       backLabel="Back to review flow"
+      headerTone="detail"
     >
       <ReviewRequestMessagingSection
         businessId={business.id}

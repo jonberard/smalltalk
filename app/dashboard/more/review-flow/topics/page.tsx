@@ -49,6 +49,7 @@ export default function ReviewFlowTopicsPage() {
       description="These prompts shape the substance of every review draft. Keep them broad enough to fit real service work, but specific enough to create honest, useful detail."
       backHref="/dashboard/more/review-flow"
       backLabel="Back to review flow"
+      headerTone="detail"
     >
       {loading ? (
         <div className="h-[420px] animate-pulse rounded-[var(--dash-radius)] bg-[var(--dash-border)]" />

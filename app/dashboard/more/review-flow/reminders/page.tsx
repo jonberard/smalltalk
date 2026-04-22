@@ -16,6 +16,7 @@ export default function ReviewFlowRemindersPage() {
       description="This is where the reminder sequence lives now: on/off, quiet hours, and the cadence that keeps things useful without feeling pushy."
       backHref="/dashboard/more/review-flow"
       backLabel="Back to review flow"
+      headerTone="detail"
     >
       <AutomatedRemindersSection
         businessId={business.id}

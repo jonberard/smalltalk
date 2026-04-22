@@ -16,6 +16,7 @@ export default function ReviewFlowVoicePage() {
       description="This setting only affects drafted public responses. It does not change the customer review flow itself, but it does shape how you show up once reviews come in."
       backHref="/dashboard/more/review-flow"
       backLabel="Back to review flow"
+      headerTone="detail"
     >
       <ReplyVoiceSection
         businessId={business.id}

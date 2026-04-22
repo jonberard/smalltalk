@@ -43,6 +43,7 @@ export default function TeamServicesSetupPage() {
       eyebrow="Setup / Team & Services"
       title="Define the real-world pieces behind each request."
       description="Send works better when your services, people, and service areas are clearly set up. This is the operational backbone behind each review request."
+      headerTone="detail"
     >
       {loading ? (
         <div className="grid gap-5 xl:grid-cols-2">

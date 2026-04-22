@@ -14,6 +14,7 @@ export default function ProfileSetupPage() {
       eyebrow="Setup / Profile"
       title="Keep your business identity sharp."
       description="This is the owner-facing profile layer: business name, logo, and the Google profile that your requests and handoff point back to."
+      headerTone="detail"
     >
       <div className="space-y-5">
         <BusinessProfile

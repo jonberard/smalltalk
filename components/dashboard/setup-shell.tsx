@@ -9,6 +9,7 @@ export function SetupPageShell({
   backHref = "/dashboard/more",
   backLabel = "Back to setup",
   actions,
+  headerTone = "hero",
   children,
 }: {
   eyebrow: string;
@@ -17,8 +18,11 @@ export function SetupPageShell({
   backHref?: string;
   backLabel?: string;
   actions?: React.ReactNode;
+  headerTone?: "hero" | "detail";
   children: React.ReactNode;
 }) {
+  const isDetail = headerTone === "detail";
+
   return (
     <main className="min-h-dvh bg-[var(--dash-bg)] sm:pl-[220px]">
       <div className="dash-page-enter mx-auto max-w-[1040px] px-5 pb-32 pt-8 sm:pb-16">
@@ -32,15 +36,31 @@ export function SetupPageShell({
             </svg>
             {backLabel}
           </Link>
-          <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div
+            className={`flex flex-col lg:flex-row lg:justify-between ${
+              isDetail
+                ? "mt-3 gap-3 lg:items-start"
+                : "mt-4 gap-4 lg:items-end"
+            }`}
+          >
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
                 {eyebrow}
               </p>
-              <h1 className="mt-2 max-w-[12ch] text-balance font-heading text-[32px] font-semibold leading-[0.98] tracking-[-0.03em] text-[var(--dash-text)] sm:text-[38px]">
+              <h1
+                className={`text-balance font-heading font-semibold tracking-[-0.03em] text-[var(--dash-text)] ${
+                  isDetail
+                    ? "mt-1 max-w-[18ch] text-[28px] leading-[1.02] sm:text-[32px]"
+                    : "mt-2 max-w-[12ch] text-[32px] leading-[0.98] sm:text-[38px]"
+                }`}
+              >
                 {title}
               </h1>
-              <p className="mt-3 max-w-[54ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
+              <p
+                className={`max-w-[54ch] text-[14px] leading-relaxed text-[var(--dash-muted)] ${
+                  isDetail ? "mt-2" : "mt-3"
+                }`}
+              >
                 {description}
               </p>
             </div>

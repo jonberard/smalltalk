@@ -22,6 +22,7 @@ export default function AccountSetupPage() {
       eyebrow="Setup / Account"
       title="Plan, billing, and sign-in in one place."
       description="The old split between Settings and Billing is gone here. This page owns subscription controls, invoices, login basics, and account-level cleanup."
+      headerTone="detail"
     >
       <div className="space-y-5">
         <BillingSummarySection business={business} />
