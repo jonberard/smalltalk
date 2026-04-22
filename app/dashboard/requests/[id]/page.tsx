@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { SkeletonRow } from "@/components/dashboard/skeleton";
 import { StatusPill } from "@/components/dashboard/status-pill";
@@ -719,7 +720,7 @@ export default function RequestDetailPage() {
             {requestContactAction ? (
               <a
                 href={requestContactAction.href}
-                className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-4 py-2.5 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                className={dashboardButtonClassName({ size: "sm" })}
               >
                 {requestContactAction.actionLabel}
               </a>
@@ -727,7 +728,7 @@ export default function RequestDetailPage() {
             {privateFeedbackSession ? (
               <Link
                 href="/dashboard/inbox"
-                className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-4 py-2.5 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                className={dashboardButtonClassName({ size: "sm" })}
               >
                 Open inbox
               </Link>
@@ -735,7 +736,7 @@ export default function RequestDetailPage() {
             {publicReviewSession?.status === "copied" ? (
               <Link
                 href="/dashboard/replies"
-                className="inline-flex items-center justify-center rounded-full bg-[var(--dash-primary)] px-4 py-2.5 text-[12px] font-semibold text-white shadow-[0_8px_24px_rgba(224,90,61,0.18)] transition-all hover:brightness-95 active:scale-[0.98]"
+                className={dashboardButtonClassName({ variant: "primary", size: "sm" })}
               >
                 Open replies
               </Link>
@@ -878,7 +879,7 @@ export default function RequestDetailPage() {
                   type="button"
                   onClick={markHandledFromDetail}
                   disabled={actionLoading}
-                  className="rounded-[var(--dash-radius-sm)] bg-[var(--dash-primary)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-60"
+                  className={dashboardButtonClassName({ variant: "primary" })}
                 >
                   {actionLoading ? "Saving..." : "Mark private feedback handled"}
                 </button>

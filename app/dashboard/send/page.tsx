@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { SetupCardLink, SetupInfoStrip, SetupPageShell } from "@/components/dashboard/setup-shell";
 import {
   RecentSendsList,
@@ -78,7 +79,7 @@ export default function SendPage() {
             </div>
             <Link
               href="/dashboard/send/jobs"
-              className="rounded-[10px] bg-[var(--dash-primary)] px-4 py-2 text-[13px] font-semibold text-white transition-all hover:brightness-95"
+              className={dashboardButtonClassName({ variant: "primary" })}
             >
               Send a request
             </Link>

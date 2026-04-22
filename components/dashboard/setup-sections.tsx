@@ -10,6 +10,7 @@ import {
   buildReviewRequestEmailPreview,
   REVIEW_REQUEST_TEMPLATE_TOKENS,
 } from "@/lib/review-request-messages";
+import { dashboardButtonClassName, dashboardUtilityLinkClassName } from "@/components/dashboard/button";
 import { useToast } from "@/components/dashboard/toast";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -513,7 +514,7 @@ export function ServicesList({
               type="button"
               onClick={() => void handleAdd()}
               disabled={!draft.trim()}
-              className={`shrink-0 rounded-[var(--dash-radius-sm)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
+              className={`${dashboardButtonClassName({ variant: "primary", size: "sm" })} shrink-0 ${
                 draft.trim() ? "bg-[#E05A3D] shadow-[0_2px_8px_rgba(224,90,61,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#F0ADA0]"
               }`}
             >
@@ -525,10 +526,10 @@ export function ServicesList({
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="flex w-full items-center gap-2.5 border-t border-[var(--dash-border)] px-6 py-4 text-[13px] font-medium text-[#E05A3D] transition-all duration-200 hover:bg-[#E05A3D]/[0.03] active:scale-[0.99]"
+          className="flex w-full items-center gap-2.5 border-t border-[var(--dash-border)] px-6 py-4 text-[12px] font-medium text-[var(--dash-muted)] transition-colors hover:bg-[var(--dash-bg)] hover:text-[var(--dash-text)]"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#E05A3D]/[0.06]">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] border border-[var(--dash-border)] bg-white">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -641,7 +642,7 @@ export function NeighborhoodsList({
               type="button"
               onClick={() => void handleAdd()}
               disabled={!draft.trim()}
-              className={`shrink-0 rounded-[var(--dash-radius-sm)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
+              className={`${dashboardButtonClassName({ variant: "primary", size: "sm" })} shrink-0 ${
                 draft.trim() ? "bg-[#E05A3D] shadow-[0_2px_8px_rgba(224,90,61,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#F0ADA0]"
               }`}
             >
@@ -653,10 +654,10 @@ export function NeighborhoodsList({
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="flex w-full items-center gap-2.5 border-t border-[var(--dash-border)] px-6 py-4 text-[13px] font-medium text-[#E05A3D] transition-all duration-200 hover:bg-[#E05A3D]/[0.03] active:scale-[0.99]"
+          className="flex w-full items-center gap-2.5 border-t border-[var(--dash-border)] px-6 py-4 text-[12px] font-medium text-[var(--dash-muted)] transition-colors hover:bg-[var(--dash-bg)] hover:text-[var(--dash-text)]"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#E05A3D]/[0.06]">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] border border-[var(--dash-border)] bg-white">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -782,7 +783,7 @@ export function TeamList({
               type="button"
               onClick={() => void handleAdd()}
               disabled={!draftName.trim()}
-              className={`shrink-0 rounded-[var(--dash-radius-sm)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
+              className={`${dashboardButtonClassName({ variant: "primary", size: "sm" })} shrink-0 ${
                 draftName.trim() ? "bg-[#E05A3D] shadow-[0_2px_8px_rgba(224,90,61,0.25)] active:scale-[0.97]" : "cursor-not-allowed bg-[#F0ADA0]"
               }`}
             >
@@ -794,10 +795,10 @@ export function TeamList({
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="flex w-full items-center gap-2.5 border-t border-[var(--dash-border)] px-6 py-4 text-[13px] font-medium text-[#E05A3D] transition-all duration-200 hover:bg-[#E05A3D]/[0.03] active:scale-[0.99]"
+          className="flex w-full items-center gap-2.5 border-t border-[var(--dash-border)] px-6 py-4 text-[12px] font-medium text-[var(--dash-muted)] transition-colors hover:bg-[var(--dash-bg)] hover:text-[var(--dash-text)]"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#E05A3D]/[0.06]">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="flex h-7 w-7 items-center justify-center rounded-[8px] border border-[var(--dash-border)] bg-white">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -861,10 +862,10 @@ export function ReplyVoiceSection({
                 void save(voice.id);
               }
             }}
-            className={`rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-all duration-150 ${
+            className={`rounded-[10px] px-3.5 py-1.5 text-[12px] font-medium transition-all duration-150 ${
               selectedId === voice.id
                 ? "bg-[var(--dash-primary)] text-white shadow-sm"
-                : "bg-[var(--dash-bg)] text-[var(--dash-muted)] hover:text-[var(--dash-text)]"
+                : "border border-[var(--dash-border)] bg-white text-[var(--dash-muted)] hover:bg-[var(--dash-bg)] hover:text-[var(--dash-text)]"
             }`}
           >
             {voice.name}
@@ -886,7 +887,7 @@ export function ReplyVoiceSection({
               type="button"
               onClick={() => void save("custom", customText)}
               disabled={!customText.trim() || saving}
-              className="rounded-[var(--dash-radius-sm)] bg-[var(--dash-primary)] px-4 py-1.5 text-[12px] font-semibold text-white transition-all hover:brightness-95 disabled:opacity-50"
+              className={dashboardButtonClassName({ variant: "primary", size: "sm" })}
             >
               Save voice
             </button>
@@ -1026,7 +1027,7 @@ export function ReviewRequestMessagingSection({
                 setEmailSubjectTemplate("");
                 setEmailIntroTemplate("");
               }}
-              className="text-[12px] font-medium text-[var(--dash-muted)] underline underline-offset-2 hover:no-underline"
+              className={dashboardUtilityLinkClassName()}
             >
               Reset to default wording
             </button>
@@ -1034,7 +1035,7 @@ export function ReviewRequestMessagingSection({
               type="button"
               onClick={() => void save()}
               disabled={saving}
-              className="rounded-[10px] bg-[var(--dash-primary)] px-4 py-2 text-[13px] font-semibold text-white transition-all hover:brightness-95 disabled:opacity-50"
+              className={dashboardButtonClassName({ variant: "primary" })}
             >
               Save message
             </button>
@@ -1565,7 +1566,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
               type="button"
               onClick={() => void handleCheckout()}
               disabled={redirecting}
-              className="rounded-[var(--dash-radius-sm)] bg-[var(--dash-primary)] px-6 py-2.5 text-[14px] font-semibold text-white transition-all duration-150 hover:brightness-95 active:scale-[0.98] disabled:opacity-60"
+              className={dashboardButtonClassName({ variant: "primary" })}
             >
               {redirecting ? "Redirecting..." : status === "none" ? "Start free trial" : "Resubscribe"}
             </button>
@@ -1576,7 +1577,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
               type="button"
               onClick={() => void handlePortal()}
               disabled={redirecting}
-              className="rounded-[var(--dash-radius-sm)] bg-[var(--dash-primary)] px-6 py-2.5 text-[14px] font-semibold text-white transition-all duration-150 hover:brightness-95 active:scale-[0.98] disabled:opacity-60"
+              className={dashboardButtonClassName({ variant: "primary" })}
             >
               {redirecting ? "Redirecting..." : "Update payment method"}
             </button>
@@ -1587,7 +1588,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
               type="button"
               onClick={() => void handlePortal()}
               disabled={redirecting}
-              className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-6 py-2.5 text-[14px] font-semibold text-[var(--dash-primary)] transition-all duration-150 hover:bg-[#E05A3D]/[0.04] active:scale-[0.98] disabled:opacity-60"
+              className={dashboardButtonClassName({ variant: "accent" })}
             >
               {redirecting ? "Redirecting..." : "Manage billing"}
             </button>
@@ -1626,7 +1627,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
                 <button
                   type="button"
                   onClick={() => void handlePortal()}
-                  className="font-medium text-[var(--dash-primary)] underline underline-offset-2 hover:no-underline"
+                  className={dashboardUtilityLinkClassName()}
                 >
                   billing portal
                 </button>
@@ -1672,14 +1673,14 @@ export function AccountControlsSection({
               toast("Password reset email sent.", "success");
             }
           }}
-          className="text-[13px] font-medium text-[var(--dash-primary)] underline underline-offset-2 hover:no-underline"
+          className={dashboardUtilityLinkClassName()}
         >
           Change password
         </button>
         <button
           type="button"
           onClick={() => void signOut()}
-          className="block text-[13px] font-medium text-[var(--dash-muted)] underline underline-offset-2 hover:no-underline"
+          className={`block ${dashboardUtilityLinkClassName()}`}
         >
           Sign out
         </button>
@@ -1687,7 +1688,7 @@ export function AccountControlsSection({
           <button
             type="button"
             onClick={onDeleteRequested}
-            className="text-[12px] font-medium text-[#DC2626] underline underline-offset-2 hover:no-underline"
+            className={dashboardUtilityLinkClassName({ tone: "danger" })}
           >
             Delete account
           </button>
@@ -1724,7 +1725,7 @@ export function DeleteAccountDialog({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] py-2.5 text-[13px] font-semibold text-[var(--dash-muted)] transition-all hover:bg-[var(--dash-bg)]"
+            className={`flex-1 ${dashboardButtonClassName()}`}
           >
             Cancel
           </button>
@@ -1734,7 +1735,7 @@ export function DeleteAccountDialog({
               onClose();
               toast("Your account deletion has been requested. We'll process this within 48 hours and email you a confirmation.", "info");
             }}
-            className="flex-1 rounded-[var(--dash-radius-sm)] bg-[#DC2626] py-2.5 text-[13px] font-semibold text-white transition-all hover:brightness-95 active:scale-[0.98]"
+            className={`flex-1 ${dashboardButtonClassName({ variant: "danger" })}`}
           >
             Delete account
           </button>

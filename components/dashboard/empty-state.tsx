@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { dashboardButtonClassName } from "@/components/dashboard/button";
 
 type EmptyStateProps = {
   icon: ReactNode;
@@ -21,7 +22,7 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
         <button
           type="button"
           onClick={action.onClick}
-          className="mt-2 rounded-[var(--dash-radius-sm)] bg-[var(--dash-primary)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-150 hover:brightness-95 active:scale-[0.98]"
+          className={`mt-2 ${dashboardButtonClassName({ variant: "primary" })}`}
         >
           {action.label}
         </button>

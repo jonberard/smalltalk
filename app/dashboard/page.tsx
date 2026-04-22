@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { fetchWithAuth, supabase } from "@/lib/supabase";
 import { capture } from "@/lib/posthog";
+import { dashboardButtonClassName, dashboardUtilityLinkClassName } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { SkeletonCard, SkeletonRow } from "@/components/dashboard/skeleton";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -789,13 +790,13 @@ export default function Dashboard() {
           <div className="flex flex-col gap-2 sm:flex-row">
             <Link
               href="/dashboard/send"
-              className="inline-flex items-center justify-center rounded-full bg-[var(--dash-primary)] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_8px_24px_rgba(224,90,61,0.18)] transition-all hover:brightness-95 active:scale-[0.98]"
+              className={dashboardButtonClassName({ variant: "primary", size: "lg" })}
             >
               Send request
             </Link>
             <Link
               href="/dashboard/inbox"
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--dash-border)] bg-white px-5 py-3 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+              className={`${dashboardButtonClassName({ size: "lg" })} gap-2`}
             >
               Open inbox
               {newPrivateFeedback.length > 0 ? (
@@ -920,7 +921,7 @@ export default function Dashboard() {
                   What customers are doing right now
                 </h2>
               </div>
-              <Link href="/dashboard/send" className="text-[12px] font-semibold text-[var(--dash-primary)]">
+              <Link href="/dashboard/send" className={dashboardUtilityLinkClassName()}>
                 Open send
               </Link>
             </div>
@@ -986,7 +987,7 @@ export default function Dashboard() {
                               });
                               setPrivateFeedbackActionError("");
                             }}
-                            className="shrink-0 rounded-[var(--dash-radius-sm)] border border-[#2563EB] px-3 py-2 text-[12px] font-semibold text-[#2563EB] transition-colors hover:bg-[#2563EB]/5"
+                            className={`${dashboardButtonClassName({ variant: "accent", size: "sm" })} shrink-0 border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/5`}
                           >
                             View feedback
                           </button>
@@ -994,14 +995,14 @@ export default function Dashboard() {
                           <div className="flex shrink-0 flex-wrap gap-2">
                             <Link
                               href={`/dashboard/requests/${item.reviewLinkId}`}
-                              className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-white"
+                              className={dashboardButtonClassName({ size: "sm" })}
                             >
                               Open request
                             </Link>
                             <button
                               type="button"
                               onClick={() => generateReplyForItem(item)}
-                              className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-primary)] transition-colors hover:bg-[var(--dash-primary)]/5"
+                              className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
                             >
                               Draft reply
                             </button>
@@ -1009,7 +1010,7 @@ export default function Dashboard() {
                         ) : (
                           <Link
                             href={`/dashboard/requests/${item.reviewLinkId}`}
-                            className="shrink-0 rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-white"
+                            className={`${dashboardButtonClassName({ size: "sm" })} shrink-0`}
                           >
                             Open request
                           </Link>
@@ -1234,14 +1235,14 @@ export default function Dashboard() {
               <div className="flex gap-2">
                 <Link
                   href={`/dashboard/requests/${privateFeedbackModal.reviewLinkId}`}
-                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                  className={dashboardButtonClassName()}
                 >
                   Open request
                 </Link>
                 <button
                   type="button"
                   onClick={closePrivateFeedbackModal}
-                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                  className={dashboardButtonClassName()}
                 >
                   Close
                 </button>
@@ -1250,7 +1251,7 @@ export default function Dashboard() {
                     type="button"
                     onClick={() => markPrivateFeedbackHandled(privateFeedbackModal.sessionId)}
                     disabled={privateFeedbackActionLoading}
-                    className="rounded-[var(--dash-radius-sm)] bg-[var(--dash-primary)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-60"
+                    className={dashboardButtonClassName({ variant: "primary" })}
                   >
                     {privateFeedbackActionLoading ? "Saving..." : "Mark handled"}
                   </button>
@@ -1330,7 +1331,7 @@ export default function Dashboard() {
                 type="button"
                 onClick={() => generateReplyForItem(replyModal)}
                 disabled={replyLoading}
-                className="text-[12px] font-medium text-[var(--dash-muted)] underline underline-offset-2 hover:no-underline disabled:opacity-50"
+                className={`${dashboardUtilityLinkClassName()} disabled:opacity-50`}
               >
                 Regenerate
               </button>
@@ -1338,7 +1339,7 @@ export default function Dashboard() {
                 type="button"
                 onClick={copyReplyAndMark}
                 disabled={replyLoading || !replyText}
-                className={`rounded-[var(--dash-radius-sm)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all active:scale-[0.97] disabled:opacity-50 ${
+                className={`${dashboardButtonClassName({ variant: "primary" })} ${
                   replyCopied ? "bg-[#059669]" : "bg-[var(--dash-primary)] hover:brightness-95"
                 }`}
               >
@@ -1349,7 +1350,7 @@ export default function Dashboard() {
             <div className="mt-3 flex justify-end">
               <Link
                 href={`/dashboard/requests/${replyModal.reviewLinkId}`}
-                className="text-[12px] font-semibold text-[var(--dash-primary)] underline underline-offset-2 hover:no-underline"
+                className={dashboardUtilityLinkClassName()}
               >
                 Open request detail
               </Link>

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
+import { dashboardButtonClassName, dashboardUtilityLinkClassName } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { SkeletonRow } from "@/components/dashboard/skeleton";
 import { StatusPill } from "@/components/dashboard/status-pill";
@@ -131,13 +132,13 @@ function InboxGuideCard() {
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
           href="/dashboard/support"
-          className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-4 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+          className={dashboardButtonClassName({ size: "sm" })}
         >
           Open Help Center
         </Link>
         <Link
           href="/dashboard/send/qr"
-          className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-4 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+          className={dashboardButtonClassName({ size: "sm" })}
         >
           Review QR flow
         </Link>
@@ -290,13 +291,13 @@ export default function InboxPage() {
           <div className="flex flex-col gap-2 sm:flex-row">
             <Link
               href="/dashboard/support"
-              className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-5 py-3 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+              className={dashboardUtilityLinkClassName()}
             >
               Help Center
             </Link>
             <Link
               href="/dashboard/send/jobs"
-              className="inline-flex items-center justify-center rounded-full bg-[var(--dash-primary)] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_8px_24px_rgba(224,90,61,0.18)] transition-all hover:brightness-95 active:scale-[0.98]"
+              className={dashboardButtonClassName({ variant: "primary", size: "lg" })}
             >
               Send request
             </Link>
@@ -546,14 +547,14 @@ export default function InboxPage() {
               <div className="mt-3 flex flex-wrap justify-end gap-2">
                 <Link
                   href={`/dashboard/requests/${selected.reviewLinkId}`}
-                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                  className={dashboardButtonClassName()}
                 >
                   Open request
                 </Link>
                 {selected.customerContact ? (
                   <a
                     href={formatCustomerContact(selected.customerContact)?.href}
-                    className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                    className={dashboardButtonClassName()}
                   >
                     {formatCustomerContact(selected.customerContact)?.actionLabel}
                   </a>
@@ -563,7 +564,7 @@ export default function InboxPage() {
                     type="button"
                     onClick={() => markHandled(selected.sessionId)}
                     disabled={actionLoading}
-                    className="rounded-[var(--dash-radius-sm)] bg-[var(--dash-primary)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-60"
+                    className={dashboardButtonClassName({ variant: "primary" })}
                   >
                     {actionLoading ? "Saving..." : "Mark handled"}
                   </button>
@@ -571,7 +572,7 @@ export default function InboxPage() {
                   <button
                     type="button"
                     onClick={closeDetail}
-                    className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                    className={dashboardButtonClassName()}
                   >
                     Close
                   </button>

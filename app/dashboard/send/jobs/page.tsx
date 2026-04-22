@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { dashboardUtilityLinkClassName } from "@/components/dashboard/button";
 import { SetupInfoStrip, SetupPageShell } from "@/components/dashboard/setup-shell";
 import {
   Paywall,
@@ -37,52 +39,49 @@ export default function SendJobsPage() {
       <div className="space-y-5">
         {effectiveTier === "trial" ? <TrialRemainingBanner trialRemaining={trialRemaining} /> : null}
 
-        <div className="grid gap-5 xl:grid-cols-[1.05fr,0.95fr]">
-          <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">
-            {loading ? (
-              <div className="flex flex-col gap-4 py-4">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index}>
-                    <div className="mb-1.5 h-[16px] w-24 animate-pulse rounded bg-[#F4F4F5]" />
-                    <div className="h-[42px] animate-pulse rounded-[var(--dash-radius-sm)] bg-[#F4F4F5]" />
-                  </div>
-                ))}
-              </div>
-            ) : effectiveTier === "expired" ? (
-              <Paywall
-                hadTrial={
-                  business.subscription_status === "trial" ||
-                  business.subscription_status === "trialing" ||
-                  business.subscription_status === "canceled"
-                }
-              />
-            ) : (
-              <SingleSendForm
-                services={services}
-                employees={employees}
-                businessId={business.id}
-                onSend={handleSingleSend}
-                onServiceCreated={(service) => setServices((prev) => [...prev, service])}
-                onEmployeeCreated={(employee) => setEmployees((prev) => [...prev, employee])}
-              />
-            )}
-          </div>
+        <SetupInfoStrip
+          title="Best for one-off follow-up after a completed job or visit."
+          description="Need something reusable instead? Use the QR / shared link path."
+          accent="warm"
+        />
 
-          <div className="space-y-5">
-            <SetupInfoStrip
-              title="What happens after send"
-              description="The customer gets the guided flow, not a blank Google box. That means the request detail page becomes the source of truth for everything that happens next."
-              accent="warm"
+        <div className="flex justify-end">
+          <Link
+            href="/dashboard/send/qr"
+            className={dashboardUtilityLinkClassName()}
+          >
+            Open QR / shared link
+          </Link>
+        </div>
+
+        <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">
+          {loading ? (
+            <div className="flex flex-col gap-4 py-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index}>
+                  <div className="mb-1.5 h-[16px] w-24 animate-pulse rounded bg-[#F4F4F5]" />
+                  <div className="h-[42px] animate-pulse rounded-[var(--dash-radius-sm)] bg-[#F4F4F5]" />
+                </div>
+              ))}
+            </div>
+          ) : effectiveTier === "expired" ? (
+            <Paywall
+              hadTrial={
+                business.subscription_status === "trial" ||
+                business.subscription_status === "trialing" ||
+                business.subscription_status === "canceled"
+              }
             />
-            <SetupInfoStrip
-              title="What this path is best for"
-              description="Direct follow-up after a completed job, service call, cleaning, or install - especially when you want the request to feel personal instead of generic."
+          ) : (
+            <SingleSendForm
+              services={services}
+              employees={employees}
+              businessId={business.id}
+              onSend={handleSingleSend}
+              onServiceCreated={(service) => setServices((prev) => [...prev, service])}
+              onEmployeeCreated={(employee) => setEmployees((prev) => [...prev, employee])}
             />
-            <SetupInfoStrip
-              title="Need a reusable link instead?"
-              description="Use the QR / shared link path when you want something that works across many customers without sending each one individually."
-            />
-          </div>
+          )}
         </div>
 
         <RecentSendsList

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { fetchWithAuth } from "@/lib/supabase";
+import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { useToast } from "@/components/dashboard/toast";
 
 const SUPPORT_TOPICS = [
@@ -129,7 +130,7 @@ export function HelpMessageForm({
           type="button"
           onClick={() => void submitSupportMessage()}
           disabled={submitting || message.trim().length < 10}
-          className="inline-flex items-center justify-center rounded-full bg-[var(--dash-primary)] px-4 py-2.5 text-[13px] font-semibold text-white shadow-[0_8px_24px_rgba(224,90,61,0.18)] transition-all hover:brightness-95 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          className={dashboardButtonClassName({ variant: "primary" })}
         >
           {submitting ? "Sending..." : "Send message"}
         </button>

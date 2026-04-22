@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { QRBlock, TrialRemainingBanner, useSendWorkspace } from "@/components/dashboard/send-sections";
 import { SetupInfoStrip, SetupPageShell } from "@/components/dashboard/setup-shell";
 
@@ -47,7 +48,7 @@ export default function SendQrPage() {
               </p>
               <Link
                 href="/dashboard/send/jobs"
-                className="mt-4 inline-flex rounded-[10px] bg-[var(--dash-primary)] px-4 py-2 text-[13px] font-semibold text-white transition-all hover:brightness-95"
+                className={`mt-4 ${dashboardButtonClassName({ variant: "primary" })}`}
               >
                 Send from jobs
               </Link>

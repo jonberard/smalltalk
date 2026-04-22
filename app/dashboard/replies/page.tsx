@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
 import { capture } from "@/lib/posthog";
+import { dashboardButtonClassName, dashboardUtilityLinkClassName } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { SkeletonRow } from "@/components/dashboard/skeleton";
 import { StatusPill } from "@/components/dashboard/status-pill";
@@ -151,13 +152,13 @@ function RepliesGuideCard() {
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
           href="/dashboard/more/review-flow/voice"
-          className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-4 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+          className={dashboardButtonClassName({ size: "sm" })}
         >
           Adjust reply voice
         </Link>
         <Link
           href="/dashboard/support/what-copied-means"
-          className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-4 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+          className={dashboardButtonClassName({ size: "sm" })}
         >
           Review copied status
         </Link>
@@ -324,16 +325,16 @@ export default function RepliesPage() {
               Draft fast, paste on Google yourself, and keep the response tone aligned with how you want the business to show up.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex items-center gap-4 sm:gap-5">
             <Link
               href="/dashboard/support"
-              className="inline-flex items-center justify-center rounded-full border border-[var(--dash-border)] bg-white px-5 py-3 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+              className={dashboardUtilityLinkClassName()}
             >
               Help Center
             </Link>
             <Link
               href="/dashboard/more/review-flow/voice"
-              className="inline-flex items-center justify-center rounded-full bg-[var(--dash-primary)] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_8px_24px_rgba(224,90,61,0.18)] transition-all hover:brightness-95 active:scale-[0.98]"
+              className={dashboardButtonClassName({ size: "sm" })}
             >
               Reply voice
             </Link>
@@ -458,14 +459,14 @@ export default function RepliesPage() {
                     <div className="flex shrink-0 gap-2">
                       <Link
                         href={`/dashboard/requests/${item.reviewLinkId}`}
-                        className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                        className={dashboardButtonClassName({ size: "sm" })}
                       >
                         Open request
                       </Link>
                       <button
                         type="button"
                         onClick={() => generateReplyForItem(item)}
-                        className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-primary)] px-3 py-2 text-[12px] font-semibold text-[var(--dash-primary)] transition-colors hover:bg-[var(--dash-primary)]/5"
+                        className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
                       >
                         {item.repliedAt ? "View reply" : "Draft reply"}
                       </button>
@@ -570,7 +571,7 @@ export default function RepliesPage() {
               <div className="flex flex-wrap justify-end gap-2">
                 <Link
                   href={`/dashboard/requests/${selected.reviewLinkId}`}
-                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                  className={dashboardButtonClassName()}
                 >
                   Open request
                 </Link>
@@ -578,7 +579,7 @@ export default function RepliesPage() {
                   type="button"
                   onClick={() => generateReplyForItem(selected)}
                   disabled={replyLoading}
-                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)] disabled:opacity-50"
+                  className={dashboardButtonClassName()}
                 >
                   {selected.replyText ? "Regenerate" : "Generate"}
                 </button>
@@ -586,7 +587,7 @@ export default function RepliesPage() {
                   type="button"
                   onClick={copyReplyAndMark}
                   disabled={replyLoading || !replyText}
-                  className={`rounded-[var(--dash-radius-sm)] px-5 py-2.5 text-[13px] font-semibold text-white transition-all active:scale-[0.97] disabled:opacity-50 ${
+                  className={`${dashboardButtonClassName({ variant: "primary" })} ${
                     replyCopied ? "bg-[#059669]" : "bg-[var(--dash-primary)] hover:brightness-95"
                   }`}
                 >

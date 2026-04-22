@@ -3,6 +3,7 @@ import {
   OWNER_HELP_ARTICLES,
   OWNER_HELP_WORKFLOW,
 } from "@/lib/owner-help-center";
+import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { HelpMessageForm } from "@/components/dashboard/help-message-form";
 
 function HelpTopicCard({
@@ -120,7 +121,7 @@ export default function DashboardSupportPage() {
             </div>
             <Link
               href="/dashboard/support/how-it-works"
-              className="inline-flex items-center justify-center rounded-full bg-[var(--dash-primary)] px-4 py-2.5 text-[13px] font-semibold text-white shadow-[0_8px_24px_rgba(224,90,61,0.18)] transition-all hover:brightness-95 active:scale-[0.98]"
+              className={dashboardButtonClassName({ variant: "primary" })}
             >
               Read the full guide
             </Link>

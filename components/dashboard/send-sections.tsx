@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Business } from "@/lib/types";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
 import { capture } from "@/lib/posthog";
+import { dashboardButtonClassName, dashboardUtilityLinkClassName } from "@/components/dashboard/button";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { useToast } from "@/components/dashboard/toast";
@@ -537,7 +538,7 @@ export function SingleSendForm({
         type="button"
         onClick={() => void handleSend()}
         disabled={!canSend}
-        className={`mt-2 w-full rounded-[var(--dash-radius-sm)] py-3 text-[15px] font-semibold text-white transition-all duration-200 ${
+        className={`mt-2 ${dashboardButtonClassName({ variant: "primary", fullWidth: true })} py-3 text-[15px] ${
           canSend
             ? "bg-[var(--dash-primary)] shadow-[0_2px_12px_rgba(224,90,61,0.3)] active:scale-[0.98]"
             : "cursor-not-allowed bg-[#E05A3D]/40"
@@ -715,7 +716,7 @@ export function Paywall({ hadTrial }: { hadTrial: boolean }) {
         type="button"
         onClick={() => void handleSubscribe()}
         disabled={redirecting}
-        className="mt-2 rounded-[var(--dash-radius-sm)] bg-[var(--dash-primary)] px-8 py-3 text-[15px] font-semibold text-white shadow-[0_2px_12px_rgba(224,90,61,0.3)] transition-all active:scale-[0.98] disabled:opacity-60"
+        className={`mt-2 ${dashboardButtonClassName({ variant: "primary" })} px-8 py-3 text-[15px]`}
       >
         {redirecting ? "Redirecting..." : buttonLabel}
       </button>
@@ -798,7 +799,7 @@ export function RecentSendsList({
                 <StatusPill status={link.status} />
                 <Link
                   href={`/dashboard/requests/${link.id}`}
-                  className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] px-3 py-1.5 text-[12px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
+                  className={dashboardButtonClassName({ size: "sm" })}
                 >
                   Open request
                 </Link>
