@@ -8,11 +8,15 @@ export async function sendReviewEmail({
   customerName,
   businessName,
   reviewLinkUrl,
+  emailSubjectTemplate,
+  emailIntroTemplate,
 }: {
   to: string;
   customerName: string;
   businessName: string;
   reviewLinkUrl: string;
+  emailSubjectTemplate?: string | null;
+  emailIntroTemplate?: string | null;
 }): Promise<{ success: boolean; providerSid?: string; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
 
@@ -25,6 +29,8 @@ export async function sendReviewEmail({
     customerName,
     businessName,
     reviewLinkUrl,
+    emailSubjectTemplate,
+    emailIntroTemplate,
   });
 
   try {

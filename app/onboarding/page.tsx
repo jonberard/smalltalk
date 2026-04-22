@@ -667,6 +667,13 @@ function StepReady({
     if (!error) {
       capture("onboarding_completed");
     }
+    try {
+      await fetchWithAuth("/api/review-links/generic", {
+        method: "POST",
+      });
+    } catch {
+      // If this misses here, the Send page will still ensure it server-side.
+    }
     onFinish(path);
   }
 

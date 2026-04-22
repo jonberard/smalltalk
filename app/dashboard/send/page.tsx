@@ -50,17 +50,6 @@ type SendReviewRequestResult = {
   remainingTrialRequests?: number;
 };
 
-/* ═══════════════════════════════════════════════════
-   HELPERS
-   ═══════════════════════════════════════════════════ */
-
-function generateCode(): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(4)))
-    .map((b) => b.toString(36).padStart(2, "0"))
-    .join("")
-    .slice(0, 8);
-}
-
 type SubTier = "active" | "trial" | "expired";
 
 function getSubTier(business: {
@@ -507,47 +496,23 @@ function QRBlock({ businessId, businessName }: { businessId: string; businessNam
 
   useEffect(() => {
     async function loadOrCreateGenericLink() {
-      // Check for an existing generic link for this business
-      const { data: existing } = await supabase
-        .from("review_links")
-        .select("unique_code")
-        .eq("business_id", businessId)
-        .eq("is_generic", true)
-        .limit(1)
-        .single();
+      try {
+        const res = await fetchWithAuth("/api/review-links/generic", {
+          method: "POST",
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          unique_code?: string;
+        };
 
-      if (existing) {
-        setGenericCode(existing.unique_code);
+        if (!res.ok || !body.unique_code) {
+          setLoadingLink(false);
+          return;
+        }
+
+        setGenericCode(body.unique_code);
+      } catch {
         setLoadingLink(false);
         return;
-      }
-
-      // Create a new generic link (no customer name/contact, needs a service)
-      const { data: defaultService } = await supabase
-        .from("services")
-        .select("id")
-        .eq("business_id", businessId)
-        .limit(1)
-        .single();
-
-      if (!defaultService) {
-        setLoadingLink(false);
-        return;
-      }
-
-      const code = generateCode();
-      const { error } = await supabase.from("review_links").insert({
-        business_id: businessId,
-        service_id: defaultService.id,
-        customer_name: "Customer",
-        customer_contact: "",
-        unique_code: code,
-        is_generic: true,
-        reminder_sequence_enabled: false,
-      });
-
-      if (!error) {
-        setGenericCode(code);
       }
       setLoadingLink(false);
     }

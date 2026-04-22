@@ -195,11 +195,14 @@ export async function POST(req: NextRequest) {
           customerName,
           businessName: business.name,
           reviewLinkUrl,
+          smsTemplate: business.review_request_sms_template,
         })
       : buildReviewRequestEmail({
           customerName,
           businessName: business.name,
           reviewLinkUrl,
+          emailSubjectTemplate: business.review_request_email_subject_template,
+          emailIntroTemplate: business.review_request_email_intro_template,
         }).html;
 
   const { data: initialDelivery, error: initialDeliveryError } = await supabaseAdmin
@@ -357,6 +360,8 @@ export async function POST(req: NextRequest) {
     customerName,
     businessName: business.name,
     reviewLinkUrl,
+    emailSubjectTemplate: business.review_request_email_subject_template,
+    emailIntroTemplate: business.review_request_email_intro_template,
   });
 
   if (emailResult.success) {

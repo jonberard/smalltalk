@@ -426,148 +426,271 @@ function CursorDot({ style }: { style?: React.CSSProperties }) {
    ═══════════════════════════════════════════════════ */
 
 function DashboardPreview() {
-  const FUNNEL = [
-    { label: "Sent", value: 65, pct: 100 },
-    { label: "Opened", value: 52, pct: 80 },
-    { label: "Started", value: 48, pct: 74 },
-    { label: "Drafted", value: 42, pct: 65 },
-    { label: "Copied", value: 38, pct: 58 },
+  const REQUEST_FLOW = [
+    { label: "Sent", value: "24", detail: "This month" },
+    { label: "Opened", value: "18", detail: "75% of sent" },
+    { label: "Copied", value: "12", detail: "67% of opened" },
   ];
 
-  const ACTIVITIES = [
-    { name: "Sarah M.", action: "copied a 5-star review", time: "12m ago", stars: 5, status: "copied", canReply: true, replied: false },
-    { name: "James T.", action: "started the review flow", time: "34m ago", stars: null, status: "in_progress", canReply: false, replied: false },
-    { name: "Maria L.", action: "copied a 4-star review", time: "1h ago", stars: 4, status: "copied", canReply: false, replied: true },
-    { name: "David K.", action: "drafted a review", time: "2h ago", stars: 5, status: "drafted", canReply: false, replied: false },
-    { name: "Lisa P.", action: "copied a 5-star review", time: "3h ago", stars: 5, status: "copied", canReply: true, replied: false },
-    { name: "Robert C.", action: "opened the link", time: "5h ago", stars: null, status: "created", canReply: false, replied: false },
+  const ACTIVITY = [
+    {
+      name: "Jon",
+      note: "Private feedback came in about weekly pool cleaning",
+      status: "Private feedback",
+      accent: "bg-[#EEF2FF] text-[#4F46E5]",
+      time: "6m ago",
+    },
+    {
+      name: "Alex",
+      note: "Copied a 5-star review and is ready for a reply",
+      status: "Copied",
+      accent: "bg-[#ECFDF5] text-[#059669]",
+      time: "24m ago",
+    },
+    {
+      name: "Customer",
+      note: "Opened the request link but has not finished yet",
+      status: "Opened",
+      accent: "bg-[#F3F4F6] text-[#5E7268]",
+      time: "1h ago",
+    },
+  ];
+
+  const INBOX = [
+    {
+      customer: "Jon",
+      service: "Weekly Pool Cleaning",
+      message: "They said the filter still wasn't fixed.",
+      urgency: "Needs attention",
+    },
+    {
+      customer: "Alex",
+      service: "Spring filter check",
+      message: "Asked if they can edit their review after the follow-up.",
+      urgency: "Follow up",
+    },
   ];
 
   return (
-    <div className="rounded-2xl border border-[#E2E5E3] bg-[#F8F9FA] p-5 sm:p-8" style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h3 className="text-[20px] font-semibold text-[#1A2E25]">Crystal Clear Pools</h3>
-          <p className="mt-0.5 text-[13px] text-[#5E7268]">Dashboard &middot; This month</p>
-        </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E05A3D]">
-          <span className="text-[12px] font-bold text-white">CCP</span>
-        </div>
-      </div>
-
-      {/* Stat cards */}
-      <div className="mb-6 grid grid-cols-3 gap-3 sm:gap-4">
-        {[
-          { label: "Reviews this month", value: "47", icon: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
-          { label: "Average rating", value: "4.8", icon: "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" },
-          { label: "Completion rate", value: "72%", icon: "M22 11.08V12a10 10 0 11-5.93-9.14" },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-[#E2E5E3] bg-white p-4 sm:p-5">
-            <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-[#E05A3D]/10">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d={s.icon} />
-              </svg>
-            </div>
-            <p className="text-[24px] font-bold leading-none text-[#1A2E25] sm:text-[28px]">{s.value}</p>
-            <p className="mt-1 text-[12px] text-[#5E7268]">{s.label}</p>
+    <div
+      className="overflow-hidden rounded-[28px] border border-[#E2E5E3] bg-[#FAFAF8]"
+      style={{ fontFamily: "Inter, system-ui, sans-serif" }}
+    >
+      <div className="grid gap-0 lg:grid-cols-[180px,1fr]">
+        <div className="border-b border-[#E2E5E3] bg-white p-5 lg:border-b-0 lg:border-r">
+          <div>
+            <p className="text-[18px] font-semibold text-[#1A2E25]">small Talk</p>
+            <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.22em] text-[#8A948E]">
+              Owner dashboard
+            </p>
           </div>
-        ))}
-      </div>
 
-      {/* Funnel */}
-      <div className="mb-6 rounded-xl border border-[#E2E5E3] bg-white p-4 sm:p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-[14px] font-semibold text-[#1A2E25]">Conversion Funnel</p>
-          <div className="flex rounded-full border border-[#E2E5E3] p-0.5">
-            {["This week", "This month"].map((label, i) => (
-              <span
+          <div className="mt-8 space-y-2">
+            {([
+              ["Home", true],
+              ["Inbox", false],
+              ["Send", false],
+              ["Replies", false],
+              ["More", false],
+            ] as const).map(([label, active]) => (
+              <div
                 key={label}
-                className={`rounded-full px-3 py-1 text-[11px] font-medium ${
-                  i === 1
-                    ? "bg-[#E05A3D] text-white"
+                className={`flex items-center justify-between rounded-[14px] px-3 py-2.5 text-[13px] font-medium ${
+                  active
+                    ? "bg-[#FFF1EC] text-[#E05A3D]"
                     : "text-[#5E7268]"
                 }`}
               >
-                {label}
-              </span>
+                <span>{label}</span>
+                {label === "Inbox" && (
+                  <span className="rounded-full bg-[#EEF2FF] px-2 py-0.5 text-[10px] font-semibold text-[#4F46E5]">
+                    2
+                  </span>
+                )}
+              </div>
             ))}
           </div>
+
+          <div className="mt-10 rounded-[18px] border border-[#E8E5E0] bg-[#FFFCF8] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8A948E]">
+              Current plan
+            </p>
+            <p className="mt-2 text-[14px] font-semibold text-[#1A2E25]">
+              Growth
+            </p>
+            <p className="mt-1 text-[12px] leading-relaxed text-[#5E7268]">
+              Private feedback, replies, and reminders are all running.
+            </p>
+          </div>
         </div>
-        <div className="space-y-2.5">
-          {FUNNEL.map((stage, i) => {
-            const isLast = i === FUNNEL.length - 1;
-            const prevValue = i > 0 ? FUNNEL[i - 1].value : null;
-            const dropoff = prevValue ? prevValue - stage.value : null;
-            return (
-              <div key={stage.label} className="flex items-center gap-3">
-                <span className="w-[60px] text-right text-[12px] font-medium text-[#5E7268]">{stage.label}</span>
-                <div className="h-[20px] flex-1 overflow-hidden rounded-full bg-[#F3F4F6]">
+
+        <div className="p-5 sm:p-7">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8A948E]">
+                Home
+              </p>
+              <h3 className="mt-2 text-[28px] font-semibold leading-[1.05] tracking-[-0.04em] text-[#1A2E25]">
+                Good morning, Crystal Clear Pools
+              </h3>
+              <p className="mt-2 max-w-[560px] text-[13px] leading-relaxed text-[#5E7268]">
+                Start with what needs your attention, then scan replies, recent
+                activity, and request flow.
+              </p>
+            </div>
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#E05A3D]">
+              <span className="text-[12px] font-bold text-white">CC</span>
+            </div>
+          </div>
+
+          <div className="mb-5 grid gap-4 xl:grid-cols-[1.15fr,0.85fr]">
+            <div className="rounded-[22px] border border-[#E2E5E3] bg-white p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8A948E]">
+                    Needs attention
+                  </p>
+                  <h4 className="mt-2 text-[24px] font-semibold leading-tight tracking-[-0.03em] text-[#1A2E25]">
+                    Private feedback and reply work should rise first.
+                  </h4>
+                </div>
+                <div className="rounded-full bg-[#FFF1EC] px-3 py-1 text-[11px] font-semibold text-[#E05A3D]">
+                  Open inbox 2
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {INBOX.map((item) => (
                   <div
-                    className="flex h-full items-center justify-end rounded-full px-2.5 transition-all"
-                    style={{
-                      width: `${stage.pct}%`,
-                      background: isLast
-                        ? "#E05A3D"
-                        : `rgba(224, 90, 61, ${0.12 + i * 0.14})`,
-                    }}
+                    key={item.customer}
+                    className="rounded-[16px] border border-[#ECE8E1] bg-[#FFFCF8] p-4"
                   >
-                    <span className={`text-[11px] font-bold ${isLast ? "text-white" : "text-[#E05A3D]"}`}>
-                      {stage.value}
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[14px] font-semibold text-[#1A2E25]">
+                          {item.customer}
+                        </p>
+                        <p className="mt-0.5 text-[12px] text-[#5E7268]">
+                          {item.service}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-[#EEF2FF] px-2.5 py-1 text-[10px] font-semibold text-[#4F46E5]">
+                        {item.urgency}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-[13px] leading-relaxed text-[#33413A]">
+                      {item.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[22px] border border-[#E2E5E3] bg-white p-5">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8A948E]">
+                How requests are moving
+              </p>
+              <div className="mt-4 space-y-3">
+                {REQUEST_FLOW.map((stage) => (
+                  <div
+                    key={stage.label}
+                    className="rounded-[16px] border border-[#ECE8E1] bg-[#FFFCF8] p-4"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8A948E]">
+                      {stage.label}
+                    </p>
+                    <div className="mt-2 flex items-end justify-between gap-3">
+                      <span className="text-[32px] font-semibold leading-none tracking-[-0.04em] text-[#1A2E25]">
+                        {stage.value}
+                      </span>
+                      <span className="text-[12px] text-[#5E7268]">
+                        {stage.detail}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-[12px] leading-relaxed text-[#5E7268]">
+                Copied is the last confirmed handoff. It does not mean we can
+                prove Google posted the review.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[0.9fr,1.1fr]">
+            <div className="rounded-[22px] border border-[#E2E5E3] bg-white p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8A948E]">
+                    Reply queue
+                  </p>
+                  <h4 className="mt-2 text-[20px] font-semibold tracking-[-0.03em] text-[#1A2E25]">
+                    Two copied reviews are ready for a draft.
+                  </h4>
+                </div>
+                <span className="rounded-full bg-[#ECFDF5] px-2.5 py-1 text-[10px] font-semibold text-[#059669]">
+                  2 ready
+                </span>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {["Alex", "Sarah"].map((name) => (
+                  <div
+                    key={name}
+                    className="flex items-center justify-between rounded-[15px] border border-[#ECE8E1] bg-[#FFFCF8] px-4 py-3"
+                  >
+                    <div>
+                      <p className="text-[14px] font-semibold text-[#1A2E25]">
+                        {name}
+                      </p>
+                      <p className="mt-0.5 text-[12px] text-[#5E7268]">
+                        5-star review copied from weekly service
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-[#E05A3D] px-3 py-1 text-[11px] font-semibold text-[#E05A3D]">
+                      Draft reply
                     </span>
                   </div>
-                </div>
-                {dropoff !== null && dropoff > 0 && (
-                  <span className="w-[40px] text-[10px] font-medium text-[#DC2626]">-{dropoff}</span>
-                )}
-                {dropoff === null && <span className="w-[40px]" />}
+                ))}
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Activity feed */}
-      <div className="rounded-xl border border-[#E2E5E3] bg-white p-4 sm:p-5">
-        <p className="mb-3 text-[14px] font-semibold text-[#1A2E25]">Recent Activity</p>
-        <div className="space-y-3">
-          {ACTIVITIES.map((a, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[10px] font-bold text-[#5E7268]">
-                {a.name.split(" ").map((w) => w[0]).join("")}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] text-[#1A2E25]">
-                  <span className="font-semibold">{a.name}</span>{" "}
-                  <span className="text-[#5E7268]">{a.action}</span>
-                </p>
-              </div>
-              {a.replied && (
-                <span className="shrink-0 text-[10px] font-medium text-[#059669]">Replied &#10003;</span>
-              )}
-              {a.canReply && !a.replied && (
-                <span className="shrink-0 rounded-lg border border-[#E05A3D] px-2.5 py-1 text-[11px] font-semibold text-[#E05A3D]">
-                  Draft Reply
-                </span>
-              )}
-              {a.stars ? (
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                  a.stars >= 4 ? "bg-[#ECFDF5] text-[#059669]" : "bg-[#FFFBEB] text-[#D97706]"
-                }`}>
-                  {a.stars}★
-                </span>
-              ) : (
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                  a.status === "in_progress"
-                    ? "bg-[#FFF7ED] text-[#EA580C]"
-                    : "bg-[#F3F4F6] text-[#5E7268]"
-                }`}>
-                  {a.status === "in_progress" ? "In Progress" : "Opened"}
-                </span>
-              )}
-              <span className="shrink-0 text-[11px] text-[#5E7268]">{a.time}</span>
             </div>
-          ))}
+
+            <div className="rounded-[22px] border border-[#E2E5E3] bg-white p-5">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8A948E]">
+                Recent activity
+              </p>
+              <div className="mt-4 space-y-3">
+                {ACTIVITY.map((item) => (
+                  <div
+                    key={`${item.name}-${item.time}`}
+                    className="flex items-start gap-3 rounded-[15px] border border-[#ECE8E1] bg-[#FFFCF8] px-4 py-3.5"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[11px] font-bold text-[#5E7268]">
+                      {item.name.slice(0, 1)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[14px] font-semibold text-[#1A2E25]">
+                          {item.name}
+                        </p>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.accent}`}
+                        >
+                          {item.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[13px] leading-relaxed text-[#5E7268]">
+                        {item.note}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-[11px] text-[#5E7268]">
+                      {item.time}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

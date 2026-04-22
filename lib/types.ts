@@ -20,6 +20,9 @@ export type Business = {
   connected_crms: Record<string, unknown>;
   reply_voice_id: string;
   custom_reply_voice: string | null;
+  review_request_sms_template: string | null;
+  review_request_email_subject_template: string | null;
+  review_request_email_intro_template: string | null;
   onboarding_completed: boolean;
   reminder_sequence_enabled: boolean;
   quiet_hours_start: number;
@@ -46,6 +49,9 @@ export type BusinessInsert = {
   connected_crms?: Record<string, unknown>;
   reply_voice_id?: string;
   custom_reply_voice?: string | null;
+  review_request_sms_template?: string | null;
+  review_request_email_subject_template?: string | null;
+  review_request_email_intro_template?: string | null;
   onboarding_completed?: boolean;
   reminder_sequence_enabled?: boolean;
   quiet_hours_start?: number;

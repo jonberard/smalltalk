@@ -9,10 +9,13 @@ export type ReviewRequestBusiness = {
   trial_requests_remaining: number;
   trial_ends_at: string | null;
   reminder_sequence_enabled: boolean | null;
+  review_request_sms_template: string | null;
+  review_request_email_subject_template: string | null;
+  review_request_email_intro_template: string | null;
 };
 
 export const REVIEW_REQUEST_BUSINESS_SELECT =
-  "id, name, subscription_status, trial_requests_remaining, trial_ends_at, reminder_sequence_enabled";
+  "id, name, subscription_status, trial_requests_remaining, trial_ends_at, reminder_sequence_enabled, review_request_sms_template, review_request_email_subject_template, review_request_email_intro_template";
 
 export function isBusinessAllowedToCreateReviewRequest(
   business: ReviewRequestBusiness,

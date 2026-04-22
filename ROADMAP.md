@@ -65,6 +65,7 @@ Anything big and complicated needs to earn its way onto the roadmap through real
 - [x] Google handoff flow with interstitial guidance
 - [x] Private feedback recourse: customers can still post publicly later
 - [x] Generic QR flow starts fresh after completion
+- [x] Generic QR/shared link is guaranteed server-side per business
 - [x] Optional contact info for QR/private feedback
 - [x] Reminder sequence MVP
 - [x] Authentication, billing gates, and basic dashboard
@@ -83,6 +84,8 @@ Anything big and complicated needs to earn its way onto the roadmap through real
 - [x] Deep link from private feedback email to the dashboard
 - [x] Mark private feedback as handled
 - [x] Contact info shown when available
+- [x] Help Center V1 foundation
+- [x] Owner-customizable review request copy with safe defaults
 
 ### Still true right now
 

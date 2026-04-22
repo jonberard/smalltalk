@@ -1,6 +1,25 @@
-import "server-only";
-
 type ReminderKind = "reminder_1" | "reminder_2";
+
+type ReviewRequestTemplateContext = {
+  customer_name: string;
+  business_name: string;
+  review_link: string;
+};
+
+export const REVIEW_REQUEST_TEMPLATE_TOKENS = [
+  {
+    token: "{{customer_name}}",
+    help: "Customer name",
+  },
+  {
+    token: "{{business_name}}",
+    help: "Business name",
+  },
+  {
+    token: "{{review_link}}",
+    help: "Review link",
+  },
+] as const;
 
 function toAscii(input: string): string {
   return input
@@ -27,18 +46,55 @@ export function escapeHtml(input: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function renderReviewRequestTemplate(
+  template: string,
+  context: ReviewRequestTemplateContext,
+) {
+  return template.replace(
+    /\{\{\s*(customer_name|business_name|review_link)\s*\}\}/gi,
+    (_match, token: keyof ReviewRequestTemplateContext) => context[token] ?? "",
+  );
+}
+
+function normalizeTemplate(template?: string | null) {
+  const trimmed = template?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function ensureReviewLink(rendered: string, reviewLinkUrl: string) {
+  return rendered.includes(reviewLinkUrl)
+    ? rendered
+    : `${rendered.trim()} ${reviewLinkUrl}`.trim();
+}
+
+function ensureStopLanguage(rendered: string) {
+  return /reply stop to opt out/i.test(rendered)
+    ? rendered
+    : `${rendered.trim()} (Reply STOP to opt out)`.trim();
+}
+
 export function buildInitialSmsMessage({
   customerName,
   businessName,
   reviewLinkUrl,
+  smsTemplate,
 }: {
   customerName: string;
   businessName: string;
   reviewLinkUrl: string;
+  smsTemplate?: string | null;
 }) {
-  return toGsmSafeText(
-    `Hi ${customerName} - ${businessName} would love your feedback. Share how we did: ${reviewLinkUrl} (Reply STOP to opt out)`,
-  );
+  const context: ReviewRequestTemplateContext = {
+    customer_name: customerName,
+    business_name: businessName,
+    review_link: reviewLinkUrl,
+  };
+  const rendered =
+    normalizeTemplate(smsTemplate)
+      ? renderReviewRequestTemplate(smsTemplate!, context)
+      : `Hi ${customerName} - ${businessName} would love your feedback. Share how we did: ${reviewLinkUrl}`;
+
+  return toGsmSafeText(ensureStopLanguage(ensureReviewLink(rendered, reviewLinkUrl)));
 }
 
 export function buildReminderSmsMessage({
@@ -64,17 +120,29 @@ export function buildReviewRequestEmail({
   customerName,
   businessName,
   reviewLinkUrl,
+  emailSubjectTemplate,
+  emailIntroTemplate,
 }: {
   customerName: string;
   businessName: string;
   reviewLinkUrl: string;
+  emailSubjectTemplate?: string | null;
+  emailIntroTemplate?: string | null;
 }) {
+  const preview = buildReviewRequestEmailPreview({
+    customerName,
+    businessName,
+    reviewLinkUrl,
+    emailSubjectTemplate,
+    emailIntroTemplate,
+  });
   const safeCustomerName = escapeHtml(customerName);
   const safeBusinessName = escapeHtml(businessName);
   const safeReviewLinkUrl = escapeHtml(reviewLinkUrl);
+  const safeIntro = escapeHtml(preview.intro).replace(/\n/g, "<br />");
 
   return {
-    subject: `${businessName} would love your feedback`,
+    subject: preview.subject,
     html: `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
@@ -87,7 +155,7 @@ export function buildReviewRequestEmail({
             Hi ${safeCustomerName},
           </h1>
           <p style="margin:0 0 24px;font-size:15px;color:#1A2E25;line-height:1.6;">
-            <strong>${safeBusinessName}</strong> would love your feedback. Tap the link below to share your experience &mdash; takes 30 seconds:
+            ${safeIntro}
           </p>
           <a href="${safeReviewLinkUrl}" target="_blank" style="display:inline-block;background-color:#E05A3D;color:#FFFFFF;font-size:15px;font-weight:600;text-decoration:none;padding:14px 28px;border-radius:99px;">
             Share Your Experience
@@ -103,5 +171,36 @@ export function buildReviewRequestEmail({
   </table>
 </body>
 </html>`,
+  };
+}
+
+export function buildReviewRequestEmailPreview({
+  customerName,
+  businessName,
+  reviewLinkUrl,
+  emailSubjectTemplate,
+  emailIntroTemplate,
+}: {
+  customerName: string;
+  businessName: string;
+  reviewLinkUrl: string;
+  emailSubjectTemplate?: string | null;
+  emailIntroTemplate?: string | null;
+}) {
+  const context: ReviewRequestTemplateContext = {
+    customer_name: customerName,
+    business_name: businessName,
+    review_link: reviewLinkUrl,
+  };
+  const subjectTemplate =
+    normalizeTemplate(emailSubjectTemplate) ??
+    "{{business_name}} would love your feedback";
+  const introTemplate =
+    normalizeTemplate(emailIntroTemplate) ??
+    "{{business_name}} would love your feedback. Tap the button below to share your experience - takes 30 seconds.";
+
+  return {
+    subject: renderReviewRequestTemplate(subjectTemplate, context),
+    intro: renderReviewRequestTemplate(introTemplate, context),
   };
 }

@@ -5,6 +5,11 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
 import { REVIEW_VOICES } from "@/lib/review-voices";
 import { REPLY_VOICES } from "@/lib/reply-generator";
+import {
+  buildInitialSmsMessage,
+  buildReviewRequestEmailPreview,
+  REVIEW_REQUEST_TEMPLATE_TOKENS,
+} from "@/lib/review-request-messages";
 import { useToast } from "@/components/dashboard/toast";
 
 /* ═══════════════════════════════════════════════════
@@ -814,6 +819,229 @@ function ReplyVoiceSection({ businessId, initialVoiceId, initialCustomVoice }: {
   );
 }
 
+function ReviewRequestMessagingSection({
+  businessId,
+  businessName,
+  initialSmsTemplate,
+  initialEmailSubjectTemplate,
+  initialEmailIntroTemplate,
+}: {
+  businessId: string;
+  businessName: string;
+  initialSmsTemplate: string | null;
+  initialEmailSubjectTemplate: string | null;
+  initialEmailIntroTemplate: string | null;
+}) {
+  const { toast } = useToast();
+  const [smsTemplate, setSmsTemplate] = useState(initialSmsTemplate ?? "");
+  const [emailSubjectTemplate, setEmailSubjectTemplate] = useState(
+    initialEmailSubjectTemplate ?? "",
+  );
+  const [emailIntroTemplate, setEmailIntroTemplate] = useState(
+    initialEmailIntroTemplate ?? "",
+  );
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const previewCustomerName = "Alex";
+  const previewLink = "https://usesmalltalk.com/r/demo1234";
+  const smsPreview = buildInitialSmsMessage({
+    customerName: previewCustomerName,
+    businessName,
+    reviewLinkUrl: previewLink,
+    smsTemplate,
+  });
+  const emailPreview = buildReviewRequestEmailPreview({
+    customerName: previewCustomerName,
+    businessName,
+    reviewLinkUrl: previewLink,
+    emailSubjectTemplate,
+    emailIntroTemplate,
+  });
+
+  async function save() {
+    setSaving(true);
+
+    const update = {
+      review_request_sms_template: smsTemplate.trim() || null,
+      review_request_email_subject_template:
+        emailSubjectTemplate.trim() || null,
+      review_request_email_intro_template: emailIntroTemplate.trim() || null,
+    };
+
+    const { error } = await supabase
+      .from("businesses")
+      .update(update)
+      .eq("id", businessId);
+
+    setSaving(false);
+
+    if (error) {
+      toast(`Couldn’t save message settings: ${error.message}`, "error");
+      return;
+    }
+
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+    toast("Review request copy updated.", "success");
+  }
+
+  return (
+    <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-[16px] font-semibold text-[var(--dash-text)]">
+            Review request message
+          </h2>
+          <p className="mt-1 max-w-[620px] text-[13px] leading-relaxed text-[var(--dash-muted)]">
+            Keep the link and compliance pieces protected, but make the message
+            sound more like your business. Leave any field blank to use the
+            default wording.
+          </p>
+        </div>
+        {(saving || saved) && (
+          <p className="text-[12px] text-[#10B981]">
+            {saving ? "Saving..." : "Saved"}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {REVIEW_REQUEST_TEMPLATE_TOKENS.map((token) => (
+          <div
+            key={token.token}
+            className="rounded-full border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3 py-1.5 text-[11px] text-[var(--dash-muted)]"
+          >
+            <span className="font-semibold text-[var(--dash-text)]">
+              {token.token}
+            </span>{" "}
+            {token.help}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-[1.05fr,0.95fr]">
+        <div className="space-y-4 rounded-[12px] border border-[var(--dash-border)] bg-white p-4">
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-[var(--dash-muted)]">
+              SMS message
+            </label>
+            <textarea
+              value={smsTemplate}
+              onChange={(event) => setSmsTemplate(event.target.value)}
+              rows={4}
+              placeholder="Hi {{customer_name}} - thanks again for choosing {{business_name}}. If you have a minute, we'd love your feedback."
+              className="w-full resize-none rounded-[10px] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-3 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-colors focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
+            />
+            <p className="mt-2 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+              We&apos;ll automatically keep the review link attached. If you
+              include{" "}
+              <span className="font-medium text-[var(--dash-text)]">
+                {"{{review_link}}"}
+              </span>
+              ,
+              we&apos;ll use it where you place it instead.
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-[var(--dash-muted)]">
+              Email subject
+            </label>
+            <input
+              type="text"
+              value={emailSubjectTemplate}
+              onChange={(event) => setEmailSubjectTemplate(event.target.value)}
+              placeholder="{{business_name}} would love your feedback"
+              className="w-full rounded-[10px] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-2.5 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-colors focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-[var(--dash-muted)]">
+              Email intro
+            </label>
+            <textarea
+              value={emailIntroTemplate}
+              onChange={(event) => setEmailIntroTemplate(event.target.value)}
+              rows={5}
+              placeholder="{{business_name}} would love your feedback. Tap the button below to share your experience - takes 30 seconds."
+              className="w-full resize-none rounded-[10px] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-3 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-colors focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
+            />
+            <p className="mt-2 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+              The email button and link stay intact even if you change the copy.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--dash-border)] pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setSmsTemplate("");
+                setEmailSubjectTemplate("");
+                setEmailIntroTemplate("");
+              }}
+              className="text-[12px] font-medium text-[var(--dash-muted)] underline underline-offset-2 hover:no-underline"
+            >
+              Reset to default wording
+            </button>
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={saving}
+              className="rounded-[10px] bg-[var(--dash-primary)] px-4 py-2 text-[13px] font-semibold text-white transition-all hover:brightness-95 disabled:opacity-50"
+            >
+              Save message
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-4 rounded-[12px] border border-[var(--dash-border)] bg-[var(--dash-bg)] p-4">
+          <div className="rounded-[12px] border border-[var(--dash-border)] bg-white p-4">
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--dash-muted)]">
+              SMS preview
+            </p>
+            <div className="mt-3 max-w-[420px] rounded-[18px] bg-[#EAECEE] px-4 py-3 text-[13px] leading-relaxed text-[var(--dash-text)]">
+              {smsPreview}
+            </div>
+          </div>
+
+          <div className="rounded-[12px] border border-[var(--dash-border)] bg-white p-4">
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--dash-muted)]">
+              Email preview
+            </p>
+            <div className="mt-3 rounded-[16px] border border-[var(--dash-border)] bg-[#FFFCF8] p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+                Subject
+              </p>
+              <p className="mt-1 text-[14px] font-semibold text-[var(--dash-text)]">
+                {emailPreview.subject}
+              </p>
+              <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+                Intro
+              </p>
+              <p className="mt-1 text-[14px] leading-relaxed text-[var(--dash-text)]">
+                Hi {previewCustomerName},
+              </p>
+              <p className="mt-2 text-[14px] leading-relaxed text-[var(--dash-text)]">
+                {emailPreview.intro}
+              </p>
+              <div className="mt-4 inline-flex rounded-full bg-[var(--dash-primary)] px-4 py-2 text-[12px] font-semibold text-white">
+                Share Your Experience
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[12px] leading-relaxed text-[var(--dash-muted)]">
+            Reminders stay on the product defaults for now, so your follow-up
+            sequence stays consistent and compliant.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════
    INTEGRATIONS (Coming Soon)
    ═══════════════════════════════════════════════════ */
@@ -1087,13 +1315,13 @@ function AutomatedRemindersSection({
               setEnabled(next);
               void save({ reminder_sequence_enabled: next });
             }}
-            className={`relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ${
+            className={`relative mt-0.5 h-7 w-12 shrink-0 overflow-hidden rounded-full transition-colors duration-200 ${
               enabled ? "bg-[#E05A3D]" : "bg-[#D1D5DB]"
             }`}
           >
             <span
-              className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-transform duration-200 ${
-                enabled ? "translate-x-6" : "translate-x-1"
+              className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white transition-transform duration-200 ${
+                enabled ? "translate-x-5" : "translate-x-0"
               }`}
             />
           </button>
@@ -1257,6 +1485,17 @@ export default function SettingsPage() {
                 google_review_url: business.google_review_url,
                 google_place_id: business.google_place_id,
               }}
+            />
+            <ReviewRequestMessagingSection
+              businessId={business.id}
+              businessName={business.name}
+              initialSmsTemplate={business.review_request_sms_template}
+              initialEmailSubjectTemplate={
+                business.review_request_email_subject_template
+              }
+              initialEmailIntroTemplate={
+                business.review_request_email_intro_template
+              }
             />
             <ServicesList services={services} businessId={business.id} />
             <NeighborhoodsList neighborhoods={business.neighborhoods || []} businessId={business.id} />
