@@ -20,6 +20,9 @@ const CATEGORY_LABELS: Record<SupportMessageCategory, string> = {
   billing: "Billing",
 };
 
+const SUPPORT_MESSAGE_COOLDOWN_MS = 2 * 60 * 1000;
+const SUPPORT_MESSAGE_DAILY_LIMIT = 20;
+
 function escapeHtml(str: string) {
   return str
     .replace(/&/g, "&amp;")
@@ -92,6 +95,62 @@ export async function POST(req: NextRequest) {
 
   const categoryLabel = CATEGORY_LABELS[body.category];
   const ownerEmail = business.owner_email ?? user.email ?? null;
+  const cooldownWindowStart = new Date(
+    Date.now() - SUPPORT_MESSAGE_COOLDOWN_MS,
+  ).toISOString();
+  const dailyWindowStart = new Date(
+    Date.now() - 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const [
+    { data: recentMessages, error: recentMessagesError },
+    { count: dailyMessageCount, error: dailyMessageCountError },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("support_messages")
+      .select("id, created_at")
+      .eq("business_id", business.id)
+      .gte("created_at", cooldownWindowStart)
+      .order("created_at", { ascending: false })
+      .limit(1),
+    supabaseAdmin
+      .from("support_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", business.id)
+      .gte("created_at", dailyWindowStart),
+  ]);
+
+  if (recentMessagesError || dailyMessageCountError) {
+    return NextResponse.json(
+      {
+        error:
+          recentMessagesError?.message ||
+          dailyMessageCountError?.message ||
+          "Could not verify support limits.",
+      },
+      { status: 500 },
+    );
+  }
+
+  if ((recentMessages ?? []).length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "You just sent a message. Give it a minute before sending another so the inbox stays usable.",
+      },
+      { status: 429 },
+    );
+  }
+
+  if ((dailyMessageCount ?? 0) >= SUPPORT_MESSAGE_DAILY_LIMIT) {
+    return NextResponse.json(
+      {
+        error:
+          "You have reached today’s support message limit. Reply to your founder email thread or try again tomorrow.",
+      },
+      { status: 429 },
+    );
+  }
 
   const { data: insertedMessage, error: insertError } = await supabaseAdmin
     .from("support_messages")

@@ -133,7 +133,13 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
               <div className="absolute right-0 top-10 z-50 w-[200px] overflow-hidden rounded-[10px] border border-[var(--dash-border)] bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]">
                 <div className="border-b border-[var(--dash-border)] px-4 py-3">
                   <p className="text-[13px] font-semibold text-[var(--dash-text)]">{business?.name}</p>
-                  <p className="mt-0.5 text-[11px] text-[var(--dash-muted)]">{business?.subscription_status === "trialing" ? "Free trial" : business?.subscription_status === "active" ? "Active" : business?.subscription_status ?? ""}</p>
+                  <p className="mt-0.5 text-[11px] text-[var(--dash-muted)]">
+                    {business?.subscription_status === "trial" || business?.subscription_status === "trialing"
+                      ? "Free trial"
+                      : business?.subscription_status === "active"
+                        ? "Active"
+                        : business?.subscription_status ?? ""}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -158,7 +164,7 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
 
       {/* ─── Trial Banner (only when running low) ─── */}
       {business &&
-        business.subscription_status === "trialing" &&
+        business.subscription_status === "trial" &&
         business.trial_requests_remaining > 0 &&
         business.trial_requests_remaining <= 3 &&
         (!business.trial_ends_at || new Date(business.trial_ends_at) > new Date()) && (

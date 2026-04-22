@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handleReviewRequest } from "@/lib/integrations/core";
 import {
+  getIntegrationApiKeyLastFour,
+  hashIntegrationApiKey,
+} from "@/lib/integration-api-key";
+import {
   decrementTrialIfNeeded,
   isBusinessAllowedToCreateReviewRequest,
   REVIEW_REQUEST_BUSINESS_SELECT,
@@ -32,18 +36,54 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2. Look up business by API key
-  const { data: business, error: lookupErr } = await supabaseAdmin
-    .from("businesses")
-    .select(REVIEW_REQUEST_BUSINESS_SELECT)
-    .eq("api_key", apiKey)
-    .single();
+  const apiKeyHash = hashIntegrationApiKey(apiKey);
 
-  if (lookupErr || !business) {
+  // 2. Look up business by hashed API key
+  const { data: hashedBusiness, error: lookupErr } = await supabaseAdmin
+    .from("businesses")
+    .select(`${REVIEW_REQUEST_BUSINESS_SELECT}, api_key`)
+    .eq("api_key_hash", apiKeyHash)
+    .maybeSingle();
+
+  const legacyOnlyMode =
+    !!lookupErr && /api_key_hash/i.test(lookupErr.message);
+
+  if (lookupErr && !legacyOnlyMode) {
     return NextResponse.json(
       { error: "Invalid API key" },
       { status: 401 },
     );
+  }
+
+  let business = hashedBusiness;
+
+  // Legacy plaintext fallback while existing keys are being migrated.
+  if (!business) {
+    const { data: legacyBusiness, error: legacyLookupErr } = await supabaseAdmin
+      .from("businesses")
+      .select(`${REVIEW_REQUEST_BUSINESS_SELECT}, api_key`)
+      .eq("api_key", apiKey)
+      .maybeSingle();
+
+    if (legacyLookupErr || !legacyBusiness) {
+      return NextResponse.json(
+        { error: "Invalid API key" },
+        { status: 401 },
+      );
+    }
+
+    business = legacyBusiness;
+
+    if (!legacyOnlyMode) {
+      await supabaseAdmin
+        .from("businesses")
+        .update({
+          api_key_hash: apiKeyHash,
+          api_key_last_four: getIntegrationApiKeyLastFour(apiKey),
+          api_key: null,
+        })
+        .eq("id", legacyBusiness.id);
+    }
   }
 
   if (

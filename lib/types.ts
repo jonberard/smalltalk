@@ -17,6 +17,8 @@ export type Business = {
   trial_requests_remaining: number;
   trial_ends_at: string | null;
   api_key: string | null;
+  api_key_hash: string | null;
+  api_key_last_four: string | null;
   connected_crms: Record<string, unknown>;
   reply_voice_id: string;
   custom_reply_voice: string | null;
@@ -46,6 +48,8 @@ export type BusinessInsert = {
   trial_requests_remaining?: number;
   trial_ends_at?: string | null;
   api_key?: string | null;
+  api_key_hash?: string | null;
+  api_key_last_four?: string | null;
   connected_crms?: Record<string, unknown>;
   reply_voice_id?: string;
   custom_reply_voice?: string | null;

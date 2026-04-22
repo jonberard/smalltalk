@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  generateIntegrationApiKey,
+  getIntegrationApiKeyLastFour,
+  hashIntegrationApiKey,
+} from "@/lib/integration-api-key";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 /* ═══════════════════════════════════════════════════
@@ -23,14 +28,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Generate a cryptographically strong API key
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  const apiKey = `st_${Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("")}`;
+  const apiKey = generateIntegrationApiKey();
+  const apiKeyHash = hashIntegrationApiKey(apiKey);
+  const apiKeyLastFour = getIntegrationApiKeyLastFour(apiKey);
 
   const { error: adminError } = await supabaseAdmin
     .from("businesses")
-    .update({ api_key: apiKey })
+    .update({
+      api_key: null,
+      api_key_hash: apiKeyHash,
+      api_key_last_four: apiKeyLastFour,
+    })
     .eq("id", user.id);
 
   if (adminError) {

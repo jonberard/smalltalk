@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
         id: user.id,
         name: deriveBusinessName(user.email, user.user_metadata),
         owner_email: user.email ?? null,
-        subscription_status: "trialing",
+        subscription_status: "trial",
         trial_ends_at: trialEndsAt,
         trial_requests_remaining: 10,
         onboarding_completed: false,

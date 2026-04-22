@@ -51,6 +51,7 @@ export default function SendJobsPage() {
             ) : effectiveTier === "expired" ? (
               <Paywall
                 hadTrial={
+                  business.subscription_status === "trial" ||
                   business.subscription_status === "trialing" ||
                   business.subscription_status === "canceled"
                 }

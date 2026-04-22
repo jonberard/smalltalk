@@ -63,7 +63,7 @@ export default function SignupPage() {
           id: userId,
           name: businessName,
           owner_email: email,
-          subscription_status: "trialing",
+          subscription_status: "trial",
           trial_ends_at: trialEndsAt,
           trial_requests_remaining: 10,
         });
@@ -103,7 +103,7 @@ export default function SignupPage() {
       }
 
       // 4. Identify and redirect to onboarding
-      identify(userId, { subscription_status: "trialing" });
+      identify(userId, { subscription_status: "trial" });
       capture("signup_completed");
       router.push("/onboarding");
     } catch {

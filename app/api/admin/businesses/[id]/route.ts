@@ -49,6 +49,13 @@ export async function PATCH(
     return auth.response;
   }
 
+  if (auth.admin.role !== "founder") {
+    return NextResponse.json(
+      { error: "Founder access required to update founder notes." },
+      { status: 403 },
+    );
+  }
+
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as {
     note?: string;
