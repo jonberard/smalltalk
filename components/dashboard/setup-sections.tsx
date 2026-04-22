@@ -70,6 +70,8 @@ export function BusinessProfile({
     google_place_id: string | null;
   };
 }) {
+  const { toast } = useToast();
+  const [savedProfile, setSavedProfile] = useState(initial);
   const [name, setName] = useState(initial.name);
   const [googleUrl, setGoogleUrl] = useState(initial.google_review_url);
   const [placeId, setPlaceId] = useState<string | null>(initial.google_place_id);
@@ -101,12 +103,20 @@ export function BusinessProfile({
   const save = useCallback(
     async (fields: Record<string, string | null>) => {
       setSaving(true);
-      await supabase.from("businesses").update(fields).eq("id", businessId);
+      const { error } = await supabase.from("businesses").update(fields).eq("id", businessId);
       setSaving(false);
+
+      if (error) {
+        toast(`Couldn't save profile changes: ${error.message}`, "error");
+        return false;
+      }
+
+      setSavedProfile((prev) => ({ ...prev, ...fields }));
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+      return true;
     },
-    [businessId],
+    [businessId, toast],
   );
 
   async function handlePlaceSearch(query: string) {
@@ -146,31 +156,62 @@ export function BusinessProfile({
     setSearchResults([]);
 
     const city = extractCity(place.address);
-    await save({ google_review_url: url, google_place_id: place.place_id, business_city: city });
+    const savedProfileChange = await save({
+      google_review_url: url,
+      google_place_id: place.place_id,
+      business_city: city,
+    });
+
+    if (!savedProfileChange) {
+      setSelectedPlace(
+        savedProfile.google_place_id
+          ? {
+              place_id: savedProfile.google_place_id,
+              name: "",
+              address: "",
+              rating: null,
+              user_ratings_total: 0,
+            }
+          : null,
+      );
+      setPlaceId(savedProfile.google_place_id);
+      setGoogleUrl(savedProfile.google_review_url);
+    }
   }
 
   function handleClearPlace() {
     setSelectedPlace(null);
     setPlaceId(null);
     setGoogleUrl("");
-    void save({ google_review_url: "", google_place_id: null });
+    void save({ google_review_url: "", google_place_id: null, business_city: null });
   }
 
   async function handleLogoUpload(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast("Please upload an image file for your logo.", "error");
+      return;
+    }
+
     const ext = file.name.split(".").pop();
     const path = `logos/${businessId}.${ext}`;
 
     const { error: uploadErr } = await supabase.storage.from("logos").upload(path, file, { upsert: true });
 
     if (uploadErr) {
-      setLogoPreview(URL.createObjectURL(file));
+      toast(`Couldn't upload logo: ${uploadErr.message}`, "error");
       return;
     }
 
     const { data } = supabase.storage.from("logos").getPublicUrl(path);
-    const url = data.publicUrl;
+    const url = `${data.publicUrl}?v=${Date.now()}`;
+    const savedLogo = await save({ logo_url: url });
+
+    if (!savedLogo) {
+      return;
+    }
+
     setLogoPreview(url);
-    void save({ logo_url: url });
+    toast("Logo updated.", "success");
   }
 
   return (
@@ -238,7 +279,7 @@ export function BusinessProfile({
             value={name}
             onChange={(event) => setName(event.target.value)}
             onBlur={() => {
-              if (name !== initial.name) void save({ name });
+              if (name !== savedProfile.name) void save({ name });
             }}
             placeholder="Your business name"
             className="w-full rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-4 py-3 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-all duration-300 focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
@@ -347,7 +388,7 @@ export function BusinessProfile({
                     value={googleUrl}
                     onChange={(event) => setGoogleUrl(event.target.value)}
                     onBlur={() => {
-                      if (googleUrl !== initial.google_review_url) void save({ google_review_url: googleUrl });
+                      if (googleUrl !== savedProfile.google_review_url) void save({ google_review_url: googleUrl });
                     }}
                     placeholder="https://search.google.com/local/writereview?placeid=..."
                     className="w-full rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-4 py-3 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-all duration-300 focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
