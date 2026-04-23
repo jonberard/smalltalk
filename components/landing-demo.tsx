@@ -426,49 +426,102 @@ function CursorDot({ style }: { style?: React.CSSProperties }) {
    ═══════════════════════════════════════════════════ */
 
 function DashboardPreview() {
-  const REQUEST_FLOW = [
-    { label: "Sent", value: "24", detail: "This month" },
-    { label: "Opened", value: "18", detail: "75% of sent" },
-    { label: "Copied", value: "12", detail: "67% of opened" },
+  const STATS = [
+    { label: "Copied this month", value: "12", detail: "Detailed review handoffs" },
+    { label: "Average rating", value: "4.7", detail: "Across copied reviews" },
+    { label: "Completion rate", value: "67%", detail: "Copied from sent requests" },
   ];
 
-  const ACTIVITY = [
+  const ATTENTION_RAILS = [
+    {
+      eyebrow: "Inbox",
+      title: "Private feedback",
+      count: "2",
+      summary: "Jon: The filter still wasn't fixed after the weekly visit.",
+      action: "Open inbox",
+      tone: "bg-[#EFF6FF] text-[#2563EB]",
+    },
+    {
+      eyebrow: "Replies",
+      title: "Public reviews",
+      count: "2",
+      summary: "Alex: Copied a 5-star review and is ready for a thoughtful reply.",
+      action: "Open replies",
+      tone: "bg-[#ECFDF5] text-[#059669]",
+    },
+    {
+      eyebrow: "Send",
+      title: "Stalled requests",
+      count: "3",
+      summary: "Sarah: Opened the request yesterday but never started the flow.",
+      action: "Open send",
+      tone: "bg-[#FFF7ED] text-[#B45309]",
+    },
+  ];
+
+  const REQUESTS_IN_MOTION = [
     {
       name: "Jon",
-      note: "Private feedback came in about weekly pool cleaning",
       status: "Private feedback",
-      accent: "bg-[#EEF2FF] text-[#4F46E5]",
+      statusClass: "bg-[#EFF6FF] text-[#2563EB]",
+      stars: "2★",
+      starsClass: "bg-[#FEF2F2] text-[#DC2626]",
+      note: "Sent private feedback about weekly pool cleaning.",
+      meta: "Weekly Pool Cleaning",
       time: "6m ago",
+      primaryAction: "View feedback",
+      primaryActionClass: "border border-[#D6E4FF] bg-[#F8FBFF] text-[#2563EB]",
     },
     {
       name: "Alex",
-      note: "Copied a 5-star review and is ready for a reply",
       status: "Copied",
-      accent: "bg-[#ECFDF5] text-[#059669]",
+      statusClass: "bg-[#FFF7ED] text-[#D97706]",
+      stars: "5★",
+      starsClass: "bg-[#ECFDF5] text-[#059669]",
+      note: "Copied a public review and is ready for a reply.",
+      meta: "Weekly Pool Cleaning",
       time: "24m ago",
+      primaryAction: "Draft reply",
+      secondaryAction: "Open request",
+      primaryActionClass: "bg-[#FFF1EC] text-[#E05A3D] border border-[#F3CCBE]",
     },
     {
       name: "Customer",
-      note: "Opened the request link but has not finished yet",
       status: "Opened",
-      accent: "bg-[#F3F4F6] text-[#5E7268]",
+      statusClass: "bg-[#F3F4F6] text-[#5E7268]",
+      note: "Opened the request but never made it into the guided flow.",
+      meta: "Spring filter check",
       time: "1h ago",
+      primaryAction: "Open request",
+      primaryActionClass: "border border-[#E0D5C5] bg-white text-[#1A2E25]",
     },
   ];
 
-  const INBOX = [
+  const RUN_NEXT = [
     {
-      customer: "Jon",
-      service: "Weekly Pool Cleaning",
-      message: "They said the filter still wasn't fixed.",
-      urgency: "Needs attention",
+      title: "Inbox",
+      description: "Handle unhappy customers first and mark them handled once you’ve followed up.",
+      badge: "2 new",
     },
     {
-      customer: "Alex",
-      service: "Spring filter check",
-      message: "Asked if they can edit their review after the follow-up.",
-      urgency: "Follow up",
+      title: "Replies",
+      description: "Draft and copy public replies without pretending we posted them for you.",
+      badge: "2 waiting",
     },
+    {
+      title: "Send from jobs",
+      description: "Create personalized requests tied to a specific customer, service, and employee.",
+    },
+    {
+      title: "QR / shared link",
+      description: "Use one stable business-wide link on cards, receipts, counters, and signs.",
+    },
+  ];
+
+  const REQUEST_FLOW = [
+    { label: "Sent", value: "24", detail: "Requests sent this month" },
+    { label: "Opened", value: "18", detail: "75% of sent" },
+    { label: "Copied", value: "12", detail: "Last confirmed handoff" },
   ];
 
   return (
@@ -496,17 +549,15 @@ function DashboardPreview() {
               <div
                 key={label}
                 className={`flex items-center justify-between rounded-[14px] px-3 py-2.5 text-[13px] font-medium ${
-                  active
-                    ? "bg-[#FFF1EC] text-[#E05A3D]"
-                    : "text-[#5E7268]"
+                  active ? "bg-[#FFF1EC] text-[#E05A3D]" : "text-[#5E7268]"
                 }`}
               >
                 <span>{label}</span>
-                {label === "Inbox" && (
+                {label === "Inbox" ? (
                   <span className="rounded-full bg-[#EEF2FF] px-2 py-0.5 text-[10px] font-semibold text-[#4F46E5]">
                     2
                   </span>
-                )}
+                ) : null}
               </div>
             ))}
           </div>
@@ -525,170 +576,236 @@ function DashboardPreview() {
         </div>
 
         <div className="p-5 sm:p-7">
-          <div className="mb-5 flex items-start justify-between gap-4">
+          <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8A948E]">
                 Home
               </p>
-              <h3 className="mt-2 text-[28px] font-semibold leading-[1.05] tracking-[-0.04em] text-[#1A2E25]">
+              <h3 className="mt-2 font-heading text-[30px] font-semibold leading-[1.02] tracking-tight text-[#1A2E25]">
                 Good morning, Crystal Clear Pools
               </h3>
               <p className="mt-2 max-w-[560px] text-[13px] leading-relaxed text-[#5E7268]">
-                Start with what needs your attention, then scan replies, recent
-                activity, and request flow.
+                Start with what needs your attention, then check private feedback, replies, and recent request activity.
               </p>
             </div>
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#E05A3D]">
-              <span className="text-[12px] font-bold text-white">CC</span>
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center justify-center rounded-[14px] border border-[#C84F34] bg-[#E05A3D] px-4 py-2.5 text-[13px] font-semibold text-white shadow-[0_1px_0_rgba(128,52,34,0.65)]">
+                Send request
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-[14px] border border-[#E0D5C5] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#1A2E25] shadow-[0_1px_0_rgba(217,206,191,0.9)]">
+                Open inbox
+                <span className="rounded-full bg-[#EFF6FF] px-2 py-0.5 text-[10px] font-semibold text-[#2563EB]">
+                  2
+                </span>
+              </span>
             </div>
           </div>
 
-          <div className="mb-5 grid gap-4 xl:grid-cols-[1.15fr,0.85fr]">
-            <div className="rounded-[22px] border border-[#E2E5E3] bg-white p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8A948E]">
-                    Needs attention
+          <div className="mb-5 grid gap-4 sm:grid-cols-3">
+            {STATS.map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-[18px] border border-[#E2E5E3] bg-white p-4"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8A948E]">
+                  {stat.label}
+                </p>
+                <p className="mt-2 text-[30px] font-semibold tracking-[-0.04em] text-[#1A2E25]">
+                  {stat.value}
+                </p>
+                <p className="mt-1 text-[12px] text-[#5E7268]">{stat.detail}</p>
+              </div>
+            ))}
+          </div>
+
+          <section className="mb-5 rounded-[22px] border border-[#F6D9A8] bg-[#FFF8EA] p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#A16207]">
+                  Needs attention now
+                </p>
+                <h4 className="mt-2 text-[22px] font-semibold tracking-tight text-[#1A2E25]">
+                  The work that actually needs you
+                </h4>
+                <p className="mt-2 max-w-[560px] text-[13px] leading-relaxed text-[#5E7268]">
+                  Home leads with unhappy customers, public reviews waiting on a response, and requests that stalled before they turned into usable reviews.
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-[12px] font-medium text-[#5E7268]">
+                <span className="h-2 w-2 rounded-full bg-[#E05A3D]" />
+                7 open items
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {ATTENTION_RAILS.map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-[16px] border border-white/70 bg-white/90 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8A948E]">
+                        {item.eyebrow}
+                      </p>
+                      <h5 className="mt-2 text-[18px] font-semibold tracking-tight text-[#1A2E25]">
+                        {item.title}
+                      </h5>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${item.tone}`}>
+                      {item.count}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-[13px] leading-relaxed text-[#5E7268]">
+                    {item.summary}
                   </p>
-                  <h4 className="mt-2 text-[24px] font-semibold leading-tight tracking-[-0.03em] text-[#1A2E25]">
-                    Private feedback and reply work should rise first.
-                  </h4>
+                  <p className="mt-4 text-[12px] font-semibold text-[#1A2E25]">{item.action}</p>
                 </div>
-                <div className="rounded-full bg-[#FFF1EC] px-3 py-1 text-[11px] font-semibold text-[#E05A3D]">
-                  Open inbox 2
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {INBOX.map((item) => (
-                  <div
-                    key={item.customer}
-                    className="rounded-[16px] border border-[#ECE8E1] bg-[#FFFCF8] p-4"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[14px] font-semibold text-[#1A2E25]">
-                          {item.customer}
-                        </p>
-                        <p className="mt-0.5 text-[12px] text-[#5E7268]">
-                          {item.service}
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-[#EEF2FF] px-2.5 py-1 text-[10px] font-semibold text-[#4F46E5]">
-                        {item.urgency}
-                      </span>
-                    </div>
-                    <p className="mt-3 text-[13px] leading-relaxed text-[#33413A]">
-                      {item.message}
-                    </p>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
+          </section>
 
-            <div className="rounded-[22px] border border-[#E2E5E3] bg-white p-5">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8A948E]">
-                How requests are moving
-              </p>
-              <div className="mt-4 space-y-3">
-                {REQUEST_FLOW.map((stage) => (
-                  <div
-                    key={stage.label}
-                    className="rounded-[16px] border border-[#ECE8E1] bg-[#FFFCF8] p-4"
-                  >
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8A948E]">
-                      {stage.label}
-                    </p>
-                    <div className="mt-2 flex items-end justify-between gap-3">
-                      <span className="text-[32px] font-semibold leading-none tracking-[-0.04em] text-[#1A2E25]">
-                        {stage.value}
-                      </span>
-                      <span className="text-[12px] text-[#5E7268]">
-                        {stage.detail}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-4 text-[12px] leading-relaxed text-[#5E7268]">
-                Copied is the last confirmed handoff. It does not mean we can
-                prove Google posted the review.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-[0.9fr,1.1fr]">
-            <div className="rounded-[22px] border border-[#E2E5E3] bg-white p-5">
-              <div className="flex items-center justify-between gap-3">
+          <div className="grid gap-4 xl:grid-cols-[1.15fr,0.85fr]">
+            <section className="rounded-[22px] border border-[#E2E5E3] bg-white p-5">
+              <div className="mb-4 flex items-end justify-between gap-3">
                 <div>
                   <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8A948E]">
-                    Reply queue
+                    Requests in motion
                   </p>
                   <h4 className="mt-2 text-[20px] font-semibold tracking-[-0.03em] text-[#1A2E25]">
-                    Two copied reviews are ready for a draft.
+                    What customers are doing right now
                   </h4>
                 </div>
-                <span className="rounded-full bg-[#ECFDF5] px-2.5 py-1 text-[10px] font-semibold text-[#059669]">
-                  2 ready
-                </span>
+                <span className="text-[12px] font-semibold text-[#5E7268]">Open send</span>
               </div>
 
-              <div className="mt-5 space-y-3">
-                {["Alex", "Sarah"].map((name) => (
-                  <div
-                    key={name}
-                    className="flex items-center justify-between rounded-[15px] border border-[#ECE8E1] bg-[#FFFCF8] px-4 py-3"
-                  >
-                    <div>
-                      <p className="text-[14px] font-semibold text-[#1A2E25]">
-                        {name}
-                      </p>
-                      <p className="mt-0.5 text-[12px] text-[#5E7268]">
-                        5-star review copied from weekly service
-                      </p>
-                    </div>
-                    <span className="rounded-full border border-[#E05A3D] px-3 py-1 text-[11px] font-semibold text-[#E05A3D]">
-                      Draft reply
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[22px] border border-[#E2E5E3] bg-white p-5">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8A948E]">
-                Recent activity
-              </p>
-              <div className="mt-4 space-y-3">
-                {ACTIVITY.map((item) => (
+              <div className="space-y-3">
+                {REQUESTS_IN_MOTION.map((item) => (
                   <div
                     key={`${item.name}-${item.time}`}
-                    className="flex items-start gap-3 rounded-[15px] border border-[#ECE8E1] bg-[#FFFCF8] px-4 py-3.5"
+                    className="rounded-[16px] border border-[#ECE8E1] bg-[#FFFCF8] p-4"
                   >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[11px] font-bold text-[#5E7268]">
-                      {item.name.slice(0, 1)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-[14px] font-semibold text-[#1A2E25]">
-                          {item.name}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-[14px] font-semibold text-[#1A2E25]">
+                            {item.name}
+                          </p>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.statusClass}`}>
+                            {item.status}
+                          </span>
+                          {item.stars ? (
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.starsClass}`}>
+                              {item.stars}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-[13px] leading-relaxed text-[#1A2E25]">
+                          {item.note}
                         </p>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.accent}`}
-                        >
-                          {item.status}
+                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[#5E7268]">
+                          <span>{item.meta}</span>
+                          <span>{item.time}</span>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        {item.secondaryAction ? (
+                          <span className="inline-flex items-center justify-center rounded-[13px] border border-[#E0D5C5] bg-white px-4 py-2 text-[12px] font-semibold text-[#1A2E25] shadow-[0_1px_0_rgba(217,206,191,0.9)]">
+                            {item.secondaryAction}
+                          </span>
+                        ) : null}
+                        <span className={`inline-flex items-center justify-center rounded-[13px] px-4 py-2 text-[12px] font-semibold shadow-[0_1px_0_rgba(217,206,191,0.55)] ${item.primaryActionClass}`}>
+                          {item.primaryAction}
                         </span>
                       </div>
-                      <p className="mt-1 text-[13px] leading-relaxed text-[#5E7268]">
-                        {item.note}
-                      </p>
                     </div>
-                    <span className="shrink-0 text-[11px] text-[#5E7268]">
-                      {item.time}
-                    </span>
                   </div>
                 ))}
               </div>
+
+              <p className="mt-4 text-[12px] leading-relaxed text-[#5E7268]">
+                This is the operational queue: private feedback, copied reviews ready for replies, and stalled requests that still might turn into usable reviews.
+              </p>
+            </section>
+
+            <div className="space-y-4">
+              <section className="rounded-[22px] border border-[#E2E5E3] bg-white p-5">
+                <div className="mb-4">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8A948E]">
+                    Run next
+                  </p>
+                  <h4 className="mt-2 text-[20px] font-semibold tracking-[-0.03em] text-[#1A2E25]">
+                    The rest of the owner workflow
+                  </h4>
+                </div>
+
+                <div className="grid gap-3">
+                  {RUN_NEXT.map((item) => (
+                    <div
+                      key={item.title}
+                      className="rounded-[15px] border border-[#ECE8E1] bg-[#FFFCF8] px-4 py-3.5"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[14px] font-semibold text-[#1A2E25]">
+                            {item.title}
+                          </p>
+                          <p className="mt-1 text-[12px] leading-relaxed text-[#5E7268]">
+                            {item.description}
+                          </p>
+                        </div>
+                        {item.badge ? (
+                          <span className="rounded-full bg-[#F4EFE8] px-2 py-0.5 text-[10px] font-semibold text-[#1A2E25]">
+                            {item.badge}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-[22px] border border-[#E2E5E3] bg-white p-5">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8A948E]">
+                      Request flow
+                    </p>
+                    <h4 className="mt-2 text-[20px] font-semibold tracking-[-0.03em] text-[#1A2E25]">
+                      How requests are moving
+                    </h4>
+                  </div>
+                  <div className="flex gap-1 rounded-full bg-[#EFEAE2] p-1">
+                    <span className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1A2E25] shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
+                      Month
+                    </span>
+                    <span className="px-3 py-1.5 text-[11px] font-semibold text-[#8A948E]">
+                      Week
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-3">
+                  {REQUEST_FLOW.map((stage) => (
+                    <div
+                      key={stage.label}
+                      className="rounded-[15px] border border-[#ECE8E1] bg-[#FFFCF8] p-4"
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8A948E]">
+                        {stage.label}
+                      </p>
+                      <p className="mt-2 text-[30px] font-semibold tracking-[-0.04em] text-[#1A2E25]">
+                        {stage.value}
+                      </p>
+                      <p className="mt-1 text-[12px] text-[#5E7268]">{stage.detail}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="mt-4 text-[12px] leading-relaxed text-[#5E7268]">
+                  Copied is the last confirmed handoff. It means the customer copied the review and opened Google. It does not mean we can prove they posted it.
+                </p>
+              </section>
             </div>
           </div>
         </div>

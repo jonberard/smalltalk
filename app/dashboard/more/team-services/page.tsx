@@ -5,8 +5,6 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import {
   SetupPageShell,
-  SetupSummaryRow,
-  SetupSummarySection,
   SetupTrustBanner,
 } from "@/components/dashboard/setup-shell";
 import {
@@ -43,14 +41,6 @@ export default function TeamServicesSetupPage() {
 
   if (!business) return null;
 
-  const neighborhoodCount = business.neighborhoods?.length ?? 0;
-  const serviceAreasValue =
-    neighborhoodCount > 0
-      ? `${neighborhoodCount} service area${neighborhoodCount === 1 ? "" : "s"} added`
-      : business.business_city
-        ? `Serving ${business.business_city}`
-        : "No service areas added yet";
-
   return (
     <SetupPageShell
       eyebrow="Setup / Team & Services"
@@ -64,41 +54,8 @@ export default function TeamServicesSetupPage() {
         {loading ? (
           <div className="grid gap-5 xl:grid-cols-2">
             {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="h-[120px] animate-pulse rounded-[var(--dash-radius)] bg-[var(--dash-border)]" />
+              <div key={index} className="h-[220px] animate-pulse rounded-[var(--dash-radius)] bg-[var(--dash-border)]" />
             ))}
-          </div>
-        ) : (
-          <SetupSummarySection heading="At a glance">
-            <SetupSummaryRow
-              label="Services"
-              value={`${services.length} service${services.length === 1 ? "" : "s"} set up`}
-              hint="These show up in Send when you create a request."
-              href="#services"
-              actionLabel="Edit"
-            />
-            <SetupSummaryRow
-              label="Team"
-              value={`${employees.length} team member${employees.length === 1 ? "" : "s"} added`}
-              hint="Use this if you want requests tied to the person who did the work."
-              href="#team"
-              actionLabel="Edit"
-            />
-            <SetupSummaryRow
-              label="Service areas"
-              value={serviceAreasValue}
-              hint="Useful if you want reviews to reflect where you work."
-              href="#areas"
-              actionLabel="Edit"
-              last
-            />
-          </SetupSummarySection>
-        )}
-
-        {loading ? (
-          <div className="grid gap-5 xl:grid-cols-2">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="h-[220px] animate-pulse rounded-[var(--dash-radius)] bg-[var(--dash-border)]" />
-          ))}
           </div>
         ) : (
           <div className="grid gap-5 xl:grid-cols-2">

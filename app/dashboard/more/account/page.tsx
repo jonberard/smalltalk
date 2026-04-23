@@ -11,8 +11,6 @@ import {
 } from "@/components/dashboard/setup-sections";
 import {
   SetupPageShell,
-  SetupSummaryRow,
-  SetupSummarySection,
   SetupTrustBanner,
 } from "@/components/dashboard/setup-shell";
 
@@ -21,22 +19,6 @@ export default function AccountSetupPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   if (!business) return null;
-
-  const status = business.subscription_status ?? "none";
-  const planValue =
-    status === "active"
-      ? "small Talk Pro is active."
-      : status === "trial" || status === "trialing"
-        ? "You are on the free trial."
-        : status === "past_due"
-          ? "Payment needs attention."
-          : status === "canceled"
-            ? "Subscription is canceled."
-            : "No paid plan is active yet.";
-  const planHint =
-    business.stripe_customer_id
-      ? "You can manage payment details and invoices in the billing portal."
-      : "Start billing when you're ready. Until then, this just stays informational.";
 
   return (
     <SetupPageShell
@@ -47,31 +29,6 @@ export default function AccountSetupPage() {
     >
       <div className="space-y-5">
         <SetupTrustBanner text="Nothing here changes the product day to day unless your billing or login details change." />
-
-        <SetupSummarySection heading="At a glance">
-          <SetupSummaryRow
-            label="Plan"
-            value={planValue}
-            hint={planHint}
-            href="#billing"
-            actionLabel="Open"
-          />
-          <SetupSummaryRow
-            label="Sign-in"
-            value={session?.user?.email ?? "No email on file"}
-            hint="You can reset your password or sign out below."
-            href="#login"
-            actionLabel="Open"
-          />
-          <SetupSummaryRow
-            label="Help"
-            value="Help Center and founder support are always available."
-            hint="Good place to check reminders, statuses, and product behavior before reaching out."
-            href="#help"
-            actionLabel="Open"
-            last
-          />
-        </SetupSummarySection>
 
         <section id="billing" className="scroll-mt-24">
           <BillingSummarySection business={business} />

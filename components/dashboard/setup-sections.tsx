@@ -577,6 +577,7 @@ export function NeighborhoodsList({
   }
 
   const areaColors = ["#06B6D4", "#8B5CF6", "#F97316", "#10B981", "#E11D48", "#E05A3D", "#F59E0B", "#6366F1"];
+  const areasBadge = items.length > 0 ? String(items.length) : "Not set";
 
   return (
     <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
@@ -586,12 +587,12 @@ export function NeighborhoodsList({
             <h3 className="text-[15px] font-semibold tracking-tight text-[var(--dash-text)]">Service areas</h3>
             <p className="mt-0.5 text-[11px] text-[#94A3B8]">Neighborhoods you serve and reference in reviews</p>
           </div>
-          {saving ? <span className="text-[11px] text-[#10B981]">Saving...</span> : null}
-          {!saving && items.length > 0 ? (
+          <div className="flex items-center gap-2">
+            {saving ? <span className="text-[11px] text-[#10B981]">Saving...</span> : null}
             <span className="rounded-full bg-[var(--dash-bg)] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[var(--dash-muted)]">
-              {items.length}
+              {areasBadge}
             </span>
-          ) : null}
+          </div>
         </div>
       </div>
 
