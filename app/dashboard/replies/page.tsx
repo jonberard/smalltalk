@@ -7,6 +7,8 @@ import { supabase, fetchWithAuth } from "@/lib/supabase";
 import { capture } from "@/lib/posthog";
 import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { DashboardHelpHint } from "@/components/dashboard/help-hint";
+import { DashboardRailSwitcher } from "@/components/dashboard/rail-switcher";
 import { SkeletonRow } from "@/components/dashboard/skeleton";
 import { StatusPill } from "@/components/dashboard/status-pill";
 
@@ -25,6 +27,8 @@ type ReplyItem = {
 };
 
 type ReplyFilter = "needs_reply" | "replied";
+
+const REPLIED_WINDOW_DAYS = 30;
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -150,18 +154,22 @@ function RepliesGuideCard() {
         </p>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link
-          href="/dashboard/more/review-flow/voice"
-          className={dashboardButtonClassName({ size: "sm" })}
-        >
-          Adjust reply voice
-        </Link>
-        <Link
-          href="/dashboard/support/what-copied-means"
-          className={dashboardButtonClassName({ size: "sm" })}
-        >
-          Review copied status
-        </Link>
+        <DashboardHelpHint text="Sets the tone for your drafted replies.">
+          <Link
+            href="/dashboard/more/review-flow/voice"
+            className={dashboardButtonClassName({ size: "sm" })}
+          >
+            Adjust reply voice
+          </Link>
+        </DashboardHelpHint>
+        <DashboardHelpHint text="Explains what copied does and does not confirm.">
+          <Link
+            href="/dashboard/support/what-copied-means"
+            className={dashboardButtonClassName({ size: "sm" })}
+          >
+            Review copied status
+          </Link>
+        </DashboardHelpHint>
       </div>
     </div>
   );
@@ -183,16 +191,33 @@ export default function RepliesPage() {
     const businessId = business.id;
 
     async function fetchReplies() {
-      const { data } = await supabase
-        .from("review_sessions")
-        .select("id, review_link_id, star_rating, generated_review, replied_at, reply_text, topics_selected, updated_at, review_links!inner(business_id, customer_name, services(name), employees(name))")
-        .eq("review_links.business_id", businessId)
-        .eq("status", "copied")
-        .neq("feedback_type", "private")
-        .order("updated_at", { ascending: false });
+      const repliedWindowStartIso = new Date(
+        Date.now() - REPLIED_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+      ).toISOString();
+      const selectFields =
+        "id, review_link_id, star_rating, generated_review, replied_at, reply_text, topics_selected, updated_at, review_links!inner(business_id, customer_name, services(name), employees(name))";
 
-      const nextItems =
-        data?.map((session) => {
+      const [needsReplyResult, repliedResult] = await Promise.all([
+        supabase
+          .from("review_sessions")
+          .select(selectFields)
+          .eq("review_links.business_id", businessId)
+          .eq("status", "copied")
+          .neq("feedback_type", "private")
+          .is("replied_at", null)
+          .order("updated_at", { ascending: false }),
+        supabase
+          .from("review_sessions")
+          .select(selectFields)
+          .eq("review_links.business_id", businessId)
+          .eq("status", "copied")
+          .neq("feedback_type", "private")
+          .not("replied_at", "is", null)
+          .gte("replied_at", repliedWindowStartIso)
+          .order("replied_at", { ascending: false }),
+      ]);
+
+      const nextItems = [...(needsReplyResult.data ?? []), ...(repliedResult.data ?? [])].map((session) => {
           const link = session.review_links as unknown as {
             customer_name: string;
             services: { name: string } | null;
@@ -212,7 +237,7 @@ export default function RepliesPage() {
             serviceType: link.services?.name ?? null,
             topicsSelected: session.topics_selected as { label: string; follow_up_answer: string }[] | null,
           } satisfies ReplyItem;
-        }) ?? [];
+        });
 
       setItems(nextItems);
       setLoading(false);
@@ -325,19 +350,23 @@ export default function RepliesPage() {
               Draft fast, paste on Google yourself, and keep the response tone aligned with how you want the business to show up.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Link
               href="/dashboard/support"
               className={dashboardButtonClassName({ size: "lg" })}
             >
               Help Center
             </Link>
-            <Link
-              href="/dashboard/more/review-flow/voice"
-              className={dashboardButtonClassName({ variant: "accent", size: "lg" })}
-            >
-              Reply voice
-            </Link>
+            <div className="flex items-center gap-2">
+              <DashboardHelpHint text="Sets the tone for your drafted replies." label="Reply voice help">
+                <Link
+                  href="/dashboard/more/review-flow/voice"
+                  className={dashboardButtonClassName({ variant: "accent", size: "lg" })}
+                >
+                  Reply voice
+                </Link>
+              </DashboardHelpHint>
+            </div>
           </div>
         </div>
 
@@ -364,8 +393,8 @@ export default function RepliesPage() {
               value={repliedCount}
               detail={
                 repliedCount > 0
-                  ? `${repliedCount} response${repliedCount === 1 ? "" : "s"} already drafted and copied.`
-                  : "Completed replies will stay here as your clean record."
+                  ? `${repliedCount} response${repliedCount === 1 ? "" : "s"} drafted and copied in the last ${REPLIED_WINDOW_DAYS} days.`
+                  : `Recent replies from the last ${REPLIED_WINDOW_DAYS} days will stay here as your clean record.`
               }
               tone="green"
             />
@@ -394,34 +423,15 @@ export default function RepliesPage() {
                     These are copied public reviews that still need a thoughtful owner response or a saved record of one.
                   </p>
                 </div>
-                <div className="flex gap-2 rounded-full bg-[#EFEAE2] p-1">
-                  {[
-                    { key: "needs_reply" as const, label: "Needs reply", count: needsReplyCount },
-                    { key: "replied" as const, label: "Replied", count: repliedCount },
-                  ].map((option) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => setFilter(option.key)}
-                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold transition-all ${
-                        filter === option.key
-                          ? "bg-white text-[var(--dash-text)] shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
-                          : "text-[var(--dash-muted)]"
-                      }`}
-                    >
-                      {option.label}
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] ${
-                          filter === option.key
-                            ? "bg-[#F4EFE8] text-[var(--dash-text)]"
-                            : "bg-white/70 text-[var(--dash-muted)]"
-                        }`}
-                      >
-                        {option.count}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                <DashboardRailSwitcher
+                  ariaLabel="Reply queue filters"
+                  value={filter}
+                  onChange={(next) => setFilter(next as ReplyFilter)}
+                  options={[
+                    { key: "needs_reply", label: "Needs reply", count: needsReplyCount },
+                    { key: "replied", label: "Replied", count: repliedCount },
+                  ]}
+                />
               </div>
             </div>
 
@@ -457,19 +467,29 @@ export default function RepliesPage() {
                       </div>
                     </div>
                     <div className="flex shrink-0 gap-2">
-                      <Link
-                        href={`/dashboard/requests/${item.reviewLinkId}`}
-                        className={dashboardButtonClassName({ size: "sm" })}
+                      <DashboardHelpHint text="View the full request timeline and customer details.">
+                        <Link
+                          href={`/dashboard/requests/${item.reviewLinkId}`}
+                          className={dashboardButtonClassName({ size: "sm" })}
+                        >
+                          Open request
+                        </Link>
+                      </DashboardHelpHint>
+                      <DashboardHelpHint
+                        text={
+                          item.repliedAt
+                            ? "Open the drafted reply again."
+                            : "Generate a suggested public reply."
+                        }
                       >
-                        Open request
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => generateReplyForItem(item)}
-                        className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
-                      >
-                        {item.repliedAt ? "View reply" : "Draft reply"}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => generateReplyForItem(item)}
+                          className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
+                        >
+                          {item.repliedAt ? "View reply" : "Draft reply"}
+                        </button>
+                      </DashboardHelpHint>
                     </div>
                   </div>
                 </div>
@@ -488,7 +508,7 @@ export default function RepliesPage() {
                   description={
                     filter === "needs_reply"
                       ? "When a customer copies a public review, it will show up here if you haven’t replied yet."
-                      : "Once you draft and copy a reply, it will stay here as a clean record."
+                      : `Replies from the last ${REPLIED_WINDOW_DAYS} days will stay here as a clean record.`
                   }
                 />
               </div>

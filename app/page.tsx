@@ -233,9 +233,26 @@ export default function LandingPage() {
             <div className="mt-8 text-center lg:text-left">
               <Link
                 href="#how-it-works"
-                className="text-[14px] font-medium text-muted underline underline-offset-4 transition-colors hover:text-primary"
+                className="group inline-flex items-center gap-2 text-[14px] font-semibold text-text transition-colors hover:text-primary"
               >
-                See how it works
+                <span className="relative">
+                  See how it works
+                  <span className="absolute inset-x-0 -bottom-1 h-px origin-left scale-x-0 bg-primary transition-transform duration-200 group-hover:scale-x-100" />
+                </span>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="transition-transform duration-200 group-hover:translate-x-0.5"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
               </Link>
             </div>
             <p className="mt-6 text-[13px] text-muted">

@@ -91,13 +91,14 @@ export default function ReviewFlowSetupPage() {
               value={topicCount === null ? "Loading topic set" : `${topicCount} active topics`}
               hint="What questions we ask customers"
             />
-            <SetupSummaryRow
-              href="/dashboard/more/review-flow/voice"
-              label="Reply voice"
-              value={hasCustomVoice ? "Custom tone" : "Using default voice"}
-              hint="How suggested replies sound"
-              last
-            />
+          <SetupSummaryRow
+            href="/dashboard/more/review-flow/voice"
+            label="Reply voice"
+            value={hasCustomVoice ? "Custom tone" : "Using default voice"}
+            hint="How suggested replies sound"
+            helpText="Sets the tone for your drafted replies."
+            last
+          />
           </SetupSummarySection>
         </div>
 

@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
 import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { DashboardRailSwitcher } from "@/components/dashboard/rail-switcher";
 import { SkeletonRow } from "@/components/dashboard/skeleton";
 import { StatusPill } from "@/components/dashboard/status-pill";
 
@@ -357,34 +358,15 @@ export default function InboxPage() {
                     Open the note, follow up directly, then keep the record clean once it is resolved.
                   </p>
                 </div>
-                <div className="flex gap-2 rounded-full bg-[#EFEAE2] p-1">
-                  {[
-                    { key: "new" as const, label: "New", count: newCount },
-                    { key: "handled" as const, label: "Handled", count: handledCount },
-                  ].map((option) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => setFilter(option.key)}
-                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold transition-all ${
-                        filter === option.key
-                          ? "bg-white text-[var(--dash-text)] shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
-                          : "text-[var(--dash-muted)]"
-                      }`}
-                    >
-                      {option.label}
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] ${
-                          filter === option.key
-                            ? "bg-[#F4EFE8] text-[var(--dash-text)]"
-                            : "bg-white/70 text-[var(--dash-muted)]"
-                        }`}
-                      >
-                        {option.count}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                <DashboardRailSwitcher
+                  ariaLabel="Private feedback filters"
+                  value={filter}
+                  onChange={(next) => setFilter(next as InboxFilter)}
+                  options={[
+                    { key: "new", label: "New", count: newCount },
+                    { key: "handled", label: "Handled", count: handledCount },
+                  ]}
+                />
               </div>
             </div>
 

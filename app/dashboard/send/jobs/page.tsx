@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { dashboardButtonClassName } from "@/components/dashboard/button";
+import { DashboardHelpHint } from "@/components/dashboard/help-hint";
 import { SetupInfoStrip, SetupPageShell } from "@/components/dashboard/setup-shell";
 import {
   Paywall,
@@ -46,12 +47,14 @@ export default function SendJobsPage() {
         />
 
         <div className="flex justify-end">
-          <Link
-            href="/dashboard/send/qr"
-            className={dashboardButtonClassName({ size: "md" })}
-          >
-            Open QR / shared link
-          </Link>
+          <DashboardHelpHint text="Reusable link for cards, signs, and follow-ups.">
+            <Link
+              href="/dashboard/send/qr"
+              className={dashboardButtonClassName({ size: "md" })}
+            >
+              Open QR / shared link
+            </Link>
+          </DashboardHelpHint>
         </div>
 
         <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">

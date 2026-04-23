@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { landingButtonClassName } from "@/components/landing/button";
 
 export default function LandingNav() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -47,9 +48,13 @@ export default function LandingNav() {
         )}
         <Link
           href={ctaHref}
-          className="rounded-full border border-accent px-6 py-2.5 text-[14px] font-semibold text-text transition-colors duration-300 hover:border-primary hover:text-primary"
+          className={landingButtonClassName({ variant: "secondary", size: "nav" })}
         >
-          {loggedIn ? "Dashboard" : "Get Started"}
+          <span className="absolute inset-y-0 left-0 w-full -translate-x-full bg-[#FBF2E8] transition-transform duration-200 ease-out group-hover:translate-x-0" />
+          <span className="absolute inset-x-5 bottom-2 h-px origin-left scale-x-0 bg-primary transition-transform duration-200 ease-out group-hover:scale-x-100" />
+          <span className="relative z-10 inline-flex items-center">
+            {loggedIn ? "Dashboard" : "Get Started"}
+          </span>
         </Link>
       </div>
     </nav>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DashboardHelpHint } from "@/components/dashboard/help-hint";
 
 export function SetupPageShell({
   eyebrow,
@@ -186,6 +187,7 @@ export function SetupSummaryRow({
   label,
   value,
   hint,
+  helpText,
   href,
   actionLabel,
   accent = false,
@@ -194,6 +196,7 @@ export function SetupSummaryRow({
   label: string;
   value: string;
   hint?: string;
+  helpText?: string;
   href?: string;
   actionLabel?: string;
   accent?: boolean;
@@ -208,9 +211,12 @@ export function SetupSummaryRow({
       }`}
     >
       <div className="min-w-0 flex-1">
-        <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
-          {label}
-        </p>
+        <div className="mb-0.5 flex items-center gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+            {label}
+          </p>
+          {helpText ? <DashboardHelpHint text={helpText} label={`${label} help`} /> : null}
+        </div>
         <p className="text-[14px] font-medium leading-[1.35] text-[var(--dash-text)]">
           {value}
         </p>
@@ -230,7 +236,7 @@ export function SetupSummaryRow({
 
   if (href) {
     return (
-      <Link href={href} className="block">
+      <Link href={href} className="block" title={helpText}>
         {content}
       </Link>
     );

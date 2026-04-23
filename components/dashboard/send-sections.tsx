@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Business } from "@/lib/types";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
 import { capture } from "@/lib/posthog";
@@ -9,6 +9,7 @@ import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { useToast } from "@/components/dashboard/toast";
+import { buildQrSvg } from "@/lib/qr-code";
 import {
   getReminderBadgeState,
   type ReminderBadgeState,
@@ -560,6 +561,13 @@ export function QRBlock({
   const [genericCode, setGenericCode] = useState<string | null>(null);
   const [loadingLink, setLoadingLink] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [origin, setOrigin] = useState("https://usesmalltalk.com");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+  }, []);
 
   useEffect(() => {
     async function loadOrCreateGenericLink() {
@@ -587,13 +595,30 @@ export function QRBlock({
     void loadOrCreateGenericLink();
   }, [businessId]);
 
-  const link = genericCode ? `usesmalltalk.com/r/${genericCode}` : null;
+  const fullLink = genericCode ? `${origin}/r/${genericCode}` : null;
+  const displayLink = genericCode ? `${origin.replace(/^https?:\/\//, "")}/r/${genericCode}` : null;
+  const qrSvg = useMemo(() => {
+    if (!fullLink) return null;
+    return buildQrSvg(fullLink, {
+      foreground: "#1A1D20",
+      background: "#FFFFFF",
+      quietZone: 4,
+    });
+  }, [fullLink]);
+
+  function buildFilename(extension: "svg" | "png") {
+    const safeName = businessName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return `${safeName || "small-talk"}-review-qr.${extension}`;
+  }
 
   function handleCopy() {
-    if (!link) return;
-    navigator.clipboard?.writeText(`https://${link}`).catch(() => {
+    if (!fullLink) return;
+    navigator.clipboard?.writeText(fullLink).catch(() => {
       const ta = document.createElement("textarea");
-      ta.value = `https://${link}`;
+      ta.value = fullLink;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand("copy");
@@ -603,11 +628,66 @@ export function QRBlock({
     setTimeout(() => setCopied(false), 2000);
   }
 
+  function triggerDownload(url: string, filename: string) {
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  }
+
+  function handleDownloadSvg() {
+    if (!qrSvg) return;
+
+    const blob = new Blob([qrSvg], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    triggerDownload(url, buildFilename("svg"));
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  async function handleDownloadPng() {
+    if (!qrSvg) return;
+
+    const blob = new Blob([qrSvg], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    try {
+      const image = new Image();
+      image.decoding = "async";
+
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("Could not load QR image."));
+        image.src = url;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = 1200;
+      canvas.height = 1200;
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        throw new Error("Canvas is not available.");
+      }
+
+      context.fillStyle = "#FFFFFF";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.imageSmoothingEnabled = false;
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      const pngUrl = canvas.toDataURL("image/png");
+      triggerDownload(pngUrl, buildFilename("png"));
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
   if (loadingLink) {
     return <div className="h-[140px] animate-pulse rounded-[var(--dash-radius)] bg-[#F4F4F5]" />;
   }
 
-  if (!link) return null;
+  if (!fullLink || !displayLink || !qrSvg) return null;
 
   return (
     <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-5 shadow-[var(--dash-shadow)]">
@@ -622,35 +702,17 @@ export function QRBlock({
       </p>
 
       <div className="mt-5 flex items-start gap-4">
-        <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-[8px] border border-[var(--dash-border)] bg-[var(--dash-bg)]">
-          <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
-            <rect x="4" y="4" width="20" height="20" rx="2" stroke="var(--dash-text)" strokeWidth="3" fill="none" />
-            <rect x="9" y="9" width="10" height="10" rx="1" fill="var(--dash-text)" />
-            <rect x="48" y="4" width="20" height="20" rx="2" stroke="var(--dash-text)" strokeWidth="3" fill="none" />
-            <rect x="53" y="9" width="10" height="10" rx="1" fill="var(--dash-text)" />
-            <rect x="4" y="48" width="20" height="20" rx="2" stroke="var(--dash-text)" strokeWidth="3" fill="none" />
-            <rect x="9" y="53" width="10" height="10" rx="1" fill="var(--dash-text)" />
-            {[
-              [28, 8], [32, 8], [36, 8], [40, 8],
-              [28, 14], [36, 14], [44, 14],
-              [4, 28], [8, 28], [14, 28], [20, 28], [28, 28], [36, 28], [44, 28], [52, 28], [60, 28],
-              [8, 32], [16, 32], [24, 32], [32, 32], [40, 32], [48, 32], [56, 32], [64, 32],
-              [4, 36], [12, 36], [20, 36], [28, 36], [36, 36], [44, 36], [52, 36], [64, 36],
-              [8, 40], [16, 40], [32, 40], [40, 40], [48, 40], [60, 40],
-              [4, 44], [12, 44], [20, 44], [28, 44], [36, 44], [56, 44], [64, 44],
-              [28, 52], [36, 52], [44, 52], [52, 52], [60, 52],
-              [28, 56], [32, 56], [40, 56], [48, 56], [56, 56], [64, 56],
-              [28, 60], [36, 60], [44, 60], [52, 60], [60, 60], [64, 60],
-              [28, 64], [32, 64], [40, 64], [48, 64], [56, 64],
-            ].map(([x, y], i) => (
-              <rect key={i} x={x} y={y} width="3" height="3" fill="var(--dash-text)" />
-            ))}
-          </svg>
+        <div className="flex h-[168px] w-[168px] shrink-0 items-center justify-center rounded-[14px] border border-[var(--dash-border)] bg-white p-3 shadow-[0_1px_0_rgba(217,206,191,0.7)]">
+          <div
+            className="h-full w-full"
+            aria-label={`QR code for ${businessName}`}
+            dangerouslySetInnerHTML={{ __html: qrSvg }}
+          />
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-2.5">
           <div className="flex items-center gap-2 rounded-[8px] bg-[var(--dash-bg)] px-3 py-2">
-            <span className="flex-1 truncate text-[13px] font-medium text-[var(--dash-text)]">{link}</span>
+            <span className="flex-1 truncate text-[13px] font-medium text-[var(--dash-text)]">{displayLink}</span>
             <button
               type="button"
               onClick={handleCopy}
@@ -663,6 +725,25 @@ export function QRBlock({
           </div>
           <p className="text-[11px] leading-relaxed text-[var(--dash-muted)]">
             This generic link works for any customer. For personalized links with pre-filled names and services, use Send from jobs instead.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadPng}
+              className={dashboardButtonClassName({ variant: "primary", size: "sm" })}
+            >
+              Download PNG
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadSvg}
+              className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}
+            >
+              Download SVG
+            </button>
+          </div>
+          <p className="text-[11px] leading-relaxed text-[var(--dash-muted)]">
+            PNG works well for quick printing. SVG stays sharp for designers, signs, and larger formats.
           </p>
         </div>
       </div>

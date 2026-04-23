@@ -11,6 +11,7 @@ import {
   REVIEW_REQUEST_TEMPLATE_TOKENS,
 } from "@/lib/review-request-messages";
 import { dashboardButtonClassName, dashboardUtilityLinkClassName } from "@/components/dashboard/button";
+import { DashboardHelpHint } from "@/components/dashboard/help-hint";
 import { useToast } from "@/components/dashboard/toast";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -845,7 +846,13 @@ export function ReplyVoiceSection({
   return (
     <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">
       <div className="mb-1 flex items-center justify-between">
-        <h3 className="text-[15px] font-semibold text-[var(--dash-text)]">Reply voice</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-[15px] font-semibold text-[var(--dash-text)]">Reply voice</h3>
+          <DashboardHelpHint
+            text="Sets the tone for your drafted replies."
+            label="Reply voice help"
+          />
+        </div>
         {saved ? <span className="text-[12px] font-medium text-[var(--dash-success)]">Saved</span> : null}
         {saving ? <span className="text-[12px] font-medium text-[var(--dash-muted)]">Saving...</span> : null}
       </div>
