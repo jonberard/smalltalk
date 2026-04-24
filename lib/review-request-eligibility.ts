@@ -9,13 +9,18 @@ export type ReviewRequestBusiness = {
   trial_requests_remaining: number;
   trial_ends_at: string | null;
   reminder_sequence_enabled: boolean | null;
+  quiet_hours_start: number | null;
+  quiet_hours_end: number | null;
+  business_timezone: string | null;
+  batch_initial_sms_enabled: boolean | null;
+  batch_initial_sms_hour: number | null;
   review_request_sms_template: string | null;
   review_request_email_subject_template: string | null;
   review_request_email_intro_template: string | null;
 };
 
 export const REVIEW_REQUEST_BUSINESS_SELECT =
-  "id, name, subscription_status, trial_requests_remaining, trial_ends_at, reminder_sequence_enabled, review_request_sms_template, review_request_email_subject_template, review_request_email_intro_template";
+  "id, name, subscription_status, trial_requests_remaining, trial_ends_at, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone, batch_initial_sms_enabled, batch_initial_sms_hour, review_request_sms_template, review_request_email_subject_template, review_request_email_intro_template";
 
 export function isBusinessAllowedToCreateReviewRequest(
   business: ReviewRequestBusiness,

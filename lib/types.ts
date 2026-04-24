@@ -30,6 +30,8 @@ export type Business = {
   quiet_hours_start: number;
   quiet_hours_end: number;
   business_timezone: string;
+  batch_initial_sms_enabled: boolean;
+  batch_initial_sms_hour: number;
   created_at: string;
 };
 
@@ -61,6 +63,8 @@ export type BusinessInsert = {
   quiet_hours_start?: number;
   quiet_hours_end?: number;
   business_timezone?: string;
+  batch_initial_sms_enabled?: boolean;
+  batch_initial_sms_hour?: number;
   created_at?: string;
 };
 

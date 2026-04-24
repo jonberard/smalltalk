@@ -153,6 +153,10 @@ function getPrimaryRequestStatus(request: RequestRow) {
     return "opted_out";
   }
 
+  if (initialDelivery?.status === "pending") {
+    return "queued";
+  }
+
   if (latestPublic?.status === "copied") {
     return "copied";
   }
@@ -198,6 +202,8 @@ function getStatusSummary(status: string) {
       return "The first delivery attempt failed, so the customer may never have seen this request.";
     case "opted_out":
       return "The customer opted out of follow-up messages, so the reminder sequence stopped.";
+    case "queued":
+      return "The request is queued for the next send window. The link exists, but the first SMS has not gone out yet.";
     default:
       return "The request exists, but there is no confirmed customer activity on it yet.";
   }
@@ -274,6 +280,17 @@ function buildDeliveryEvent(delivery: RequestDelivery, index: number): TimelineE
       order: 20 + index,
       title: `${label} skipped`,
       body,
+      tone: "neutral",
+    };
+  }
+
+  if (delivery.status === "pending" && delivery.kind === "initial") {
+    return {
+      id: delivery.id,
+      timestamp: delivery.scheduled_for,
+      order: 20 + index,
+      title: "Initial request queued",
+      body: "Waiting for the next send window before the first text goes out.",
       tone: "neutral",
     };
   }

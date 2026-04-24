@@ -126,3 +126,34 @@ export function getNextAllowedSendAt(
     timeZone,
   );
 }
+
+export function getNextBatchSendAt(
+  date: Date,
+  timeZone: string,
+  batchHour: number,
+  quietHoursStart: number,
+  quietHoursEnd: number,
+) {
+  const parts = getZonedParts(date, timeZone);
+
+  let targetParts: ZonedDateParts = {
+    ...parts,
+    hour: batchHour,
+    minute: 0,
+    second: 0,
+  };
+
+  let candidate = zonedDateTimeToUtc(targetParts, timeZone);
+
+  if (candidate.getTime() <= date.getTime()) {
+    targetParts = {
+      ...addLocalDays(parts, 1),
+      hour: batchHour,
+      minute: 0,
+      second: 0,
+    };
+    candidate = zonedDateTimeToUtc(targetParts, timeZone);
+  }
+
+  return getNextAllowedSendAt(candidate, timeZone, quietHoursStart, quietHoursEnd);
+}

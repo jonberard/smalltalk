@@ -4,12 +4,59 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { fetchWithAuth, supabase } from "@/lib/supabase";
-import {
-  SetupPageShell,
-  SetupSummaryRow,
-  SetupSummarySection,
-  SetupTrustBanner,
-} from "@/components/dashboard/setup-shell";
+import { SetupPageShell } from "@/components/dashboard/setup-shell";
+
+function formatHourLabel(hour: number) {
+  if (hour === 0) return "12:00 AM";
+  if (hour < 12) return `${hour}:00 AM`;
+  if (hour === 12) return "12:00 PM";
+  return `${hour - 12}:00 PM`;
+}
+
+function SetupOverviewCard({
+  href,
+  eyebrow,
+  title,
+  value,
+  detail,
+  accent,
+}: {
+  href: string;
+  eyebrow: string;
+  title: string;
+  value: string;
+  detail: string;
+  accent?: "coral" | "sage";
+}) {
+  return (
+    <Link
+      href={href}
+      className={`group rounded-[var(--dash-radius)] border bg-white p-5 shadow-[var(--dash-shadow)] transition-all duration-200 hover:-translate-y-[1px] ${
+        accent === "coral"
+          ? "border-[#E7C6B9] hover:border-[#D8A693]"
+          : accent === "sage"
+            ? "border-[#D8E2DB] hover:border-[#BFD0C5]"
+            : "border-[var(--dash-border)] hover:border-[#D8CCB7]"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+            {eyebrow}
+          </p>
+          <h2 className="mt-2 text-[20px] font-heading font-semibold leading-none tracking-[-0.03em] text-[var(--dash-text)]">
+            {title}
+          </h2>
+        </div>
+        <span className="text-[18px] text-[var(--dash-muted)] transition-transform duration-200 group-hover:translate-x-0.5">
+          →
+        </span>
+      </div>
+      <p className="mt-3 text-[14px] font-semibold text-[var(--dash-text)]">{value}</p>
+      <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">{detail}</p>
+    </Link>
+  );
+}
 
 export default function MorePage() {
   const { business, session, signOut } = useAuth();
@@ -73,121 +120,119 @@ export default function MorePage() {
 
   if (!business) return null;
 
-  const serviceAreaCount = business.neighborhoods?.length ?? 0;
-  const teamServicesValue =
-    serviceCount === null || employeeCount === null
-      ? "Loading team and services"
-      : `${employeeCount} ${employeeCount === 1 ? "person" : "people"} · ${serviceCount} ${
-          serviceCount === 1 ? "service" : "services"
-        }`;
-  const teamServicesHint =
-    serviceAreaCount > 0
-      ? `${serviceAreaCount} ${serviceAreaCount === 1 ? "service area" : "service areas"} on file`
-      : "Who you send from and what you offer";
+  const areaCount = business.neighborhoods?.length ?? 0;
   const reviewFlowCustomized = Boolean(
     business.review_request_sms_template ||
       business.review_request_email_subject_template ||
       business.review_request_email_intro_template ||
       business.custom_reply_voice,
   );
-  const reviewFlowValue = reviewFlowCustomized
-    ? "Some custom edits"
-    : "Using recommended defaults";
-  const planValue =
+  const accountValue =
     business.subscription_status === "active" || business.subscription_status === "trialing"
-      ? "Active subscription"
+      ? "Paid through billing"
       : business.subscription_status === "trial"
-        ? `Free trial · ${business.trial_requests_remaining} requests left`
+        ? `${business.trial_requests_remaining} requests left in trial`
         : business.subscription_status === "past_due"
           ? "Billing needs attention"
-          : business.subscription_status === "canceled"
-            ? "Canceled"
-            : "No active plan";
+          : "No active plan";
 
   return (
     <SetupPageShell
-      eyebrow="Setup"
-      title="You're all set up."
-      description="small Talk is running on recommended defaults. Edit anything below - or leave it as is."
+      eyebrow="More / Overview"
+      title="Setup"
+      description="How your business is set up in small Talk. Four areas - change what you need, leave the rest."
+      headerTone="detail"
       backHref="/dashboard"
       backLabel="Back to dashboard"
-      headerTone="detail"
     >
-      <div className="mx-auto max-w-[760px] space-y-6">
-        <SetupTrustBanner />
+      <div className="space-y-5">
+        <section className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white px-5 py-4 shadow-[var(--dash-shadow)]">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-5">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+                  Everything’s running
+                </p>
+                <p className="mt-2 text-[24px] font-heading font-semibold leading-none tracking-[-0.03em] text-[var(--dash-text)]">
+                  All good
+                </p>
+              </div>
+              <div className="max-w-[52ch] pt-0.5 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                Your profile is live, Google is {business.google_place_id ? "connected" : "ready to connect"}, the review flow is{" "}
+                {business.batch_initial_sms_enabled ? `batching texts at ${formatHourLabel(business.batch_initial_sms_hour ?? 18)}` : "running on direct send"}, and your account is{" "}
+                {business.subscription_status === "active" || business.subscription_status === "trialing" ? "paid up" : business.subscription_status}.
+              </div>
+            </div>
+            <div className="text-[12px] text-[var(--dash-muted)]">
+              {session?.user?.email ?? business.owner_email ?? "Owner account"}
+            </div>
+          </div>
+        </section>
 
-        <SetupSummarySection heading="Your business">
-          <SetupSummaryRow
+        <div className="grid gap-5 xl:grid-cols-2">
+          <SetupOverviewCard
             href="/dashboard/more/profile"
-            label="Business"
-            value={business.name}
-            hint={`${business.business_city ?? "Location not added yet"} · ${
-              business.logo_url ? "Logo uploaded" : "Logo not added yet"
-            }`}
+            eyebrow="Profile"
+            title={business.name}
+            value={`${business.business_city ?? "Location pending"} · ${business.logo_url ? "Logo on file" : "Logo not added"}`}
+            detail={business.google_place_id ? "Google profile connected and reviews can sync in." : "Connect your Google Business Profile to complete the handoff."}
+            accent="coral"
           />
-          <SetupSummaryRow
+          <SetupOverviewCard
             href="/dashboard/more/team-services"
-            label="Team & services"
-            value={teamServicesValue}
-            hint={teamServicesHint}
-          />
-          <SetupSummaryRow
-            href="/dashboard/more/profile"
-            label="Google profile"
-            value={business.google_place_id ? "Connected" : "Not connected yet"}
-            hint={
-              business.google_place_id
-                ? "Reviews are pulled in automatically"
-                : "Connect your Google Business Profile"
+            eyebrow="Team & services"
+            title={
+              serviceCount === null || employeeCount === null
+                ? "Loading"
+                : `${employeeCount} ${employeeCount === 1 ? "person" : "people"} · ${serviceCount} ${serviceCount === 1 ? "service" : "services"}`
             }
-            accent={Boolean(business.google_place_id)}
-            last
+            value={
+              areaCount > 0
+                ? `${areaCount} ${areaCount === 1 ? "service area" : "service areas"}`
+                : "Service areas not set yet"
+            }
+            detail="Who shows up on requests, what you offer, and where you work."
+            accent="sage"
           />
-        </SetupSummarySection>
-
-        <SetupSummarySection
-          heading="How requests work"
-          note="Opens a calmer page with the basics first and optional customization second."
-        >
-          <SetupSummaryRow
+          <SetupOverviewCard
             href="/dashboard/more/review-flow"
-            label="Review flow"
-            value={reviewFlowValue}
-            hint="Message, reminders, topics, and reply voice"
-            last
-          />
-        </SetupSummarySection>
-
-        <SetupSummarySection heading="Account">
-          <SetupSummaryRow
-            href="/dashboard/more/account"
-            label="Plan"
-            value={planValue}
-            hint={
-              business.subscription_status === "trial"
-                ? "Most businesses upgrade only after the trial feels useful"
-                : "Billing, invoices, and plan controls"
+            eyebrow="Review flow"
+            title={reviewFlowCustomized ? "Customized" : "Using defaults"}
+            value={
+              business.batch_initial_sms_enabled
+                ? `Texts queue for ${formatHourLabel(business.batch_initial_sms_hour ?? 18)}`
+                : "Texts send right away"
             }
+            detail="Message, reminders, timing, topics, and reply voice live here."
           />
-          <SetupSummaryRow
+          <SetupOverviewCard
             href="/dashboard/more/account"
-            label="Login"
-            value={session?.user?.email ?? business.owner_email ?? "No login email"}
-            hint="Password, account access, and sign-in basics"
-            last
+            eyebrow="Account"
+            title={accountValue}
+            value={business.subscription_status === "trial" ? "Upgrade whenever it feels useful" : "Billing, login, and support"}
+            detail="Keep the account side tidy without digging through settings."
           />
-        </SetupSummarySection>
+        </div>
 
         {isFounderAdmin ? (
-          <SetupSummarySection heading="Internal">
-            <SetupSummaryRow
-              href="/admin"
-              label="Founder admin"
-              value="Internal operations view"
-              hint="Support, business health, and system controls"
-              last
-            />
-          </SetupSummarySection>
+          <section className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+              Internal
+            </p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-[18px] font-semibold tracking-tight text-[var(--dash-text)]">
+                  Founder admin
+                </h2>
+                <p className="mt-1 text-[13px] text-[var(--dash-muted)]">
+                  Support, business health, and internal operations.
+                </p>
+              </div>
+              <Link href="/admin" className="font-medium text-[#E05A3D] underline decoration-[rgba(224,90,61,0.35)] underline-offset-4">
+                Open founder admin
+              </Link>
+            </div>
+          </section>
         ) : null}
 
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-2 pb-4 text-[13px] text-[var(--dash-muted)]">

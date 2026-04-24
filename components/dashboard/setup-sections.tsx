@@ -70,6 +70,9 @@ export function BusinessProfile({
     logo_url: string | null;
     google_review_url: string;
     google_place_id: string | null;
+    owner_email: string | null;
+    business_city: string | null;
+    neighborhoods: string[] | null;
   };
 }) {
   const { toast } = useToast();
@@ -77,6 +80,7 @@ export function BusinessProfile({
   const [name, setName] = useState(initial.name);
   const [googleUrl, setGoogleUrl] = useState(initial.google_review_url);
   const [placeId, setPlaceId] = useState<string | null>(initial.google_place_id);
+  const [businessCity, setBusinessCity] = useState(initial.business_city);
   const [logoPreview, setLogoPreview] = useState<string | null>(initial.logo_url);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -158,6 +162,7 @@ export function BusinessProfile({
     setSearchResults([]);
 
     const city = extractCity(place.address);
+    setBusinessCity(city);
     const savedProfileChange = await save({
       google_review_url: url,
       google_place_id: place.place_id,
@@ -178,6 +183,7 @@ export function BusinessProfile({
       );
       setPlaceId(savedProfile.google_place_id);
       setGoogleUrl(savedProfile.google_review_url);
+      setBusinessCity(initial.business_city);
     }
   }
 
@@ -185,6 +191,7 @@ export function BusinessProfile({
     setSelectedPlace(null);
     setPlaceId(null);
     setGoogleUrl("");
+    setBusinessCity(null);
     void save({ google_review_url: "", google_place_id: null, business_city: null });
   }
 
@@ -216,192 +223,344 @@ export function BusinessProfile({
     toast("Logo updated.", "success");
   }
 
+  const connectedToGoogle = Boolean(placeId || googleUrl.trim());
+  const neighborhoodCount = initial.neighborhoods?.length ?? 0;
+  const areaSummary = businessCity
+    ? neighborhoodCount > 0
+      ? `${businessCity} + ${neighborhoodCount} area${neighborhoodCount === 1 ? "" : "s"}`
+      : businessCity
+    : neighborhoodCount > 0
+      ? `${neighborhoodCount} service area${neighborhoodCount === 1 ? "" : "s"}`
+      : "Service area not set";
+
+  let googleHost = "";
+  try {
+    googleHost = googleUrl ? new URL(googleUrl).host.replace(/^www\./, "") : "";
+  } catch {
+    googleHost = googleUrl;
+  }
+
   return (
-    <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
-      <div className="relative overflow-hidden rounded-t-[16px] bg-gradient-to-br from-[#E05A3D]/[0.04] via-[#F8F9FA] to-[#E05A3D]/[0.02] px-6 pb-6 pt-8">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) void handleLogoUpload(file);
-          }}
-        />
+    <div className="space-y-5">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void handleLogoUpload(file);
+        }}
+      />
 
-        <div className="flex flex-col items-center">
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            className="group relative mb-4 flex h-24 w-24 items-center justify-center overflow-hidden rounded-[20px] bg-white shadow-[0_4px_24px_rgba(224,90,61,0.12)] ring-1 ring-[rgba(228,228,231,0.5)] transition-all duration-300 hover:shadow-[0_8px_32px_rgba(224,90,61,0.18)] active:scale-[0.97]"
-          >
-            {logoPreview ? (
-              <img src={logoPreview} alt="Logo" className="h-full w-full object-cover" />
-            ) : (
-              <span className="text-[24px] font-bold tracking-tight text-[#E05A3D]">{initials}</span>
-            )}
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-[20px] bg-[#18181B]/0 transition-all duration-300 group-hover:bg-[#18181B]/50">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="translate-y-1 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100"
-              >
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
-              <span className="translate-y-1 text-[10px] font-medium text-white opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-                Upload
-              </span>
-            </div>
-          </button>
-
-          <p className="text-[18px] font-bold tracking-tight text-[var(--dash-text)]">{name || "Your Business"}</p>
-
-          <div className="mt-3 flex items-center gap-2 rounded-full bg-white/80 px-3.5 py-1.5 shadow-[var(--dash-shadow)] ring-1 ring-[rgba(228,228,231,0.5)]">
-            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#E05A3D]/10">
-              <span className="text-[8px] font-bold text-[#E05A3D]">{initials.slice(0, 2)}</span>
-            </div>
-            <span className="text-[11px] text-[var(--dash-muted)]">How customers see you</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-4 px-6 py-6">
-        <div>
-          <label className="mb-2 block text-[12px] font-medium text-[var(--dash-muted)]">Business name</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            onBlur={() => {
-              if (name !== savedProfile.name) void save({ name });
-            }}
-            placeholder="Your business name"
-            className="w-full rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-4 py-3 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-all duration-300 focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block text-[12px] font-medium text-[var(--dash-muted)]">Google Business Profile</label>
-          {selectedPlace && placeId ? (
-            <div className="flex items-start gap-3 rounded-[var(--dash-radius-sm)] border border-[#10B981]/30 bg-[#ECFDF5] px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-[#10B981]">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <polyline points="22 4 12 14.01 9 11.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span className="text-[13px] font-medium text-[var(--dash-text)]">{selectedPlace.name || "Connected"}</span>
+      <div className="grid gap-5 xl:grid-cols-[1.08fr,0.92fr]">
+        <section className="overflow-hidden rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
+          <div className="relative overflow-hidden bg-gradient-to-br from-[#E05A3D]/[0.09] via-[#F8F9FA] to-[#DDE5DF] px-6 pb-6 pt-8">
+            <div className="absolute inset-x-0 top-0 h-[1px] bg-[linear-gradient(90deg,rgba(224,90,61,0.4),rgba(221,229,223,0.2),rgba(224,90,61,0.2))]" />
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="group relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[20px] bg-[#284A63] shadow-[0_14px_34px_rgba(40,74,99,0.18)] ring-1 ring-white/80 transition-all duration-300 hover:-translate-y-[1px] hover:shadow-[0_20px_38px_rgba(40,74,99,0.2)] active:scale-[0.98]"
+                >
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Logo" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-[26px] font-heading font-semibold tracking-[-0.04em] text-white">{initials}</span>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#13261F]/0 text-[11px] font-semibold text-white opacity-0 transition-all duration-300 group-hover:bg-[#13261F]/40 group-hover:opacity-100">
+                    Upload
+                  </div>
+                </button>
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-white/85 px-3 py-1 text-[11px] font-medium text-[var(--dash-muted)] shadow-[0_10px_30px_rgba(26,46,37,0.08)]">
+                    <span className="h-2 w-2 rounded-full bg-[#9FB8A3]" />
+                    How customers see you
+                  </div>
+                  <h2 className="mt-4 text-[33px] font-heading font-semibold tracking-[-0.04em] leading-[0.95] text-[var(--dash-text)]">
+                    {name || "Your Business"}
+                  </h2>
+                  <p className="mt-2 max-w-[36ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
+                    {businessCity || "Location pending"}
+                    {neighborhoodCount > 0 ? ` · ${neighborhoodCount} area${neighborhoodCount === 1 ? "" : "s"}` : ""}
+                  </p>
                 </div>
-                {selectedPlace.address ? (
-                  <p className="mt-1 pl-[24px] text-[12px] text-[var(--dash-muted)]">{selectedPlace.address}</p>
-                ) : null}
               </div>
-              <button
-                type="button"
-                onClick={handleClearPlace}
-                className="shrink-0 rounded-[6px] px-2.5 py-1 text-[11px] font-medium text-[var(--dash-muted)] transition-all duration-200 hover:bg-white hover:text-[#EF4444]"
-              >
-                Change
-              </button>
+              <StatusPill
+                status={connectedToGoogle ? "connected" : "pending"}
+                className="self-start bg-white/80 text-[var(--dash-text)] ring-1 ring-[rgba(26,46,37,0.08)]"
+              />
             </div>
-          ) : (
-            <>
-              <div className="relative">
-                <div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--dash-muted)]">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
+          </div>
+
+          <div className="grid gap-4 px-6 py-6 sm:grid-cols-3">
+            <div className="rounded-[14px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Owner account</p>
+              <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">
+                {initial.owner_email ?? "Not set"}
+              </p>
+            </div>
+            <div className="rounded-[14px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Primary area</p>
+              <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">{areaSummary}</p>
+            </div>
+            <div className="rounded-[14px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Google handoff</p>
+              <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">
+                {connectedToGoogle ? "Connected" : "Needs connection"}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-[var(--dash-radius)] border border-[rgba(19,38,31,0.12)] bg-[#13261F] text-white shadow-[0_24px_60px_rgba(19,38,31,0.24)]">
+          <div className="border-b border-white/10 px-5 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-white text-[13px] font-semibold text-[#1A2E25]">
+                  G
                 </div>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(event) => void handlePlaceSearch(event.target.value)}
-                  placeholder="Search for your business on Google"
-                  className="w-full rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] py-3 pl-10 pr-4 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-all duration-300 focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
-                />
-                {searching ? (
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#D4D4D8] border-t-[#E05A3D]" />
+                <div>
+                  <p className="text-[13px] font-semibold text-white">Google Business Profile</p>
+                  <p className="text-[12px] text-white/60">
+                    {connectedToGoogle ? "Connected and ready for review handoff" : "Connect your handoff destination"}
+                  </p>
+                </div>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1 text-[11px] font-medium text-white/80 ring-1 ring-white/10">
+                <span className={`h-2 w-2 rounded-full ${connectedToGoogle ? "bg-[#9FB8A3]" : "bg-[#E6B768]"}`} />
+                {connectedToGoogle ? "Connected" : "Pending"}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 px-5 py-5">
+            {connectedToGoogle ? (
+              <div className="rounded-[16px] border border-white/10 bg-white/6 px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[16px] font-semibold text-white">{selectedPlace?.name || name || "Connected profile"}</p>
+                    <p className="mt-1 break-all text-[12px] leading-relaxed text-white/65">
+                      {selectedPlace?.address || googleHost || "Review link saved"}
+                    </p>
+                  </div>
+                  <a
+                    href={googleUrl || undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`inline-flex rounded-[10px] border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                      googleUrl
+                        ? "border-white/16 bg-white/10 text-white hover:bg-white/16"
+                        : "pointer-events-none border-white/8 bg-white/5 text-white/40"
+                    }`}
+                  >
+                    Open profile
+                  </a>
+                </div>
+                {selectedPlace?.rating ? (
+                  <div className="mt-3 flex items-center gap-2 text-[12px] text-white/70">
+                    <div className="flex items-center gap-0.5 text-[#E6B768]">
+                      {Array.from({ length: 5 }).map((_, step) => (
+                        <svg key={step} width="10" height="10" viewBox="0 0 24 24" fill={step < Math.round(selectedPlace.rating as number) ? "currentColor" : "rgba(255,255,255,0.18)"}>
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                        </svg>
+                      ))}
+                    </div>
+                    <span>{selectedPlace.rating} · {selectedPlace.user_ratings_total} reviews</span>
                   </div>
                 ) : null}
               </div>
+            ) : (
+              <div className="rounded-[16px] border border-dashed border-white/12 bg-white/4 px-4 py-5">
+                <p className="text-[14px] font-medium text-white">No Google Business Profile connected yet</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-white/65">
+                  Search for the business or paste the review link directly. Once it is saved, customers can finish on the real Google page.
+                </p>
+              </div>
+            )}
 
-              {searchResults.length > 0 ? (
-                <div className="mt-2 overflow-hidden rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-white shadow-[0_4px_12px_rgba(0,0,0,0.06)]">
-                  {searchResults.map((place, index) => (
-                    <button
-                      key={place.place_id}
-                      type="button"
-                      onClick={() => void handlePlaceSelect(place)}
-                      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-all duration-200 hover:bg-[var(--dash-bg)] active:bg-[var(--dash-bg)] ${
-                        index < searchResults.length - 1 ? "border-b border-[var(--dash-border)]" : ""
-                      }`}
-                    >
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#E05A3D]/[0.06]">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                          <circle cx="12" cy="10" r="3" />
-                        </svg>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium text-[var(--dash-text)]">{place.name}</p>
-                        <p className="mt-0.5 truncate text-[12px] text-[var(--dash-muted)]">{place.address}</p>
-                        {place.rating ? (
-                          <div className="mt-1 flex items-center gap-1.5">
-                            <div className="flex items-center gap-0.5">
-                              {Array.from({ length: 5 }).map((_, step) => (
-                                <svg key={step} width="10" height="10" viewBox="0 0 24 24" fill={step < Math.round(place.rating as number) ? "#F59E0B" : "#E5E7EB"}>
-                                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                                </svg>
-                              ))}
-                            </div>
-                            <span className="text-[11px] text-[var(--dash-muted)]">
-                              {place.rating} ({place.user_ratings_total})
-                            </span>
-                          </div>
-                        ) : null}
-                      </div>
-                    </button>
-                  ))}
+            <div className="relative">
+              <div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/45">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(event) => void handlePlaceSearch(event.target.value)}
+                placeholder="Search for your business on Google"
+                className="w-full rounded-[12px] border border-white/12 bg-white/6 py-3 pl-10 pr-4 text-[14px] text-white outline-none placeholder:text-white/40 transition-all duration-300 focus:border-[#E6B768]/40 focus:bg-white/9 focus:shadow-[0_0_0_3px_rgba(230,183,104,0.12)]"
+              />
+              {searching ? (
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-[#E6B768]" />
                 </div>
               ) : null}
+            </div>
 
-              {!showManual ? (
-                <button
-                  type="button"
-                  onClick={() => setShowManual(true)}
-                  className="mt-2.5 text-[12px] text-[var(--dash-muted)] transition-all duration-200 hover:text-[var(--dash-text)]"
-                >
-                  Can&apos;t find your business? Paste your Google review link directly
-                </button>
-              ) : (
-                <div className="mt-2.5">
-                  <input
-                    type="text"
-                    value={googleUrl}
-                    onChange={(event) => setGoogleUrl(event.target.value)}
-                    onBlur={() => {
-                      if (googleUrl !== savedProfile.google_review_url) void save({ google_review_url: googleUrl });
-                    }}
-                    placeholder="https://search.google.com/local/writereview?placeid=..."
-                    className="w-full rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-4 py-3 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-all duration-300 focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
-                  />
+            {searchResults.length > 0 ? (
+              <div className="overflow-hidden rounded-[14px] border border-white/8 bg-white">
+                {searchResults.map((place, index) => (
+                  <button
+                    key={place.place_id}
+                    type="button"
+                    onClick={() => void handlePlaceSelect(place)}
+                    className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-[#FCFAF6] ${
+                      index < searchResults.length - 1 ? "border-b border-[var(--dash-border)]" : ""
+                    }`}
+                  >
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#E05A3D]/10">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-medium text-[var(--dash-text)]">{place.name}</p>
+                      <p className="mt-0.5 truncate text-[12px] text-[var(--dash-muted)]">{place.address}</p>
+                    </div>
+                    {place.rating ? (
+                      <span className="shrink-0 text-[11px] font-medium text-[var(--dash-muted)]">
+                        {place.rating}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {!showManual ? (
+              <button
+                type="button"
+                onClick={() => setShowManual(true)}
+                className="text-[12px] font-medium text-white/70 transition-colors hover:text-white"
+              >
+                Paste the Google review link manually
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={googleUrl}
+                  onChange={(event) => setGoogleUrl(event.target.value)}
+                  onBlur={() => {
+                    if (googleUrl !== savedProfile.google_review_url) void save({ google_review_url: googleUrl });
+                  }}
+                  placeholder="https://search.google.com/local/writereview?placeid=..."
+                  className="w-full rounded-[12px] border border-white/12 bg-white/6 px-4 py-3 text-[13px] text-white outline-none placeholder:text-white/40 transition-all duration-300 focus:border-[#E6B768]/40 focus:bg-white/9 focus:shadow-[0_0_0_3px_rgba(230,183,104,0.12)]"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] leading-relaxed text-white/50">
+                    Use the direct Google review link if search cannot find the listing.
+                  </p>
+                  {connectedToGoogle ? (
+                    <button
+                      type="button"
+                      onClick={handleClearPlace}
+                      className="rounded-[10px] border border-white/12 px-3 py-1.5 text-[12px] font-medium text-white/75 transition-colors hover:bg-white/8 hover:text-white"
+                    >
+                      Reconnect
+                    </button>
+                  ) : null}
                 </div>
-              )}
-            </>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
 
-        {saving || saved ? <p className="text-[12px] text-[#10B981]">{saving ? "Saving..." : "Saved"}</p> : null}
+      <div className="grid gap-5 xl:grid-cols-[1.1fr,0.9fr]">
+        <section className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Profile details</p>
+              <h3 className="mt-2 text-[19px] font-semibold tracking-tight text-[var(--dash-text)]">Keep the identity clean</h3>
+              <p className="mt-2 max-w-[48ch] text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                This is the baseline customers see before they ever read the draft. Update the name here, and use Team & Services for neighborhoods and staffing.
+              </p>
+            </div>
+            {saving || saved ? (
+              <span className="rounded-full bg-[#ECFDF5] px-3 py-1 text-[11px] font-medium text-[#0F766E]">
+                {saving ? "Saving..." : "Saved"}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-5 space-y-4">
+            <div>
+              <label className="mb-2 block text-[12px] font-medium text-[var(--dash-muted)]">Business name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                onBlur={() => {
+                  if (name !== savedProfile.name) void save({ name });
+                }}
+                placeholder="Your business name"
+                className="w-full rounded-[12px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-all duration-300 focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[14px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Owner email</p>
+                <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">{initial.owner_email ?? "Not set"}</p>
+              </div>
+              <div className="rounded-[14px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Primary city</p>
+                <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">{businessCity ?? "Not set"}</p>
+              </div>
+              <div className="rounded-[14px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Review handoff</p>
+                <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">
+                  {googleHost || "Add Google review URL"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Service area</p>
+              <h3 className="mt-2 text-[19px] font-semibold tracking-tight text-[var(--dash-text)]">
+                {businessCity || "Add a primary location"}
+                {neighborhoodCount > 0 ? ` + ${neighborhoodCount}` : ""}
+              </h3>
+            </div>
+            <span className="text-[11px] font-medium text-[#BC4A2F]">Managed in Team & Services</span>
+          </div>
+          <div className="mt-4 overflow-hidden rounded-[16px] border border-[var(--dash-border)] bg-[#FCFAF6]">
+            <div className="relative h-[182px] bg-[linear-gradient(180deg,rgba(224,90,61,0.08),rgba(255,255,255,0))]">
+              <div className="absolute inset-0 bg-[linear-gradient(rgba(26,46,37,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(26,46,37,0.06)_1px,transparent_1px)] bg-[size:33.333%_33.333%]" />
+              <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#E05A3D] bg-white shadow-[0_0_0_8px_rgba(224,90,61,0.08)]" />
+              <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-[#E05A3D]/45" />
+              <div className="absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-[#E05A3D]/20" />
+            </div>
+            <div className="border-t border-[var(--dash-border)] px-4 py-4">
+              <div className="flex flex-wrap gap-2">
+                {initial.neighborhoods?.length ? (
+                  initial.neighborhoods.map((area, index) => (
+                    <span
+                      key={`${area}-${index}`}
+                      className="rounded-full border border-[#E6DDD0] bg-white px-3 py-1.5 text-[12px] font-medium text-[var(--dash-text)]"
+                    >
+                      {area}
+                    </span>
+                  ))
+                ) : (
+                  <p className="text-[13px] text-[var(--dash-muted)]">
+                    Add neighborhoods below or from Team & Services so reviews can mention where you work.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -1281,28 +1440,44 @@ export function AutomatedRemindersSection({
   initialQuietStart,
   initialQuietEnd,
   initialTimezone,
+  initialBatchEnabled,
+  initialBatchHour,
 }: {
   businessId: string;
   initialEnabled: boolean;
   initialQuietStart: number;
   initialQuietEnd: number;
   initialTimezone: string;
+  initialBatchEnabled: boolean;
+  initialBatchHour: number;
 }) {
   const { toast } = useToast();
   const [enabled, setEnabled] = useState(initialEnabled);
   const [quietStart, setQuietStart] = useState(initialQuietStart);
   const [quietEnd, setQuietEnd] = useState(initialQuietEnd);
   const [timeZone, setTimeZone] = useState(initialTimezone);
+  const [batchEnabled, setBatchEnabled] = useState(initialBatchEnabled);
+  const [batchHour, setBatchHour] = useState(initialBatchHour);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const timezones = REMINDER_TIMEZONE_OPTIONS.includes(timeZone) ? REMINDER_TIMEZONE_OPTIONS : [timeZone, ...REMINDER_TIMEZONE_OPTIONS];
+  const timezones = REMINDER_TIMEZONE_OPTIONS.includes(timeZone)
+    ? REMINDER_TIMEZONE_OPTIONS
+    : [timeZone, ...REMINDER_TIMEZONE_OPTIONS];
+
+  const batchFallsInQuietHours =
+    quietStart !== quietEnd &&
+    (quietStart < quietEnd
+      ? batchHour >= quietStart && batchHour < quietEnd
+      : batchHour >= quietStart || batchHour < quietEnd);
 
   async function save(next: {
     reminder_sequence_enabled?: boolean;
     quiet_hours_start?: number;
     quiet_hours_end?: number;
     business_timezone?: string;
+    batch_initial_sms_enabled?: boolean;
+    batch_initial_sms_hour?: number;
   }) {
     setSaving(true);
 
@@ -1328,7 +1503,9 @@ export function AutomatedRemindersSection({
             Follow up automatically when a customer doesn&apos;t finish their review.
           </p>
         </div>
-        {saving || saved ? <p className="text-[12px] text-[#10B981]">{saving ? "Saving..." : "Saved"}</p> : null}
+        {saving || saved ? (
+          <p className="text-[12px] text-[#10B981]">{saving ? "Saving..." : "Saved"}</p>
+        ) : null}
       </div>
 
       <div className="mt-5 rounded-[12px] border border-[var(--dash-border)] bg-[var(--dash-bg)] p-4">
@@ -1338,7 +1515,7 @@ export function AutomatedRemindersSection({
               Send automatic reminders to customers who don&apos;t complete their review
             </p>
             <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">
-              Initial message sends right away. Then small Talk can send up to two follow-ups, and stops as soon as the customer completes the flow or texts STOP.
+              small Talk can send up to two follow-ups, and stops as soon as the customer completes the flow or texts STOP.
             </p>
           </div>
           <button
@@ -1363,21 +1540,102 @@ export function AutomatedRemindersSection({
         </label>
       </div>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr,0.8fr]">
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
         <div className="rounded-[12px] border border-[var(--dash-border)] bg-white p-4">
-          <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--dash-muted)]">Sequence</p>
+          <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--dash-muted)]">Initial delivery</p>
+          <div className="mt-3 rounded-[10px] bg-[var(--dash-bg)] p-3.5">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setBatchEnabled(false);
+                  void save({ batch_initial_sms_enabled: false });
+                }}
+                className={`rounded-[10px] border px-3 py-3 text-left transition-colors ${
+                  !batchEnabled
+                    ? "border-[#E05A3D]/30 bg-[#FFF4ED] text-[var(--dash-text)]"
+                    : "border-[var(--dash-border)] bg-white text-[var(--dash-muted)] hover:bg-[#FCFAF6]"
+                }`}
+              >
+                <p className="text-[13px] font-semibold">Send right away</p>
+                <p className="mt-1 text-[12px] leading-relaxed">
+                  Best when you want the customer to get the text immediately.
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBatchEnabled(true);
+                  void save({ batch_initial_sms_enabled: true });
+                }}
+                className={`rounded-[10px] border px-3 py-3 text-left transition-colors ${
+                  batchEnabled
+                    ? "border-[#E05A3D]/30 bg-[#FFF4ED] text-[var(--dash-text)]"
+                    : "border-[var(--dash-border)] bg-white text-[var(--dash-muted)] hover:bg-[#FCFAF6]"
+                }`}
+              >
+                <p className="text-[13px] font-semibold">Queue texts for one send window</p>
+                <p className="mt-1 text-[12px] leading-relaxed">
+                  Hold SMS requests until your chosen local send time.
+                </p>
+              </button>
+            </div>
+
+            {batchEnabled ? (
+              <div className="mt-3 rounded-[10px] border border-[var(--dash-border)] bg-white p-3.5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="flex-1">
+                    <label className="mb-1.5 block text-[12px] font-medium text-[var(--dash-muted)]">Send window</label>
+                    <select
+                      value={batchHour}
+                      onChange={(event) => {
+                        const next = Number(event.target.value);
+                        setBatchHour(next);
+                        void save({ batch_initial_sms_hour: next });
+                      }}
+                      className="w-full rounded-[10px] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-2.5 text-[14px] text-[var(--dash-text)] outline-none transition-colors focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
+                    >
+                      {Array.from({ length: 24 }).map((_, hour) => (
+                        <option key={hour} value={hour}>
+                          {formatHourLabel(hour)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="max-w-[26ch] text-[12px] leading-relaxed text-[var(--dash-muted)]">
+                    SMS requests from jobs wait for this window. Emails still go out right away.
+                  </p>
+                </div>
+                {batchFallsInQuietHours ? (
+                  <p className="mt-2 text-[12px] leading-relaxed text-[#B45309]">
+                    That send window lands inside quiet hours, so small Talk will hold it until quiet hours end.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          <p className="mt-4 text-[12px] font-semibold uppercase tracking-wider text-[var(--dash-muted)]">Sequence</p>
           <div className="mt-3 space-y-3">
             <div className="rounded-[10px] bg-[var(--dash-bg)] px-3.5 py-3">
               <p className="text-[13px] font-medium text-[var(--dash-text)]">1. Initial message</p>
-              <p className="mt-1 text-[12px] text-[var(--dash-muted)]">Sent immediately when you send the review request.</p>
+              <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
+                {batchEnabled
+                  ? `Queued for your next ${formatHourLabel(batchHour)} send window.`
+                  : "Sent immediately when you send the review request."}
+              </p>
             </div>
             <div className="rounded-[10px] bg-[var(--dash-bg)] px-3.5 py-3">
               <p className="text-[13px] font-medium text-[var(--dash-text)]">2. First reminder</p>
-              <p className="mt-1 text-[12px] text-[var(--dash-muted)]">Sent 24 hours later if the customer still hasn&apos;t completed the flow.</p>
+              <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
+                Sent 24 hours later if the customer still hasn&apos;t completed the flow.
+              </p>
             </div>
             <div className="rounded-[10px] bg-[var(--dash-bg)] px-3.5 py-3">
               <p className="text-[13px] font-medium text-[var(--dash-text)]">3. Final reminder</p>
-              <p className="mt-1 text-[12px] text-[var(--dash-muted)]">Sent 72 hours after the initial request. That&apos;s the last message.</p>
+              <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
+                Sent 72 hours after the initial request. That&apos;s the last message.
+              </p>
             </div>
           </div>
           <p className="mt-4 text-[12px] leading-relaxed text-[var(--dash-muted)]">
@@ -1665,38 +1923,73 @@ export function AccountControlsSection({
   const { toast } = useToast();
 
   return (
-    <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] p-6 shadow-[var(--dash-shadow)]">
-      <h2 className="mb-4 text-[16px] font-semibold text-[var(--dash-text)]">Login & security</h2>
-      <div className="space-y-4">
-        <div>
-          <label className="mb-1 block text-[13px] font-medium text-[var(--dash-muted)]">Email</label>
-          <p className="text-[14px] text-[var(--dash-text)]">{session?.user?.email ?? "\u2014"}</p>
+    <div className="overflow-hidden rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]">
+      <div className="border-b border-[var(--dash-border)] px-6 py-5">
+        <h2 className="text-[16px] font-semibold text-[var(--dash-text)]">Login & security</h2>
+        <p className="mt-1 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+          The everyday account items live here. Nothing below changes how requests work.
+        </p>
+      </div>
+
+      <div className="divide-y divide-[var(--dash-border)]">
+        <div className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Email</p>
+            <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">{session?.user?.email ?? "\u2014"}</p>
+            <p className="mt-1 text-[12px] text-[var(--dash-muted)]">Used for login and account notices</p>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={async () => {
-            const email = session?.user?.email;
-            if (email) {
-              await supabase.auth.resetPasswordForEmail(email);
-              toast("Password reset email sent.", "success");
-            }
-          }}
-          className={dashboardUtilityLinkClassName()}
-        >
-          Change password
-        </button>
-        <button
-          type="button"
-          onClick={() => void signOut()}
-          className={`block ${dashboardUtilityLinkClassName()}`}
-        >
-          Sign out
-        </button>
-        <div className="border-t border-[var(--dash-border)] pt-4">
+
+        <div className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Password</p>
+            <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">Reset by email</p>
+            <p className="mt-1 text-[12px] text-[var(--dash-muted)]">We’ll send a secure reset link to your owner email.</p>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              const email = session?.user?.email;
+              if (email) {
+                await supabase.auth.resetPasswordForEmail(email);
+                toast("Password reset email sent.", "success");
+              }
+            }}
+            className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}
+          >
+            Send reset link
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Session</p>
+            <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">You are signed in</p>
+            <p className="mt-1 text-[12px] text-[var(--dash-muted)]">Sign out here if you’re switching devices or owner accounts.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+
+      <div className="border-t border-[var(--dash-border)] bg-[#FFF8F4] px-6 py-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#BC4A2F]">Danger zone</p>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[14px] font-medium text-[var(--dash-text)]">Delete account and data</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+              This removes the business, review links, and subscription records. It cannot be undone.
+            </p>
+          </div>
           <button
             type="button"
             onClick={onDeleteRequested}
-            className={dashboardUtilityLinkClassName({ tone: "danger" })}
+            className={dashboardButtonClassName({ variant: "danger", size: "sm" })}
           >
             Delete account
           </button>

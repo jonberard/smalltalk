@@ -13,6 +13,13 @@ import {
   useSendWorkspace,
 } from "@/components/dashboard/send-sections";
 
+function formatHourLabel(hour: number) {
+  if (hour === 0) return "12:00 AM";
+  if (hour < 12) return `${hour}:00 AM`;
+  if (hour === 12) return "12:00 PM";
+  return `${hour - 12}:00 PM`;
+}
+
 export default function SendJobsPage() {
   const { business } = useAuth();
   const {
@@ -42,7 +49,13 @@ export default function SendJobsPage() {
 
         <SetupInfoStrip
           title="Best for one-off follow-up after a completed job or visit."
-          description="Need something reusable instead? Use the QR / shared link path."
+          description={
+            business.batch_initial_sms_enabled
+              ? `Need something reusable instead? Use the QR / shared link path. New texts queue for your ${formatHourLabel(
+                  business.batch_initial_sms_hour ?? 18,
+                )} send window.`
+              : "Need something reusable instead? Use the QR / shared link path."
+          }
           accent="warm"
         />
 

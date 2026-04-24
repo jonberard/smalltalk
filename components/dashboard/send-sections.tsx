@@ -49,8 +49,9 @@ export type SendReviewRequestResult = {
   name: string;
   code: string;
   channel: "sms" | "email";
-  deliveryStatus: "sent" | "failed" | "skipped";
+  deliveryStatus: "sent" | "queued" | "failed" | "skipped";
   deliveryError?: string;
+  scheduledFor?: string;
   remainingTrialRequests?: number;
 };
 
@@ -88,6 +89,15 @@ export function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
+function formatScheduledAt(dateStr: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(dateStr));
+}
+
 function getPrimaryStatus(link: RecentLinkRow): string {
   const deliveries = link.review_message_deliveries ?? [];
   const sessions = [...(link.review_sessions ?? [])].sort(
@@ -99,6 +109,7 @@ function getPrimaryStatus(link: RecentLinkRow): string {
   if (initialDelivery?.status === "skipped" && initialDelivery.skipped_reason === "opted_out") {
     return "opted_out";
   }
+  if (initialDelivery?.status === "pending") return "queued";
   if (sessions.some((session) => session.feedback_type === "private" && !!session.optional_text?.trim())) {
     return "private_feedback";
   }
@@ -177,6 +188,11 @@ export function useSendWorkspace(business: Business | null) {
       toast(
         `${result.channel === "email" ? "Email" : "SMS"} sent to ${result.name}! ${link}`,
         "success",
+      );
+    } else if (result.deliveryStatus === "queued") {
+      toast(
+        `Text queued for ${result.name}${result.scheduledFor ? ` · next send ${formatScheduledAt(result.scheduledFor)}` : ""} · ${link}`,
+        "info",
       );
     } else {
       toast(
@@ -405,8 +421,9 @@ export function SingleSendForm({
         name: firstName.trim(),
         code: result.unique_code as string,
         channel: result.channel as "sms" | "email",
-        deliveryStatus: result.delivery_status as "sent" | "failed" | "skipped",
+        deliveryStatus: result.delivery_status as "sent" | "queued" | "failed" | "skipped",
         deliveryError: result.delivery_error as string | undefined,
+        scheduledFor: result.scheduled_for as string | undefined,
         remainingTrialRequests: result.remaining_trial_requests as number | undefined,
       });
 

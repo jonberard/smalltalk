@@ -13,7 +13,7 @@ export default function ReviewFlowRemindersPage() {
     <SetupPageShell
       eyebrow="Setup / Review Flow / Reminders"
       title="Control the follow-up without nagging forever."
-      description="This is where the reminder sequence lives now: on/off, quiet hours, and the cadence that keeps things useful without feeling pushy."
+      description="This is where the send window, reminder sequence, and quiet hours live now - enough control to keep requests timely without turning it into a campaign tool."
       backHref="/dashboard/more/review-flow"
       backLabel="Back to review flow"
       headerTone="detail"
@@ -24,6 +24,8 @@ export default function ReviewFlowRemindersPage() {
         initialQuietStart={business.quiet_hours_start ?? 21}
         initialQuietEnd={business.quiet_hours_end ?? 9}
         initialTimezone={business.business_timezone ?? "America/Chicago"}
+        initialBatchEnabled={business.batch_initial_sms_enabled ?? false}
+        initialBatchHour={business.batch_initial_sms_hour ?? 18}
       />
     </SetupPageShell>
   );

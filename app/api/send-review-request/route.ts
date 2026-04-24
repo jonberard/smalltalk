@@ -4,7 +4,6 @@ import { sendReviewEmail } from "@/lib/email-send";
 import { normalizePhone } from "@/lib/phone";
 import {
   buildInitialSmsMessage,
-  buildReminderSmsMessage,
   buildReviewRequestEmail,
 } from "@/lib/review-request-messages";
 import { getAppBaseUrl } from "@/lib/app-url";
@@ -17,6 +16,8 @@ import {
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendReviewSms } from "@/lib/twilio-send";
 import { serverCapture } from "@/lib/posthog-server";
+import { getNextBatchSendAt } from "@/lib/quiet-hours";
+import { queueReminderDeliveries } from "@/lib/review-message-deliveries";
 
 type SendRequestBody = {
   customer_name?: string;
@@ -142,6 +143,9 @@ export async function POST(req: NextRequest) {
   }
 
   const reminderSequenceEnabled = business.reminder_sequence_enabled ?? true;
+  const batchInitialSmsEnabled =
+    channel === "sms" && (business.batch_initial_sms_enabled ?? false);
+  const batchInitialSmsHour = business.batch_initial_sms_hour ?? 18;
   const normalizedContact = channel === "sms" ? normalizedPhone! : normalizedEmail;
 
   let reviewLink:
@@ -205,6 +209,17 @@ export async function POST(req: NextRequest) {
           emailIntroTemplate: business.review_request_email_intro_template,
         }).html;
 
+  const scheduledFor =
+    batchInitialSmsEnabled
+      ? getNextBatchSendAt(
+          new Date(),
+          business.business_timezone ?? "America/Chicago",
+          batchInitialSmsHour,
+          business.quiet_hours_start ?? 21,
+          business.quiet_hours_end ?? 9,
+        ).toISOString()
+      : new Date().toISOString();
+
   const { data: initialDelivery, error: initialDeliveryError } = await supabaseAdmin
     .from("review_message_deliveries")
     .insert({
@@ -213,7 +228,7 @@ export async function POST(req: NextRequest) {
       channel,
       kind: "initial",
       status: "pending",
-      scheduled_for: new Date().toISOString(),
+      scheduled_for: scheduledFor,
       to_address: customerContact,
       normalized_phone: normalizedPhone,
       message_body: initialMessageBody,
@@ -231,6 +246,28 @@ export async function POST(req: NextRequest) {
   const sentAt = new Date().toISOString();
 
   if (channel === "sms") {
+    if (batchInitialSmsEnabled) {
+      const remainingTrialRequests = await decrementTrialIfNeeded(
+        business as ReviewRequestBusiness,
+      );
+
+      serverCapture(userId, "review_request_queued", {
+        business_id: business.id,
+        scheduled_for: scheduledFor,
+      });
+
+      return NextResponse.json({
+        success: true,
+        channel,
+        delivery_status: "queued",
+        scheduled_for: scheduledFor,
+        review_link_id: reviewLink.id,
+        review_link_url: reviewLinkUrl,
+        unique_code: reviewLink.unique_code,
+        remaining_trial_requests: remainingTrialRequests,
+      });
+    }
+
     const sendResult = await sendReviewSms({
       to: normalizedPhone!,
       body: initialMessageBody,
@@ -256,40 +293,16 @@ export async function POST(req: NextRequest) {
       serverCapture(userId, "review_request_sent", { channel, business_id: business.id });
 
       if (reminderSequenceEnabled) {
-        const { error: reminderError } = await supabaseAdmin.from("review_message_deliveries").insert([
-          {
-            review_link_id: reviewLink.id,
-            business_id: business.id,
-            channel: "sms",
-            kind: "reminder_1",
-            status: "pending",
-            scheduled_for: new Date(new Date(sentAt).getTime() + 24 * 60 * 60 * 1000).toISOString(),
-            to_address: customerContact,
-            normalized_phone: normalizedPhone,
-            message_body: buildReminderSmsMessage({
-              kind: "reminder_1",
-              customerName,
-              businessName: business.name,
-              reviewLinkUrl,
-            }),
-          },
-          {
-            review_link_id: reviewLink.id,
-            business_id: business.id,
-            channel: "sms",
-            kind: "reminder_2",
-            status: "pending",
-            scheduled_for: new Date(new Date(sentAt).getTime() + 72 * 60 * 60 * 1000).toISOString(),
-            to_address: customerContact,
-            normalized_phone: normalizedPhone,
-            message_body: buildReminderSmsMessage({
-              kind: "reminder_2",
-              customerName,
-              businessName: business.name,
-              reviewLinkUrl,
-            }),
-          },
-        ]);
+        const { error: reminderError } = await queueReminderDeliveries({
+          reviewLinkId: reviewLink.id,
+          businessId: business.id,
+          customerContact,
+          normalizedPhone: normalizedPhone!,
+          customerName,
+          businessName: business.name,
+          reviewLinkUrl,
+          sentAt,
+        });
 
         if (!reminderError) {
           serverCapture(userId, "reminder_scheduled", { reminder_count: 2, business_id: business.id });

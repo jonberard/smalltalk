@@ -17,6 +17,7 @@ type DashboardStats = {
   avgRating: number;
   completionRate: number;
   totalLinks: number;
+  replyRate: number;
 };
 
 type FunnelData = {
@@ -348,6 +349,7 @@ export default function Dashboard() {
     avgRating: 0,
     completionRate: 0,
     totalLinks: 0,
+    replyRate: 0,
   });
   const [funnel, setFunnel] = useState<FunnelData>({
     sent: 0,
@@ -370,6 +372,7 @@ export default function Dashboard() {
   const [privateFeedbackModal, setPrivateFeedbackModal] = useState<PrivateFeedbackItem | null>(null);
   const [privateFeedbackActionLoading, setPrivateFeedbackActionLoading] = useState(false);
   const [privateFeedbackActionError, setPrivateFeedbackActionError] = useState("");
+  const [queuedInitialCount, setQueuedInitialCount] = useState(0);
   const { business } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -406,7 +409,16 @@ export default function Dashboard() {
         .select("*", { count: "exact", head: true })
         .eq("business_id", businessId);
 
+      const { count: queuedInitial } = await supabase
+        .from("review_message_deliveries")
+        .select("*", { count: "exact", head: true })
+        .eq("business_id", businessId)
+        .eq("channel", "sms")
+        .eq("kind", "initial")
+        .eq("status", "pending");
+
       const linkCount = totalLinks ?? 0;
+      setQueuedInitialCount(queuedInitial ?? 0);
 
       const { data: allSessions } = await supabase
         .from("review_sessions")
@@ -427,8 +439,11 @@ export default function Dashboard() {
       const completionRate = linkCount > 0
         ? Math.round((completedSessions.length / linkCount) * 100)
         : 0;
+      const publicReviews = completedSessions.filter((session) => session.feedback_type !== "private");
+      const repliedPublic = publicReviews.filter((session) => !!session.replied_at).length;
+      const replyRate = publicReviews.length > 0 ? Math.round((repliedPublic / publicReviews.length) * 100) : 0;
 
-      setStats({ reviewsThisMonth, avgRating, completionRate, totalLinks: linkCount });
+      setStats({ reviewsThisMonth, avgRating, completionRate, totalLinks: linkCount, replyRate });
 
       const privateFeedback = sessions
         .filter(
@@ -736,12 +751,6 @@ export default function Dashboard() {
     }
   }
 
-  const FILTER_OPTIONS: { key: FunnelFilter; label: string }[] = [
-    { key: "week", label: "This week" },
-    { key: "month", label: "This month" },
-    { key: "all", label: "All time" },
-  ];
-
   const newPrivateFeedback = privateFeedbackItems.filter((item) => item.status === "new").slice(0, 3);
   const replyQueue = activityItems.filter(
     (item) =>
@@ -750,392 +759,329 @@ export default function Dashboard() {
       !item.repliedAt,
   ).slice(0, 3);
   const stalledRequests = attention.slice(0, 3);
-  const recentActivityPreview = activityItems.slice(0, 8);
   const openedRate = funnel.sent > 0 ? Math.round((funnel.opened / funnel.sent) * 100) : 0;
-  const copiedRate = funnel.opened > 0 ? Math.round((funnel.posted / funnel.opened) * 100) : 0;
-  const dashboardHighlights = [
+  const responseRate = funnel.sent > 0 ? Math.round((funnel.started / funnel.sent) * 100) : 0;
+  const attentionBuckets = [
+    newPrivateFeedback.length > 0,
+    replyQueue.length > 0,
+    queuedInitialCount > 0 || stalledRequests.length > 0,
+  ].filter(Boolean).length;
+  const batchWindowLabel =
+    business?.batch_initial_sms_enabled
+      ? `Next batch ${((hour: number) => {
+          if (hour === 0) return "12:00 AM";
+          if (hour < 12) return `${hour}:00 AM`;
+          if (hour === 12) return "12:00 PM";
+          return `${hour - 12}:00 PM`;
+        })(business.batch_initial_sms_hour ?? 18)}`
+      : "Requests send right away";
+  const bannerText = (() => {
+    if (newPrivateFeedback.length > 0 && replyQueue.length > 0) {
+      return `${newPrivateFeedback.length} private-feedback note${newPrivateFeedback.length === 1 ? "" : "s"} came in, and ${replyQueue.length === 1 ? "a public review is waiting on your reply." : `${replyQueue.length} public reviews are waiting on your reply.`}`;
+    }
+
+    if (newPrivateFeedback.length > 0) {
+      return `${newPrivateFeedback.length} private-feedback note${newPrivateFeedback.length === 1 ? "" : "s"} came in and need a follow-up.`;
+    }
+
+    if (replyQueue.length > 0) {
+      return `${replyQueue.length === 1 ? "A public review is" : `${replyQueue.length} public reviews are`} waiting on your reply.`;
+    }
+
+    if (queuedInitialCount > 0) {
+      return `${queuedInitialCount} request${queuedInitialCount === 1 ? "" : "s"} are queued for the next send window.`;
+    }
+
+    if (stalledRequests.length > 0) {
+      return `${stalledRequests.length} request${stalledRequests.length === 1 ? "" : "s"} stalled before the customer finished.`;
+    }
+
+    return "Everything urgent is quiet right now. New feedback and reply work will show up here first.";
+  })();
+  const feedbackPreviewItems = (newPrivateFeedback.length > 0 ? newPrivateFeedback : privateFeedbackItems.slice(0, 2)).slice(0, 2);
+  const todayItems = [
+    business?.batch_initial_sms_enabled
+      ? {
+          key: "batch",
+          title: queuedInitialCount > 0 ? `${queuedInitialCount} request${queuedInitialCount === 1 ? "" : "s"} queued` : "Batch window ready",
+          detail:
+            queuedInitialCount > 0
+              ? `Automatic texts go out at ${((hour: number) => {
+                  if (hour === 0) return "12:00 AM";
+                  if (hour < 12) return `${hour}:00 AM`;
+                  if (hour === 12) return "12:00 PM";
+                  return `${hour - 12}:00 PM`;
+                })(business.batch_initial_sms_hour ?? 18)}.`
+              : "New SMS requests will hold for the next send window.",
+          tone: "coral" as const,
+        }
+      : {
+          key: "batch",
+          title: "Requests send right away",
+          detail: "Batch texting is off — new SMS requests go out as soon as you send them.",
+          tone: "coral" as const,
+        },
     {
-      label: "Sent",
-      value: funnel.sent,
-      detail: funnelFilter === "week" ? "This week" : funnelFilter === "month" ? "This month" : "All time",
+      key: "reply",
+      title: replyQueue.length > 0 ? `${replyQueue.length} review${replyQueue.length === 1 ? "" : "s"} ready` : "No reply backlog",
+      detail:
+        replyQueue.length > 0
+          ? "Draft reply — tap to open the next one."
+          : "Public replies are caught up right now.",
+      tone: "sage" as const,
     },
     {
-      label: "Opened",
-      value: funnel.opened,
-      detail: funnel.sent > 0 ? `${openedRate}% of sent` : "No sends yet",
-    },
-    {
-      label: "Copied",
-      value: funnel.posted,
-      detail: funnel.opened > 0 ? `${copiedRate}% of opened` : "No handoffs yet",
+      key: "stalled",
+      title: stalledRequests.length > 0 ? `${stalledRequests.length} stalled request${stalledRequests.length === 1 ? "" : "s"}` : "Request flow is moving",
+      detail:
+        stalledRequests.length > 0
+          ? stalledRequests[0].detail
+          : "Nothing is stuck between send and customer action.",
+      tone: "forest" as const,
     },
   ];
 
   return (
     <main className="min-h-dvh bg-[var(--dash-bg)] sm:pl-[220px]">
-      <div className="dash-page-enter mx-auto max-w-[960px] px-5 pb-32 pt-8 sm:pb-16">
+      <div className="dash-page-enter mx-auto max-w-[1120px] px-5 pb-32 pt-8 sm:pb-16">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
-              Home
-            </p>
-            <h1 className="mt-2 text-balance font-heading text-[30px] font-semibold leading-[1.02] tracking-tight text-[var(--dash-text)] sm:text-[34px]">
-              {getGreeting()}
-              {business?.name ? `, ${business.name}` : ""}
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">Home</p>
+            <h1 className="mt-2 text-balance font-heading text-[32px] font-semibold leading-[0.98] tracking-[-0.03em] text-[var(--dash-text)] sm:text-[38px]">
+              {getGreeting()}.
             </h1>
-            <p className="mt-2 max-w-[46ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
-              Start with what needs your attention, then check private feedback, replies, and recent request activity.
+            <p className="mt-2 max-w-[50ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
+              Three things want your attention. Everything else is moving on its own.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Link
-              href="/dashboard/send"
+              href="/dashboard/send/jobs"
               className={dashboardButtonClassName({ variant: "primary", size: "lg" })}
             >
-              Send request
-            </Link>
-            <Link
-              href="/dashboard/inbox"
-              className={`${dashboardButtonClassName({ size: "lg" })} gap-2`}
-            >
-              Open inbox
-              {newPrivateFeedback.length > 0 ? (
-                <span className="rounded-full bg-[#EFF6FF] px-2 py-0.5 text-[11px] font-semibold text-[#2563EB]">
-                  {newPrivateFeedback.length}
-                </span>
-              ) : null}
+              + New request
             </Link>
           </div>
         </div>
 
-        {loading ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <StatCard icon={<CalendarIcon />} label="Copied this month" value={stats.reviewsThisMonth} />
-            <StatCard
-              icon={<StarIcon />}
-              label="Average rating"
-              value={stats.avgRating > 0 ? stats.avgRating.toFixed(1) : "\u2014"}
-              detail={stats.avgRating > 0 ? <MiniStars rating={stats.avgRating} /> : undefined}
-            />
-            <StatCard
-              icon={<ChartIcon />}
-              label="Completion rate"
-              value={stats.totalLinks > 0 ? `${stats.completionRate}%` : "\u2014"}
-              detail={stats.totalLinks > 0 ? <ProgressRing percentage={stats.completionRate} /> : undefined}
-            />
-          </div>
-        )}
-
-        <section className="mt-6 rounded-[var(--dash-radius)] border border-[#F6D9A8] bg-[#FFF8EA] p-5 shadow-[var(--dash-shadow)]">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <section className="rounded-[18px] bg-[var(--dash-primary)] px-6 py-6 text-white shadow-[0_18px_42px_rgba(224,90,61,0.18)]">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#A16207]">
-                Needs attention now
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">
+                Needs you · {attentionBuckets}
               </p>
-              <h2 className="mt-2 text-[22px] font-semibold tracking-tight text-[var(--dash-text)]">
-                The work that actually needs you
+              <h2 className="mt-3 max-w-[18ch] text-balance font-heading text-[28px] font-semibold leading-[1.08] tracking-[-0.03em] text-white sm:text-[34px]">
+                {bannerText}
               </h2>
-              <p className="mt-2 max-w-[48ch] text-[13px] leading-relaxed text-[var(--dash-muted)]">
-                Home now leads with the decisions that matter: unhappy customers, public reviews waiting on a response, and requests that stalled before they turned into usable reviews.
-              </p>
             </div>
-            <div className="flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-[12px] font-medium text-[var(--dash-muted)]">
-              <span className="h-2 w-2 rounded-full bg-[#E05A3D]" />
-              {newPrivateFeedback.length + replyQueue.length + stalledRequests.length} open items
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/dashboard/inbox"
+                className="inline-flex min-h-[42px] items-center rounded-[10px] bg-white px-4 py-2 text-[13px] font-semibold text-[#A33A21] transition-transform hover:-translate-y-[1px]"
+              >
+                Open inbox
+              </Link>
+              {replyQueue[0] ? (
+                <button
+                  type="button"
+                  onClick={() => generateReplyForItem(replyQueue[0])}
+                  className="inline-flex min-h-[42px] items-center rounded-[10px] border border-white/30 bg-white/10 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-white/16"
+                >
+                  Draft replies
+                </button>
+              ) : (
+                <Link
+                  href="/dashboard/send/jobs"
+                  className="inline-flex min-h-[42px] items-center rounded-[10px] border border-white/30 bg-white/10 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-white/16"
+                >
+                  Open send
+                </Link>
+              )}
             </div>
           </div>
-
-          {loading ? (
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-            </div>
-          ) : (
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              <HomeRailCard
-                eyebrow="Inbox"
-                title="Private feedback"
-                count={newPrivateFeedback.length}
-                tone="blue"
-                summary={
-                  newPrivateFeedback[0]
-                    ? `${newPrivateFeedback[0].name}: ${newPrivateFeedback[0].message}`
-                    : "No new private feedback is waiting on you right now."
-                }
-                href="/dashboard/inbox"
-                linkLabel="Open inbox"
-                onClick={
-                  newPrivateFeedback[0]
-                    ? () => {
-                        setPrivateFeedbackModal(newPrivateFeedback[0]);
-                        setPrivateFeedbackActionError("");
-                      }
-                    : undefined
-                }
-              />
-              <HomeRailCard
-                eyebrow="Replies"
-                title="Public reviews"
-                count={replyQueue.length}
-                tone="green"
-                summary={
-                  replyQueue[0]
-                    ? `${replyQueue[0].name}: ${replyQueue[0].snippet ?? "Star-only review waiting on a reply."}`
-                    : "Nothing is waiting on a public reply right now."
-                }
-                href="/dashboard/replies"
-                linkLabel="Open replies"
-              />
-              <HomeRailCard
-                eyebrow="Send"
-                title="Stalled requests"
-                count={stalledRequests.length}
-                tone="amber"
-                summary={
-                  stalledRequests[0]
-                    ? `${stalledRequests[0].name}: ${stalledRequests[0].detail}`
-                    : "No stalled requests are crowding the queue."
-                }
-                href="/dashboard/send"
-                linkLabel="Open send"
-              />
-            </div>
-          )}
         </section>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <section className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-5 shadow-[var(--dash-shadow)]">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
-                  Requests in motion
-                </p>
-                <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
-                  What customers are doing right now
-                </h2>
-              </div>
-              <Link href="/dashboard/send" className={dashboardUtilityLinkClassName()}>
-                Open send
+        <section className="mt-5 overflow-hidden rounded-[16px] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
+          <div className="grid gap-0 md:grid-cols-4">
+            {loading || funnelLoading ? (
+              Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="border-b border-[var(--dash-border)] px-5 py-5 md:border-b-0 md:border-r last:border-r-0">
+                  <SkeletonCard />
+                </div>
+              ))
+            ) : (
+              [
+                {
+                  label: "Google rating",
+                  value: stats.avgRating > 0 ? stats.avgRating.toFixed(1) : "—",
+                  detail: stats.avgRating > 0 ? `${stats.reviewsThisMonth} new this month` : "Waiting on your first posted review",
+                  progress: stats.avgRating > 0 ? Math.min(100, (stats.avgRating / 5) * 100) : 8,
+                },
+                {
+                  label: "New reviews · month",
+                  value: `+${stats.reviewsThisMonth}`,
+                  detail: stats.reviewsThisMonth > 0 ? "Copied and handed off" : "Nothing new yet",
+                  progress: Math.min(100, stats.reviewsThisMonth * 10),
+                },
+                {
+                  label: "Response rate",
+                  value: `${responseRate}%`,
+                  detail: funnel.sent > 0 ? `${funnel.started} people responded to ${funnel.sent} requests` : "No sends yet",
+                  progress: responseRate,
+                },
+                {
+                  label: "Reply rate",
+                  value: `${stats.replyRate}%`,
+                  detail: replyQueue.length > 0 ? `${replyQueue.length} still waiting on you` : "Public replies are caught up",
+                  progress: stats.replyRate || 8,
+                },
+              ].map((metric, index) => (
+                <div
+                  key={metric.label}
+                  className={`px-5 py-5 ${index < 3 ? "border-b border-[var(--dash-border)] md:border-b-0 md:border-r" : ""}`}
+                >
+                  <p className="text-[12px] text-[var(--dash-muted)]">{metric.label}</p>
+                  <p className="mt-3 font-heading text-[42px] font-semibold leading-none tracking-[-0.04em] text-[var(--dash-text)]">
+                    {metric.value}
+                  </p>
+                  <p className="mt-2 text-[12px] leading-relaxed text-[var(--dash-muted)]">{metric.detail}</p>
+                  <div className="mt-4 h-[3px] overflow-hidden rounded-full bg-[#EFE8DA]">
+                    <div
+                      className="h-full rounded-full bg-[var(--dash-primary)]"
+                      style={{ width: `${metric.progress}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <div className="mt-6 grid gap-6 xl:grid-cols-[1.35fr,0.95fr]">
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-[12px] font-medium text-[var(--dash-muted)]">
+                Private feedback · {newPrivateFeedback.length} new
+              </p>
+              <Link href="/dashboard/inbox" className="text-[12px] font-semibold text-[var(--dash-primary)]">
+                Open all →
               </Link>
             </div>
 
             {loading ? (
               <div className="space-y-3">
-                <SkeletonRow />
-                <SkeletonRow />
-                <SkeletonRow />
+                <SkeletonCard />
+                <SkeletonCard />
               </div>
-            ) : recentActivityPreview.length > 0 ? (
-              <div className="space-y-3">
-                {recentActivityPreview.map((item) => {
-                  const isPrivateFeedback = item.feedbackType === "private";
-                  const isCopied = item.status === "copied" && item.feedbackType !== "private";
-                  const isReplied = !!item.repliedAt;
-
-                  return (
-                    <div key={item.sessionId} className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[#FCFAF6] p-4">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            ) : feedbackPreviewItems.length > 0 ? (
+              <div className="overflow-hidden rounded-[16px] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
+                {feedbackPreviewItems.map((item, index) => (
+                  <button
+                    key={item.sessionId}
+                    type="button"
+                    onClick={() => {
+                      setPrivateFeedbackModal(item);
+                      setPrivateFeedbackActionError("");
+                    }}
+                    className={`flex w-full items-start gap-4 px-5 py-4 text-left transition-colors hover:bg-[#FCFAF6] ${
+                      index < feedbackPreviewItems.length - 1 ? "border-b border-[var(--dash-border)]" : ""
+                    }`}
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F5E3D8] text-[13px] font-semibold text-[#9A462E]">
+                      {item.name
+                        .split(" ")
+                        .map((part) => part[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-[14px] font-semibold text-[var(--dash-text)]">{item.name}</p>
-                            <StatusPill status={item.status} />
-                            {item.stars ? <RatingBadge rating={item.stars} /> : null}
-                            {isReplied ? (
-                              <span className="rounded-full bg-[#ECFDF5] px-2 py-0.5 text-[11px] font-semibold text-[#059669]">
-                                Replied
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="mt-2 text-[13px] leading-relaxed text-[var(--dash-text)]">
-                            {item.action}
-                          </p>
-                          {item.snippet ? (
-                            <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
-                              {item.snippet}
-                            </p>
-                          ) : null}
-                          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[var(--dash-muted)]">
+                          <p className="text-[14px] font-semibold text-[var(--dash-text)]">{item.name}</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-[var(--dash-muted)]">
                             {item.serviceType ? <span>{item.serviceType}</span> : null}
-                            {item.employeeName ? <span>{item.employeeName}</span> : null}
-                            <span>{item.time}</span>
+                            {item.employeeName ? <span>· {item.employeeName}</span> : null}
+                            {item.stars ? <MiniStars rating={item.stars} /> : null}
                           </div>
                         </div>
-
-                        {isPrivateFeedback ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPrivateFeedbackModal({
-                                sessionId: item.sessionId,
-                                reviewLinkId: item.reviewLinkId,
-                                name: item.name,
-                                time: item.time,
-                                stars: item.stars,
-                                message: item.snippet ?? "",
-                                employeeName: item.employeeName,
-                                serviceType: item.serviceType,
-                                customerContact: item.customerContact,
-                                status: item.privateFeedbackStatus ?? "new",
-                                handledAt: item.privateFeedbackHandledAt,
-                              });
-                              setPrivateFeedbackActionError("");
-                            }}
-                            className={`${dashboardButtonClassName({ variant: "accent", size: "sm" })} shrink-0 border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/5`}
-                          >
-                            View feedback
-                          </button>
-                        ) : isCopied && !isReplied ? (
-                          <div className="flex shrink-0 flex-wrap gap-2">
-                            <Link
-                              href={`/dashboard/requests/${item.reviewLinkId}`}
-                              className={dashboardButtonClassName({ size: "sm" })}
-                            >
-                              Open request
-                            </Link>
-                            <button
-                              type="button"
-                              onClick={() => generateReplyForItem(item)}
-                              className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
-                            >
-                              Draft reply
-                            </button>
-                          </div>
-                        ) : (
-                          <Link
-                            href={`/dashboard/requests/${item.reviewLinkId}`}
-                            className={`${dashboardButtonClassName({ size: "sm" })} shrink-0`}
-                          >
-                            Open request
-                          </Link>
-                        )}
+                        <span className="shrink-0 text-[11px] text-[var(--dash-muted)]">{item.time}</span>
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[var(--dash-text)]">
+                        "{item.message}"
+                      </p>
+                      <div className="mt-3 flex gap-3 text-[12px]">
+                        <span className="font-semibold text-[var(--dash-primary)]">Reply privately</span>
+                        <span className="text-[var(--dash-muted)]">
+                          {item.status === "handled" ? "Marked resolved" : "Mark resolved"}
+                        </span>
                       </div>
                     </div>
-                  );
-                })}
+                  </button>
+                ))}
               </div>
             ) : (
-              <EmptyState
-                icon={
-                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                  </svg>
-                }
-                title="No activity yet"
-                description="Send your first review request to start filling this in."
-              />
+              <div className="rounded-[16px] border border-[var(--dash-border)] bg-white px-5 py-8 shadow-[var(--dash-shadow)]">
+                <p className="text-[14px] font-medium text-[var(--dash-text)]">No private feedback is waiting right now</p>
+                <p className="mt-2 max-w-[40ch] text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                  New direct feedback will land here first, so you can handle it before it goes stale.
+                </p>
+              </div>
             )}
           </section>
 
-          <div className="space-y-6">
-            <section className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-5 shadow-[var(--dash-shadow)]">
-              <div className="mb-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
-                  Run next
-                </p>
-                <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
-                  The rest of the owner workflow
-                </h2>
-              </div>
-
-              <div className="grid gap-3">
-                <QuickActionCard
-                  href="/dashboard/inbox"
-                  title="Inbox"
-                  description="Handle unhappy customers first and mark them handled once you’ve followed up."
-                  badge={newPrivateFeedback.length > 0 ? `${newPrivateFeedback.length} new` : null}
-                />
-                <QuickActionCard
-                  href="/dashboard/replies"
-                  title="Replies"
-                  description="Draft and copy public review replies without pretending we posted them for you."
-                  badge={replyQueue.length > 0 ? `${replyQueue.length} waiting` : null}
-                />
-                <QuickActionCard
-                  href="/dashboard/send/jobs"
-                  title="Send from jobs"
-                  description="Create personalized one-off requests tied to a specific customer, service, and employee."
-                />
-                <QuickActionCard
-                  href="/dashboard/send/qr"
-                  title="QR / shared link"
-                  description="Use one stable business-wide link on cards, receipts, counters, and signs."
-                />
-              </div>
-            </section>
-
-            <section className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-5 shadow-[var(--dash-shadow)]">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
-                    Request flow
-                  </p>
-                  <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
-                    How requests are moving
-                  </h2>
-                </div>
-                <div className="flex gap-1 rounded-full bg-[#EFEAE2] p-1">
-                  {FILTER_OPTIONS.map((option) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => setFunnelFilter(option.key)}
-                      className={`rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all ${
-                        funnelFilter === option.key
-                          ? "bg-white text-[var(--dash-text)] shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
-                          : "text-[var(--dash-muted)]"
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-[12px] font-medium text-[var(--dash-muted)]">Today</p>
+              <span className="text-[12px] text-[var(--dash-muted)]">{batchWindowLabel}</span>
+            </div>
+            <div className="rounded-[16px] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
+              <div className="space-y-0">
+                {todayItems.map((item, index) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => {
+                      if (item.key === "reply" && replyQueue[0]) {
+                        void generateReplyForItem(replyQueue[0]);
+                        return;
+                      }
+                      if (item.key === "batch") {
+                        router.push("/dashboard/more/review-flow/reminders");
+                        return;
+                      }
+                      if (item.key === "stalled") {
+                        router.push("/dashboard/send");
+                      }
+                    }}
+                    className={`flex w-full items-start gap-4 py-4 text-left ${index < todayItems.length - 1 ? "border-b border-[var(--dash-border)]" : ""}`}
+                  >
+                    <span
+                      className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
+                        item.tone === "coral"
+                          ? "bg-[var(--dash-primary)]"
+                          : item.tone === "sage"
+                            ? "bg-[#9FB8A3]"
+                            : "bg-[var(--dash-text)]"
                       }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {funnelLoading ? (
-                <div className="grid grid-cols-1 gap-3">
-                  <SkeletonCard />
-                  <SkeletonCard />
-                  <SkeletonCard />
-                </div>
-              ) : funnel.sent > 0 ? (
-                <div className="grid grid-cols-1 gap-3">
-                  {dashboardHighlights.map((highlight) => (
-                    <div key={highlight.label} className="rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[#FCFAF6] p-4">
-                      <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
-                        {highlight.label}
+                    />
+                    <div>
+                      <p className="font-heading text-[24px] font-semibold leading-[1.05] tracking-[-0.03em] text-[var(--dash-text)]">
+                        {item.title}
                       </p>
-                      <p className="mt-2 text-[28px] font-semibold tracking-tight text-[var(--dash-text)]">
-                        {highlight.value}
-                      </p>
-                      <p className="mt-1 text-[12px] text-[var(--dash-muted)]">{highlight.detail}</p>
+                      <p className="mt-1 text-[13px] leading-relaxed text-[var(--dash-muted)]">{item.detail}</p>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={
-                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M22 2L11 13" />
-                      <path d="M22 2L15 22l-4-9-9-4 20-7z" />
-                    </svg>
-                  }
-                  title="No request data yet"
-                  description="Once you send requests, this strip will show sent, opened, and copied counts."
-                />
-              )}
-
-              <p className="mt-4 text-[12px] leading-relaxed text-[var(--dash-muted)]">
-                Until Google review sync is live, <span className="font-semibold text-[var(--dash-text)]">Copied</span> is the last confirmed step. It means the customer copied the review and opened the Google handoff. It does not mean we can confirm they posted it.
-              </p>
-            </section>
-          </div>
+                  </button>
+                ))}
+              </div>
+              <Link
+                href="/dashboard/send/jobs"
+                className="mt-5 inline-flex w-full items-center justify-center rounded-[12px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-white"
+              >
+                Send a request now →
+              </Link>
+            </div>
+          </section>
         </div>
       </div>
 

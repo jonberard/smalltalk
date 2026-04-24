@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAppBaseUrl } from "@/lib/app-url";
 import { getNextAllowedSendAt, isInQuietHours } from "@/lib/quiet-hours";
+import { queueReminderDeliveries } from "@/lib/review-message-deliveries";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendReviewSms } from "@/lib/twilio-send";
 import { serverCapture } from "@/lib/posthog-server";
@@ -21,6 +23,8 @@ type DeliveryRow = {
 type ReviewLinkContext = {
   id: string;
   business_id: string;
+  customer_name: string;
+  unique_code: string;
   is_generic: boolean;
   reminder_sequence_enabled: boolean | null;
   sequence_completed: boolean | null;
@@ -54,7 +58,7 @@ async function loadReviewLinkContext(reviewLinkId: string) {
   const { data } = await supabaseAdmin
     .from("review_links")
     .select(
-      "id, business_id, is_generic, reminder_sequence_enabled, sequence_completed, initial_sent_at, created_at, businesses(name, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone)",
+      "id, business_id, customer_name, unique_code, is_generic, reminder_sequence_enabled, sequence_completed, initial_sent_at, created_at, businesses(name, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone)",
     )
     .eq("id", reviewLinkId)
     .maybeSingle();
@@ -88,15 +92,15 @@ async function evaluateDelivery(delivery: DeliveryRow) {
     return { action: "skip" as const, reason: "missing_link" };
   }
 
-  if (reviewLink.sequence_completed) {
+  if (delivery.kind !== "initial" && reviewLink.sequence_completed) {
     return { action: "skip" as const, reason: "sequence_completed" };
   }
 
-  if (!(reviewLink.businesses.reminder_sequence_enabled ?? true)) {
+  if (delivery.kind !== "initial" && !(reviewLink.businesses.reminder_sequence_enabled ?? true)) {
     return { action: "skip" as const, reason: "business_disabled" };
   }
 
-  if (!(reviewLink.reminder_sequence_enabled ?? true)) {
+  if (delivery.kind !== "initial" && !(reviewLink.reminder_sequence_enabled ?? true)) {
     return { action: "skip" as const, reason: "link_disabled" };
   }
 
@@ -153,7 +157,7 @@ export async function GET(req: NextRequest) {
     const { data: dueDeliveries } = await supabaseAdmin
       .from("review_message_deliveries")
       .select("id, review_link_id, business_id, kind, status, scheduled_for, claimed_at, attempt_count, to_address, normalized_phone, message_body")
-      .in("kind", ["reminder_1", "reminder_2"])
+      .in("kind", ["initial", "reminder_1", "reminder_2"])
       .eq("status", "pending")
       .lte("scheduled_for", nowIso)
       .lt("attempt_count", 3)
@@ -184,7 +188,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { data: claimedDeliveries, error: claimError } = await supabaseAdmin.rpc(
-    "claim_due_reminder_deliveries",
+    "claim_due_review_message_deliveries",
     { p_limit: 50 },
   );
 
@@ -244,11 +248,13 @@ export async function GET(req: NextRequest) {
     const nextAttemptCount = delivery.attempt_count + (sendResult.attemptedSend ? 1 : 0);
 
     if (sendResult.success) {
+      const sentAt = new Date().toISOString();
+
       await supabaseAdmin
         .from("review_message_deliveries")
         .update({
           status: "sent",
-          sent_at: new Date().toISOString(),
+          sent_at: sentAt,
           provider_sid: sendResult.providerSid ?? null,
           attempt_count: nextAttemptCount,
           claimed_at: null,
@@ -257,9 +263,51 @@ export async function GET(req: NextRequest) {
         })
         .eq("id", delivery.id);
 
-      const linkAnchor = evaluation.reviewLink.initial_sent_at ?? evaluation.reviewLink.created_at;
+      if (delivery.kind === "initial") {
+        const businessRecord = evaluation.reviewLink.businesses;
+
+        await supabaseAdmin
+          .from("review_links")
+          .update({ initial_sent_at: sentAt })
+          .eq("id", delivery.review_link_id);
+
+        if (
+          businessRecord &&
+          (businessRecord.reminder_sequence_enabled ?? true) &&
+          (evaluation.reviewLink.reminder_sequence_enabled ?? true) &&
+          delivery.normalized_phone &&
+          delivery.message_body
+        ) {
+          const { error: reminderError } = await queueReminderDeliveries({
+            reviewLinkId: delivery.review_link_id,
+            businessId: delivery.business_id,
+            customerContact: delivery.to_address,
+            normalizedPhone: delivery.normalized_phone,
+            customerName: evaluation.reviewLink.customer_name,
+            businessName: businessRecord.name,
+            reviewLinkUrl: `${getAppBaseUrl()}/r/${evaluation.reviewLink.unique_code}`,
+            sentAt,
+          });
+
+          if (!reminderError) {
+            serverCapture(delivery.business_id, "reminder_scheduled", {
+              reminder_count: 2,
+              business_id: delivery.business_id,
+            });
+          }
+        }
+      }
+
+      const linkAnchor =
+        delivery.kind === "initial"
+          ? sentAt
+          : evaluation.reviewLink.initial_sent_at ?? evaluation.reviewLink.created_at;
       const linkAgeHours = Math.round(((Date.now() - new Date(linkAnchor).getTime()) / 3600000) * 10) / 10;
-      serverCapture(delivery.business_id, "reminder_sent", { kind: delivery.kind, delivery_id: delivery.id, link_age_hours: linkAgeHours });
+      serverCapture(
+        delivery.business_id,
+        delivery.kind === "initial" ? "review_request_sent" : "reminder_sent",
+        { kind: delivery.kind, delivery_id: delivery.id, link_age_hours: linkAgeHours },
+      );
       results.push({
         id: delivery.id,
         kind: delivery.kind,

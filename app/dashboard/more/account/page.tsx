@@ -11,8 +11,9 @@ import {
 } from "@/components/dashboard/setup-sections";
 import {
   SetupPageShell,
-  SetupTrustBanner,
+  SetupInfoStrip,
 } from "@/components/dashboard/setup-shell";
+import { dashboardButtonClassName } from "@/components/dashboard/button";
 
 export default function AccountSetupPage() {
   const { business, session, signOut } = useAuth();
@@ -22,13 +23,30 @@ export default function AccountSetupPage() {
 
   return (
     <SetupPageShell
-      eyebrow="Setup / Account"
-      title="Keep the account side simple."
-      description="This is where billing, login basics, and account cleanup live. Most owners only come here occasionally."
+      eyebrow="More / Account"
+      title="Account & billing"
+      description="Plan, receipts, login, and the quieter account details live here."
       headerTone="detail"
+      actions={
+        <Link href="/dashboard/support" className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}>
+          Contact support
+        </Link>
+      }
     >
       <div className="space-y-5">
-        <SetupTrustBanner text="Nothing here changes the product day to day unless your billing or login details change." />
+        <SetupInfoStrip
+          title={
+            business.subscription_status === "active"
+              ? "Your plan is active and the day-to-day product is in good shape"
+              : "Account details need a quick look"
+          }
+          description={
+            business.subscription_status === "active"
+              ? "Billing and login live here. Everything else about sending, replies, and private feedback keeps running as usual."
+              : "Use this page for billing recovery, password resets, or account cleanup — not for day-to-day workflow changes."
+          }
+          accent={business.subscription_status === "active" ? "soft" : "warm"}
+        />
 
         <section id="billing" className="scroll-mt-24">
           <BillingSummarySection business={business} />
@@ -45,21 +63,25 @@ export default function AccountSetupPage() {
           <div className="space-y-5">
             <IntegrationsSection />
             <section id="help" className="scroll-mt-24 rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
-                Help
-              </p>
-              <h2 className="mt-2 text-[18px] font-semibold tracking-tight text-[var(--dash-text)]">
-                Need context before you change something?
-              </h2>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">Help</p>
+              <h2 className="mt-2 text-[18px] font-semibold tracking-tight text-[var(--dash-text)]">Need a quick answer before you change something?</h2>
               <p className="mt-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
-                The Help Center explains reminders, statuses, private feedback, and what the product can actually confirm.
+                The Help Center covers reminders, statuses, private feedback, and what small Talk can actually confirm about customer actions.
               </p>
-              <Link
-                href="/dashboard/support"
-                className="mt-4 inline-flex rounded-[10px] border border-[var(--dash-border)] px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] transition-colors hover:bg-[var(--dash-bg)]"
-              >
-                Open Help Center
-              </Link>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href="/dashboard/support"
+                  className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}
+                >
+                  Open Help Center
+                </Link>
+                <Link
+                  href="/dashboard/support"
+                  className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
+                >
+                  Send a question
+                </Link>
+              </div>
             </section>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
@@ -52,17 +52,14 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
-  {
-    label: "More",
-    href: "/dashboard/more",
-    icon: (active: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.75"} strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="5" cy="12" r="2" />
-        <circle cx="12" cy="12" r="2" />
-        <circle cx="19" cy="12" r="2" />
-      </svg>
-    ),
-  },
+];
+
+const MORE_ITEMS = [
+  { label: "Overview", href: "/dashboard/more" },
+  { label: "Profile", href: "/dashboard/more/profile" },
+  { label: "Team & services", href: "/dashboard/more/team-services" },
+  { label: "Review flow", href: "/dashboard/more/review-flow" },
+  { label: "Account", href: "/dashboard/more/account" },
 ];
 
 function TrialBanner({ remaining }: { remaining: number }) {
@@ -104,11 +101,20 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { business, signOut } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(pathname.startsWith("/dashboard/more"));
+
+  useEffect(() => {
+    if (pathname.startsWith("/dashboard/more")) {
+      setMoreOpen(true);
+    }
+  }, [pathname]);
 
   function isActive(href: string) {
     if (href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(href);
   }
+
+  const moreActive = pathname.startsWith("/dashboard/more");
 
   const initials = business?.name
     ? business.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
@@ -214,7 +220,7 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* ─── Desktop Sidebar Nav ─── */}
-      <nav aria-label="Main navigation" className="fixed left-0 top-0 z-40 hidden h-full w-[220px] flex-col border-r border-[var(--dash-border)] bg-white font-dashboard sm:flex">
+      <nav aria-label="Main navigation" className="fixed left-0 top-0 z-40 hidden h-full w-[220px] flex-col border-r border-[var(--dash-border)] bg-[var(--dash-bg)] font-dashboard sm:flex">
         <div className="px-5 pt-7 pb-6">
           <Link href="/dashboard" className="font-heading text-[15px] font-bold tracking-tight text-[var(--dash-text)]">small Talk</Link>
           <p className="text-[11px] text-[var(--dash-muted)]">Dashboard</p>
@@ -226,10 +232,10 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[13px] font-medium transition-all duration-200 ${
+                className={`flex items-center gap-3 rounded-[14px] px-4 py-3 text-[13px] font-medium transition-all duration-200 ${
                   active
-                    ? "bg-[#E05A3D]/[0.08] text-[#E05A3D]"
-                    : "text-[var(--dash-muted)] hover:bg-[var(--dash-bg)]"
+                    ? "border border-[#E6DDD0] bg-white text-[var(--dash-text)] shadow-[0_10px_24px_rgba(26,46,37,0.06)]"
+                    : "text-[var(--dash-muted)] hover:bg-white/70 hover:text-[var(--dash-text)]"
                 }`}
               >
                 {tab.icon(active)}
@@ -237,28 +243,94 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+
+          <div className="my-3 h-px bg-[var(--dash-border)]" />
+
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setMoreOpen((current) => !current)}
+              className={`flex w-full items-center justify-between rounded-[14px] px-4 py-3 text-left text-[13px] font-medium transition-all duration-200 ${
+                moreActive || moreOpen
+                  ? "text-[var(--dash-text)]"
+                  : "text-[var(--dash-muted)] hover:bg-white/70 hover:text-[var(--dash-text)]"
+              }`}
+            >
+              <span>More</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`transition-transform duration-200 ${moreOpen ? "rotate-180" : ""}`}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {moreOpen ? (
+              <div className="mt-1 space-y-1 pl-2">
+                {MORE_ITEMS.map((item) => {
+                  const active =
+                    item.href === "/dashboard/more"
+                      ? pathname === item.href
+                      : pathname.startsWith(item.href);
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`relative flex min-h-[44px] items-center rounded-[14px] px-4 py-2.5 text-[13px] font-medium transition-all duration-200 ${
+                        active
+                          ? "border border-[#E6DDD0] bg-white text-[var(--dash-text)] shadow-[0_10px_24px_rgba(26,46,37,0.06)]"
+                          : "text-[var(--dash-muted)] hover:bg-white/70 hover:text-[var(--dash-text)]"
+                      }`}
+                    >
+                      {active ? (
+                        <span className="absolute inset-y-[7px] left-0 w-[3px] rounded-r-full bg-[var(--dash-primary)]" />
+                      ) : null}
+                      <span className={active ? "pl-2.5" : "pl-2.5"}>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {/* Sidebar bottom — profile + sign out */}
         <div className="border-t border-[var(--dash-border)] px-3 py-3">
-          <div className="flex items-center gap-2.5 rounded-[10px] px-3 py-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E05A3D] text-[11px] font-bold text-white">
-              {initials}
+          <div className="overflow-hidden rounded-[14px] border border-[#E6DDD0] bg-white shadow-[0_10px_24px_rgba(26,46,37,0.04)]">
+            <div className="flex items-center gap-2.5 px-3 py-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E05A3D] text-[11px] font-bold text-white">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[12px] font-medium text-[var(--dash-text)]">{business?.name}</p>
+                {business?.subscription_status && (
+                  <StatusPill status={business.subscription_status} />
+                )}
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[12px] font-medium text-[var(--dash-text)]">{business?.name}</p>
-              {business?.subscription_status && (
-                <StatusPill status={business.subscription_status} />
-              )}
+            <div className="border-t border-[var(--dash-border)] bg-[#FCFAF6] px-3 py-2">
+              <button
+                type="button"
+                onClick={signOut}
+                className="inline-flex min-h-[32px] w-full items-center justify-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[12px] font-medium text-[#BC4A2F] transition-all duration-200 hover:bg-[var(--dash-primary)] hover:text-white"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Sign out
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={signOut}
-            className="mt-2 w-full px-3 py-2 text-left text-[12px] font-medium text-[var(--dash-muted)] transition-colors hover:text-[var(--dash-text)]"
-          >
-            Sign out
-          </button>
         </div>
       </nav>
     </>
