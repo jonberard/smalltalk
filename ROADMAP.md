@@ -551,6 +551,13 @@ These matter, but they come after the pre-launch items above.
 
 ### 1. Owner Product Expansion
 
+- [ ] Review Flow follow-ons
+  - [ ] Pause the full request system from the Review Flow page
+  - [ ] Send a test request message to the owner before changing live copy
+  - [ ] Add date-range controls on Review Flow (30d / 90d / all time)
+  - [ ] Add filtered drill-through from Review Flow health rows into the right owner views
+  - [ ] Keep deeper request intelligence separate from Review Flow so it does not turn into an analytics console
+
 - [ ] Staff performance dashboard
   - by employee
   - by service

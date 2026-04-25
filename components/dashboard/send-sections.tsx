@@ -571,9 +571,11 @@ export function SingleSendForm({
 export function QRBlock({
   businessId,
   businessName,
+  embedded = false,
 }: {
   businessId: string;
   businessName: string;
+  embedded?: boolean;
 }) {
   const [genericCode, setGenericCode] = useState<string | null>(null);
   const [loadingLink, setLoadingLink] = useState(true);
@@ -706,20 +708,20 @@ export function QRBlock({
 
   if (!fullLink || !displayLink || !qrSvg) return null;
 
-  return (
-    <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-5 shadow-[var(--dash-shadow)]">
+  const content = (
+    <>
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
         QR / Shared Link
       </p>
-      <h3 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
-        One stable link for {businessName}
+      <h3 className="mt-2 text-balance font-heading text-[24px] font-semibold leading-[1.02] tracking-[-0.03em] text-[var(--dash-text)]">
+        One stable link for {businessName}.
       </h3>
       <p className="mt-2 max-w-[42ch] text-[13px] leading-relaxed text-[var(--dash-muted)]">
-        Print it on receipts, post it on signs, or share it anywhere. This is your reusable business-wide link, not a one-off request.
+        Print on receipts, signs, or business cards. Same link, no expiration, built for passive collection.
       </p>
 
-      <div className="mt-5 flex items-start gap-4">
-        <div className="flex h-[168px] w-[168px] shrink-0 items-center justify-center rounded-[14px] border border-[var(--dash-border)] bg-white p-3 shadow-[0_1px_0_rgba(217,206,191,0.7)]">
+      <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-start">
+        <div className="flex h-[162px] w-[162px] shrink-0 items-center justify-center rounded-[14px] border border-[var(--dash-border)] bg-white p-3 shadow-[0_1px_0_rgba(217,206,191,0.7)]">
           <div
             className="h-full w-full"
             aria-label={`QR code for ${businessName}`}
@@ -727,43 +729,54 @@ export function QRBlock({
           />
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-          <div className="flex items-center gap-2 rounded-[8px] bg-[var(--dash-bg)] px-3 py-2">
-            <span className="flex-1 truncate text-[13px] font-medium text-[var(--dash-text)]">{displayLink}</span>
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <div className="flex min-h-[44px] items-center gap-2 rounded-[12px] border border-[var(--dash-border)] bg-[#FCFAF6] px-3 py-2.5">
+            <span className="flex-1 truncate text-[13px] font-medium text-[var(--dash-text)]">
+              {displayLink}
+            </span>
             <button
               type="button"
               onClick={handleCopy}
               className={`shrink-0 text-[12px] font-semibold transition-colors ${
-                copied ? "text-[#10B981]" : "text-[#E05A3D] hover:text-[#C7432A]"
+                copied ? "text-[#3B5B4C]" : "text-[#E05A3D] hover:text-[#C7432A]"
               }`}
             >
-              {copied ? "Copied!" : "Copy"}
+              {copied ? "Copied" : "Copy"}
             </button>
           </div>
-          <p className="text-[11px] leading-relaxed text-[var(--dash-muted)]">
-            This generic link works for any customer. For personalized links with pre-filled names and services, use Send from jobs instead.
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
+
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={handleDownloadPng}
-              className={dashboardButtonClassName({ variant: "primary", size: "sm" })}
+              className={dashboardButtonClassName({ size: "sm" })}
             >
-              Download PNG
+              PNG
             </button>
             <button
               type="button"
               onClick={handleDownloadSvg}
-              className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}
+              className={dashboardButtonClassName({ size: "sm" })}
             >
-              Download SVG
+              SVG
             </button>
           </div>
-          <p className="text-[11px] leading-relaxed text-[var(--dash-muted)]">
-            PNG works well for quick printing. SVG stays sharp for designers, signs, and larger formats.
+
+          <p className="max-w-[30ch] text-[11px] leading-relaxed text-[var(--dash-muted)]">
+            Anyone who scans this gets the same business-wide flow. Personalized sends still belong in the direct request path.
           </p>
         </div>
       </div>
+    </>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-5 shadow-[var(--dash-shadow)]">
+      {content}
     </div>
   );
 }
@@ -824,14 +837,22 @@ export function Paywall({ hadTrial }: { hadTrial: boolean }) {
 
 export function TrialRemainingBanner({ trialRemaining }: { trialRemaining: number }) {
   return (
-    <div className="flex items-center gap-2 rounded-[var(--dash-radius-sm)] bg-[#FFF7ED] px-4 py-2.5">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--dash-radius-sm)] border border-[#E8D9B7] bg-[#FBF1D7] px-4 py-3">
+      <div className="flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B7791F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
         <polyline points="12 6 12 12 16 14" />
-      </svg>
-      <p className="text-[13px] text-[#92400E]">
-        <span className="font-semibold">{trialRemaining}</span> review request{trialRemaining !== 1 ? "s" : ""} left in your free trial
-      </p>
+        </svg>
+        <p className="text-[13px] text-[#8A651F]">
+          <span className="font-semibold">{trialRemaining}</span> review request{trialRemaining !== 1 ? "s" : ""} left in your free trial
+        </p>
+      </div>
+      <Link
+        href="/dashboard/more/account#billing"
+        className="text-[12px] font-semibold text-[#BC4A2F] transition-colors hover:text-[#A43F27]"
+      >
+        Upgrade
+      </Link>
     </div>
   );
 }
@@ -841,11 +862,13 @@ export function RecentSendsList({
   title = "Recent sends",
   description,
   maxItems,
+  variant = "default",
 }: {
   recentLinks: RecentLinkItem[];
   title?: string;
   description?: string;
   maxItems?: number;
+  variant?: "default" | "compact";
 }) {
   const items = typeof maxItems === "number" ? recentLinks.slice(0, maxItems) : recentLinks;
 
@@ -869,6 +892,24 @@ export function RecentSendsList({
           title="No review links yet"
           description="Your sent review links will appear here"
         />
+      ) : variant === "compact" ? (
+        <div className="overflow-hidden rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)]">
+          {items.map((link, index) => (
+            <div
+              key={link.id}
+              className={`flex items-center gap-3 px-4 py-3 ${index < items.length - 1 ? "border-b border-[var(--dash-border)]" : ""}`}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-medium text-[var(--dash-text)]">{link.customer_name}</p>
+                <p className="mt-0.5 text-[12px] text-[var(--dash-muted)]">{link.service_name}</p>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <span className="text-[11px] text-[var(--dash-muted)]">{timeAgo(link.created_at)}</span>
+                <StatusPill status={link.status} />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="overflow-hidden rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)]">
           {items.map((link, index) => (

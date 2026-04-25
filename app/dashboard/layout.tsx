@@ -102,11 +102,17 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
   const { business, signOut } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(pathname.startsWith("/dashboard/more"));
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
   useEffect(() => {
     if (pathname.startsWith("/dashboard/more")) {
       setMoreOpen(true);
     }
+  }, [pathname]);
+
+  useEffect(() => {
+    setMobileMoreOpen(false);
+    setProfileOpen(false);
   }, [pathname]);
 
   function isActive(href: string) {
@@ -181,6 +187,66 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
 
       {children}
 
+      {mobileMoreOpen ? (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-[rgba(26,46,37,0.18)] sm:hidden"
+            onClick={() => setMobileMoreOpen(false)}
+          />
+          <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+76px)] z-50 px-3 sm:hidden">
+            <div className="overflow-hidden rounded-[22px] border border-[#E6DDD0] bg-[#FCFAF6] shadow-[0_20px_44px_rgba(26,46,37,0.16)]">
+              <div className="flex items-center justify-between border-b border-[var(--dash-border)] px-4 py-3.5">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+                    More
+                  </p>
+                  <p className="mt-1 text-[13px] text-[var(--dash-muted)]">
+                    Setup and quieter account pages
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileMoreOpen(false)}
+                  aria-label="Close more menu"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--dash-border)] bg-white text-[var(--dash-muted)]"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              <div className="space-y-1.5 p-3">
+                {MORE_ITEMS.map((item) => {
+                  const active =
+                    item.href === "/dashboard/more"
+                      ? pathname === item.href
+                      : pathname.startsWith(item.href);
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMoreOpen(false)}
+                      className={`relative flex min-h-[48px] items-center rounded-[16px] px-4 py-3 text-[14px] font-medium transition-all duration-200 ${
+                        active
+                          ? "border border-[#E6DDD0] bg-white text-[var(--dash-text)] shadow-[0_10px_24px_rgba(26,46,37,0.06)]"
+                          : "border border-transparent bg-transparent text-[var(--dash-muted)] hover:bg-white hover:text-[var(--dash-text)]"
+                      }`}
+                    >
+                      {active ? (
+                        <span className="absolute inset-y-[8px] left-0 w-[3px] rounded-r-full bg-[var(--dash-primary)]" />
+                      ) : null}
+                      <span className="pl-2.5">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
+
       {/* ─── Bottom Tab Bar ─── */}
       <nav aria-label="Main navigation" className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--dash-border)] bg-white/95 backdrop-blur-md font-dashboard sm:hidden">
         <div className="mx-auto flex max-w-[600px] items-stretch">
@@ -216,6 +282,33 @@ function DashboardNav({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          <button
+            type="button"
+            onClick={() => setMobileMoreOpen((current) => !current)}
+            className={`flex flex-1 flex-col items-center gap-1 pb-[env(safe-area-inset-bottom,8px)] pt-2.5 transition-colors duration-200 ${
+              moreActive || mobileMoreOpen ? "text-[#E05A3D]" : "text-[var(--dash-muted)]"
+            }`}
+          >
+            <span
+              className={`flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 ${
+                moreActive || mobileMoreOpen
+                  ? "bg-[#E05A3D]/10 text-[#E05A3D]"
+                  : "bg-transparent"
+              }`}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none" />
+                <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+                <circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none" />
+              </svg>
+            </span>
+            <span className={`text-[10px] ${(moreActive || mobileMoreOpen) ? "font-semibold" : "font-medium"}`}>
+              More
+            </span>
+            {(moreActive || mobileMoreOpen) && (
+              <span className="mt-0.5 h-1 w-1 rounded-full bg-[#E05A3D]" />
+            )}
+          </button>
         </div>
       </nav>
 

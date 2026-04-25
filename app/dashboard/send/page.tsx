@@ -1,100 +1,236 @@
 "use client";
 
-import Link from "next/link";
+import type { ReactNode } from "react";
+import { useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { dashboardButtonClassName } from "@/components/dashboard/button";
-import { SetupCardLink, SetupInfoStrip, SetupPageShell } from "@/components/dashboard/setup-shell";
 import {
+  Paywall,
+  QRBlock,
   RecentSendsList,
+  SingleSendForm,
   TrialRemainingBanner,
   useSendWorkspace,
 } from "@/components/dashboard/send-sections";
 
+function SendUseCaseCard({
+  title,
+  items,
+  tone = "default",
+}: {
+  title: string;
+  items: string[];
+  tone?: "default" | "warm";
+}) {
+  return (
+    <div
+      className={`rounded-[var(--dash-radius)] border p-5 shadow-[var(--dash-shadow)] ${
+        tone === "warm"
+          ? "border-[#F1CEC3] bg-[#FFF8F4]"
+          : "border-[var(--dash-border)] bg-white"
+      }`}
+    >
+      <p className="text-[12px] font-semibold text-[var(--dash-text)]">{title}</p>
+      <div className="mt-3 space-y-2.5">
+        {items.map((item) => (
+          <div key={item} className="flex items-start gap-2.5">
+            <span className="mt-[2px] inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#E05A3D]/10 text-[#E05A3D]">
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </span>
+            <p className="text-[13px] leading-relaxed text-[var(--dash-muted)]">{item}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SendEntryCard({
+  eyebrow,
+  title,
+  description,
+  badge,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  badge: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-[20px] border border-[var(--dash-border)] bg-white p-6 shadow-[var(--dash-shadow)]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+            {eyebrow}
+          </p>
+          <h2 className="mt-2 max-w-[18ch] text-balance font-heading text-[30px] font-semibold leading-[1.04] tracking-[-0.03em] text-[var(--dash-text)]">
+            {title}
+          </h2>
+          <p className="mt-2 max-w-[42ch] text-[13px] leading-relaxed text-[var(--dash-muted)]">
+            {description}
+          </p>
+        </div>
+        <span className="inline-flex items-center rounded-full bg-[#F6E8DE] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#BC4A2F]">
+          {badge}
+        </span>
+      </div>
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
+
 export default function SendPage() {
   const { business } = useAuth();
-  const { recentLinks, trialRemaining, effectiveTier } = useSendWorkspace(business);
+  const {
+    services,
+    employees,
+    loading,
+    recentLinks,
+    trialRemaining,
+    effectiveTier,
+    setServices,
+    setEmployees,
+    handleSingleSend,
+  } = useSendWorkspace(business);
+
+  const useCases = useMemo(
+    () => ({
+      direct: [
+        "You just finished a visit",
+        "You want the tech name attached",
+        "You need it to feel personal",
+      ],
+      shared: [
+        "Printing on signs or receipts",
+        "Adding to email signatures",
+        "Letting walk-ins self-serve",
+      ],
+    }),
+    [],
+  );
 
   if (!business) return null;
 
   return (
-    <SetupPageShell
-      eyebrow="Send"
-      title="Choose the fastest way to ask."
-      description="Send now works like one outbound workflow instead of one crowded utility page. Pick the path that matches the moment, then keep recent requests moving from one place."
-      backHref="/dashboard"
-      backLabel="Back to dashboard"
-    >
-      <div className="space-y-5">
-        {effectiveTier === "trial" ? <TrialRemainingBanner trialRemaining={trialRemaining} /> : null}
-
-        <div className="grid gap-5 lg:grid-cols-2">
-          <SetupCardLink
-            href="/dashboard/send/jobs"
-            eyebrow="Send From Jobs"
-            title="Create one-off personalized requests"
-            description="Prefill the customer, service, and employee context so each link feels specific and tied to a real visit."
-            meta={
-              <div className="rounded-full bg-[var(--dash-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--dash-muted)]">
-                Best for direct outreach
-              </div>
-            }
-          />
-          <SetupCardLink
-            href="/dashboard/send/qr"
-            eyebrow="QR / Shared Link"
-            title="Use one stable business-wide link"
-            description="Perfect for printed materials, signage, receipts, or any moment where you want a reusable link instead of a personalized send."
-            meta={
-              <div className="rounded-full bg-[var(--dash-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--dash-muted)]">
-                Best for passive collection
-              </div>
-            }
-          />
-        </div>
-
-        <div className="grid gap-5 lg:grid-cols-2">
-          <SetupInfoStrip
-            title="When to use Send from jobs"
-            description="Use it after a specific completed job or visit, especially when you want the customer name, service, and employee to already be attached to the request."
-            accent="warm"
-          />
-          <SetupInfoStrip
-            title="When to use QR / shared link"
-            description="Use it when you need something reusable - business cards, yard signs, invoices, email signatures, or a counter sign in the office."
-          />
-        </div>
-
-        <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
-                Requests in motion
-              </p>
-              <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[var(--dash-text)]">
-                What you sent recently still belongs here.
-              </h2>
-              <p className="mt-2 max-w-[44ch] text-[13px] leading-relaxed text-[var(--dash-muted)]">
-                Send owns the outbound side of the workflow, so recent requests and their next step stay connected to the way you created them.
-              </p>
-            </div>
-            <Link
-              href="/dashboard/send/jobs"
-              className={dashboardButtonClassName({ variant: "primary" })}
-            >
-              Send a request
-            </Link>
+    <main className="min-h-dvh bg-[var(--dash-bg)] sm:pl-[220px]">
+      <div className="dash-page-enter mx-auto max-w-[1240px] px-5 pb-32 pt-8 sm:pb-16">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">
+              Send
+            </p>
+            <h1 className="mt-2 text-balance font-heading text-[30px] font-semibold leading-[1.02] tracking-tight text-[var(--dash-text)] sm:text-[34px]">
+              Ask for a review
+            </h1>
+            <p className="mt-2 max-w-[58ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
+              Two ways to ask. A personalized text or email tied to a real visit, or a stable QR code your customers can scan from anywhere.
+            </p>
           </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <a
+              href="#send-direct"
+              className={dashboardButtonClassName({ variant: "primary", size: "lg" })}
+            >
+              + New request
+            </a>
+          </div>
+        </div>
 
-          <div className="mt-5">
+        <div className="space-y-5">
+          {effectiveTier === "trial" ? <TrialRemainingBanner trialRemaining={trialRemaining} /> : null}
+
+          {effectiveTier === "expired" ? (
+            <div className="rounded-[20px] border border-[var(--dash-border)] bg-white p-6 shadow-[var(--dash-shadow)]">
+              <Paywall
+                hadTrial={
+                  business.subscription_status === "trial" ||
+                  business.subscription_status === "trialing" ||
+                  business.subscription_status === "canceled"
+                }
+              />
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-5 min-[1180px]:grid-cols-[1.06fr_0.94fr]">
+                <div id="send-direct">
+                  <SendEntryCard
+                    eyebrow="From jobs"
+                    title="Send a personalized request after a visit."
+                    description="Pre-fills name, service, and tech so the link feels specific — best for direct outreach."
+                    badge="Most direct"
+                  >
+                    {loading ? (
+                      <div className="space-y-4 py-3">
+                        {Array.from({ length: 4 }).map((_, index) => (
+                          <div key={index}>
+                            <div className="mb-2 h-4 w-28 animate-pulse rounded bg-[#F4F4F5]" />
+                            <div className="h-[44px] animate-pulse rounded-[14px] bg-[#F4F4F5]" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        <SingleSendForm
+                          services={services}
+                          employees={employees}
+                          businessId={business.id}
+                          onSend={handleSingleSend}
+                          onServiceCreated={(service) => setServices((prev) => [...prev, service])}
+                          onEmployeeCreated={(employee) => setEmployees((prev) => [...prev, employee])}
+                        />
+                        <p className="mt-3 text-center text-[11px] leading-relaxed text-[var(--dash-muted)]">
+                          We&apos;ll text or email from your configured business sending flow.
+                        </p>
+                      </>
+                    )}
+                  </SendEntryCard>
+                </div>
+
+                <SendEntryCard
+                  eyebrow="QR · Shared Link"
+                  title="One stable link for customers."
+                  description="Print on receipts, signs, or business cards. Same link, no expiration — best for passive collection."
+                  badge="Reusable"
+                >
+                  <QRBlock businessId={business.id} businessName={business.name} embedded />
+                </SendEntryCard>
+              </div>
+
+              <div className="grid gap-5 min-[1180px]:grid-cols-2">
+                <SendUseCaseCard
+                  title="Use From jobs when..."
+                  items={useCases.direct}
+                  tone="warm"
+                />
+                <SendUseCaseCard title="Use QR / shared link when..." items={useCases.shared} />
+              </div>
+            </>
+          )}
+
+          <div className="rounded-[20px] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
             <RecentSendsList
               recentLinks={recentLinks}
               title="Recent sends"
-              description="Open a request to see the full timeline, private feedback path, or copied-review handoff."
+              description="Keep the outbound side of the workflow moving from one place."
               maxItems={5}
+              variant="compact"
             />
           </div>
         </div>
       </div>
-    </SetupPageShell>
+    </main>
   );
 }
