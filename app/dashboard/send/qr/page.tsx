@@ -23,7 +23,7 @@ export default function SendQrPage() {
       <div className="space-y-5">
         {effectiveTier === "trial" ? <TrialRemainingBanner trialRemaining={trialRemaining} /> : null}
 
-        <div className="grid gap-5 xl:grid-cols-[1.05fr,0.95fr]">
+        <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
           <QRBlock businessId={business.id} businessName={business.name} />
 
           <div className="space-y-5">

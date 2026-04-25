@@ -65,7 +65,11 @@ export function SetupPageShell({
                 {description}
               </p>
             </div>
-            {actions ? <div className="shrink-0">{actions}</div> : null}
+            {actions ? (
+              <div className="w-full shrink-0 sm:w-auto [&>*]:w-full sm:[&>*]:w-auto">
+                {actions}
+              </div>
+            ) : null}
           </div>
         </div>
         {children}

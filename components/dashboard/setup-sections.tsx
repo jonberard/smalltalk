@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import type { Business } from "@/lib/types";
@@ -37,6 +38,20 @@ type PlaceResult = {
   user_ratings_total: number;
 };
 
+export type BusinessProfilePreviewSnapshot = {
+  name: string;
+  logo_url: string | null;
+  owner_email: string | null;
+  business_city: string | null;
+  neighborhoods: string[];
+  google_review_url: string;
+  google_place_id: string | null;
+  google_host: string;
+  google_connected: boolean;
+  google_name: string | null;
+  google_address: string | null;
+};
+
 const REMINDER_TIMEZONE_OPTIONS = [
   "America/New_York",
   "America/Chicago",
@@ -63,6 +78,7 @@ function formatHourLabel(hour: number) {
 export function BusinessProfile({
   businessId,
   initial,
+  onPreviewSnapshotChange,
 }: {
   businessId: string;
   initial: {
@@ -74,6 +90,7 @@ export function BusinessProfile({
     business_city: string | null;
     neighborhoods: string[] | null;
   };
+  onPreviewSnapshotChange?: (snapshot: BusinessProfilePreviewSnapshot) => void;
 }) {
   const { toast } = useToast();
   const [savedProfile, setSavedProfile] = useState(initial);
@@ -240,6 +257,34 @@ export function BusinessProfile({
     googleHost = googleUrl;
   }
 
+  useEffect(() => {
+    onPreviewSnapshotChange?.({
+      name,
+      logo_url: logoPreview,
+      owner_email: initial.owner_email,
+      business_city: businessCity,
+      neighborhoods: initial.neighborhoods ?? [],
+      google_review_url: googleUrl,
+      google_place_id: placeId,
+      google_host: googleHost,
+      google_connected: connectedToGoogle,
+      google_name: selectedPlace?.name || null,
+      google_address: selectedPlace?.address || null,
+    });
+  }, [
+    businessCity,
+    connectedToGoogle,
+    googleHost,
+    googleUrl,
+    initial.neighborhoods,
+    initial.owner_email,
+    logoPreview,
+    name,
+    onPreviewSnapshotChange,
+    placeId,
+    selectedPlace,
+  ]);
+
   return (
     <div className="space-y-5">
       <input
@@ -253,7 +298,7 @@ export function BusinessProfile({
         }}
       />
 
-      <div className="grid gap-5 xl:grid-cols-[1.08fr,0.92fr]">
+      <div className="grid gap-5 min-[1180px]:grid-cols-[1.08fr_0.92fr]">
         <section className="overflow-hidden rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
           <div className="relative overflow-hidden bg-gradient-to-br from-[#E05A3D]/[0.09] via-[#F8F9FA] to-[#DDE5DF] px-6 pb-6 pt-8">
             <div className="absolute inset-x-0 top-0 h-[1px] bg-[linear-gradient(90deg,rgba(224,90,61,0.4),rgba(221,229,223,0.2),rgba(224,90,61,0.2))]" />
@@ -294,7 +339,7 @@ export function BusinessProfile({
             </div>
           </div>
 
-          <div className="grid gap-4 px-6 py-6 sm:grid-cols-3">
+          <div className="grid gap-4 px-6 py-6 sm:grid-cols-2 min-[1180px]:grid-cols-3">
             <div className="rounded-[14px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Owner account</p>
               <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">
@@ -472,7 +517,7 @@ export function BusinessProfile({
         </section>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[1.1fr,0.9fr]">
+      <div className="grid gap-5 min-[1180px]:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -504,7 +549,7 @@ export function BusinessProfile({
               />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 min-[1180px]:grid-cols-3">
               <div className="rounded-[14px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Owner email</p>
                 <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">{initial.owner_email ?? "Not set"}</p>
@@ -1145,7 +1190,7 @@ export function ReviewRequestMessagingSection({
         ))}
       </div>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-[1.05fr,0.95fr]">
+      <div className="mt-5 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-4 rounded-[12px] border border-[var(--dash-border)] bg-white p-4">
           <div>
             <label className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-[var(--dash-muted)]">SMS message</label>
@@ -1540,7 +1585,7 @@ export function AutomatedRemindersSection({
         </label>
       </div>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="rounded-[12px] border border-[var(--dash-border)] bg-white p-4">
           <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--dash-muted)]">Initial delivery</p>
           <div className="mt-3 rounded-[10px] bg-[var(--dash-bg)] p-3.5">
@@ -1711,6 +1756,8 @@ export function AutomatedRemindersSection({
 
 export function BillingSummarySection({ business }: { business: Business }) {
   const [usageCount, setUsageCount] = useState(0);
+  const [smsCount, setSmsCount] = useState(0);
+  const [teamCount, setTeamCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
 
@@ -1718,12 +1765,28 @@ export function BillingSummarySection({ business }: { business: Business }) {
     async function fetchUsage() {
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const { count } = await supabase
-        .from("review_links")
-        .select("*", { count: "exact", head: true })
-        .eq("business_id", business.id)
-        .gte("created_at", monthStart);
-      setUsageCount(count ?? 0);
+      const [requestRes, smsRes, teamRes] = await Promise.all([
+        supabase
+          .from("review_links")
+          .select("*", { count: "exact", head: true })
+          .eq("business_id", business.id)
+          .gte("created_at", monthStart),
+        supabase
+          .from("review_message_deliveries")
+          .select("*", { count: "exact", head: true })
+          .eq("business_id", business.id)
+          .eq("channel", "sms")
+          .eq("status", "sent")
+          .gte("sent_at", monthStart),
+        supabase
+          .from("employees")
+          .select("*", { count: "exact", head: true })
+          .eq("business_id", business.id),
+      ]);
+
+      setUsageCount(requestRes.count ?? 0);
+      setSmsCount(smsRes.count ?? 0);
+      setTeamCount(teamRes.count ?? 0);
       setLoading(false);
     }
 
@@ -1764,147 +1827,350 @@ export function BillingSummarySection({ business }: { business: Business }) {
   const status = business.subscription_status ?? "none";
   const trialEndsAt = business.trial_ends_at ? new Date(business.trial_ends_at) : null;
   const daysRemaining = trialEndsAt ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 0;
+  const planName =
+    status === "trial" || status === "trialing"
+      ? "Trial"
+      : status === "active"
+        ? "Pro"
+        : status === "past_due"
+          ? "Past due"
+          : status === "canceled"
+            ? "Canceled"
+            : "Starter";
+  const ownerSince = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(business.created_at));
+  const badgeLabel =
+    status === "active"
+      ? "Active"
+      : status === "trial" || status === "trialing"
+        ? trialEndsAt
+          ? `Trial ends ${trialEndsAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+          : "Trialing"
+        : status === "past_due"
+          ? "Payment issue"
+          : status === "canceled"
+            ? "Canceled"
+            : "Not subscribed";
+  const badgeToneClassName =
+    status === "active"
+      ? "bg-[#DDE5DF] text-[#365347]"
+      : status === "trial" || status === "trialing"
+        ? "bg-[#F3E7C7] text-[#8A651F]"
+        : status === "past_due" || status === "canceled"
+          ? "bg-[#FBE3DA] text-[#A6452E]"
+          : "bg-[#F4EFE5] text-[var(--dash-muted)]";
+  const usageTiles = [
+    {
+      label: "Requests this month",
+      value: loading ? "—" : usageCount.toLocaleString("en-US"),
+      detail:
+        status === "trial" || status === "trialing"
+          ? `${business.trial_requests_remaining} trial request${business.trial_requests_remaining === 1 ? "" : "s"} left`
+          : "Review requests created",
+    },
+    {
+      label: "SMS sent",
+      value: loading ? "—" : smsCount.toLocaleString("en-US"),
+      detail: "Delivered this month",
+    },
+    {
+      label: "Team members",
+      value: loading ? "—" : teamCount.toLocaleString("en-US"),
+      detail: teamCount > 0 ? "On your account" : "Add from Team & Services",
+    },
+  ];
+  const billingAccessRows = business.stripe_customer_id
+    ? [
+        {
+          title: "Invoices & receipts",
+          detail: "Download invoice history and receipts in the billing portal.",
+          value: "In Stripe",
+        },
+        {
+          title: "Payment method",
+          detail: status === "past_due" ? "Update the saved card to clear the payment issue." : "Update the saved card or billing details from the same place.",
+          value: status === "past_due" ? "Needs attention" : "Saved card",
+        },
+        {
+          title: "Plan changes",
+          detail:
+            status === "trial" || status === "trialing"
+              ? "Upgrade from trial whenever you're ready."
+              : status === "canceled"
+                ? "Resume the plan without losing history."
+                : "Change plans or review subscription details in Stripe.",
+          value: status === "trial" || status === "trialing" ? "Trial" : status === "canceled" ? "Paused" : "Manage",
+        },
+      ]
+    : [
+        {
+          title: "Start billing",
+          detail: "Checkout opens in Stripe when you're ready to unlock live sending.",
+          value: "Stripe",
+        },
+        {
+          title: "Current status",
+          detail:
+            status === "trial" || status === "trialing"
+              ? `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in the trial.`
+              : "No paid billing activity yet.",
+          value: status === "trial" || status === "trialing" ? "Trial" : "Not started",
+        },
+        {
+          title: "Team members",
+          detail: teamCount > 0 ? `${teamCount} on the account today.` : "No team members added yet.",
+          value: teamCount > 0 ? `${teamCount}` : "—",
+        },
+      ];
+  const billingAccessTitle = business.stripe_customer_id ? "Billing access" : "Billing setup";
+  const billingAccessDescription = business.stripe_customer_id
+    ? "The billing portal handles invoices, cards, and plan changes in one place."
+    : "Stripe opens when you're ready to start the plan and save billing details.";
+  const billingFooterNote =
+    status === "active"
+      ? "Your plan is active. Review requests and follow-ups keep running as normal."
+      : status === "trial" || status === "trialing"
+        ? trialEndsAt
+          ? `Trial ends on ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
+          : "Trial is active."
+        : status === "past_due"
+          ? "A recent payment failed. Update the billing method to keep sending without interruption."
+          : status === "canceled"
+            ? "Sending is paused until you resubscribe. Historic requests and replies stay on the account."
+            : "Start the plan when you're ready to send live requests and follow-ups to real customers.";
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1.1fr,0.9fr]">
-      <div className="rounded-[var(--dash-radius)] bg-[var(--dash-surface)] px-6 py-7 shadow-[var(--dash-shadow)]">
-        <div className="flex items-center gap-3">
-          <div>
-            <h2 className="text-[18px] font-semibold text-[var(--dash-text)]">small Talk Pro</h2>
-            <p className="mt-0.5 text-[14px] text-[var(--dash-muted)]">$79/mo</p>
-          </div>
-          <StatusPill status={status} className="self-start" />
-        </div>
-
-        <div className="mt-5">
-          {status === "trialing" && trialEndsAt ? (
+    <div className="grid gap-5 min-[1180px]:grid-cols-[1.1fr_0.9fr]">
+      <section className="relative overflow-hidden rounded-[16px] border border-[var(--dash-border)] bg-white px-7 py-7 shadow-[var(--dash-shadow)]">
+        <div className="pointer-events-none absolute right-[-38px] top-[-56px] h-[200px] w-[200px] rounded-full bg-[radial-gradient(circle,rgba(224,90,61,0.16)_0%,rgba(224,90,61,0.05)_34%,transparent_68%)]" />
+        <div className="relative">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-[14px] text-[var(--dash-text)]">
-                Your free trial ends{" "}
-                <span className="font-medium">
-                  {trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-                </span>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+                Your plan
               </p>
-              <p className="mt-1 text-[13px] font-semibold text-[#D97706]">
-                {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} remaining
-              </p>
-              <div className="mt-3 flex items-center gap-3">
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--dash-border)]">
-                  <div
-                    className="h-full rounded-full bg-[#D97706] transition-all"
-                    style={{ width: `${Math.max(5, ((7 - daysRemaining) / 7) * 100)}%` }}
-                  />
+              <div className="mt-4 flex flex-wrap items-end gap-x-4 gap-y-2">
+                <h2 className="font-heading text-[66px] font-semibold leading-[0.9] tracking-[-0.05em] text-[var(--dash-text)]">
+                  {planName}
+                </h2>
+                <div className="pb-2">
+                  <div className="flex items-end gap-1">
+                    <span className="font-heading text-[36px] font-semibold leading-none tracking-[-0.03em] text-[var(--dash-text)]">
+                      $79
+                    </span>
+                    <span className="pb-1 text-[13px] text-[var(--dash-muted)]">/ month</span>
+                  </div>
+                  <p className="mt-1 text-[12px] text-[var(--dash-muted)]">Customer since {ownerSince}</p>
                 </div>
               </div>
             </div>
-          ) : null}
 
-          {status === "active" ? (
-            <p className="text-[14px] text-[var(--dash-muted)]">
-              Your subscription is active. Next billing date will appear in the Stripe portal.
-            </p>
-          ) : null}
+            <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${badgeToneClassName}`}>
+              {badgeLabel}
+            </span>
+          </div>
 
-          {status === "past_due" ? (
-            <div className="rounded-[var(--dash-radius-sm)] border border-[#DC2626]/20 bg-[#FEF2F2] px-4 py-3">
-              <p className="text-[14px] font-medium text-[#DC2626]">
-                Your payment failed. Update your payment method to keep your account active.
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 min-[1180px]:grid-cols-3">
+            {usageTiles.map((tile) => (
+              <div key={tile.label} className="rounded-[14px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+                  {tile.label}
+                </p>
+                <p className="mt-3 font-heading text-[30px] font-semibold leading-none tracking-[-0.04em] text-[var(--dash-text)]">
+                  {tile.value}
+                </p>
+                <p className="mt-2 text-[12px] leading-relaxed text-[var(--dash-muted)]">{tile.detail}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-dashed border-[#D9CFB6] pt-4">
+            <div>
+              <p className="text-[13px] text-[var(--dash-text)]">
+                {business.stripe_customer_id
+                  ? "Billing details, invoices, and payment methods live in Stripe."
+                  : "Start the plan when you’re ready to unlock live sending."}
               </p>
+              {(status === "trial" || status === "trialing") && trialEndsAt ? (
+                <p className="mt-1 text-[12px] text-[#9B5C2E]">
+                  {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} left in the trial.
+                </p>
+              ) : null}
             </div>
-          ) : null}
+            <div className="flex flex-wrap gap-2.5">
+              {business.stripe_customer_id ? (
+                <button
+                  type="button"
+                  onClick={() => void handlePortal()}
+                  disabled={redirecting}
+                  className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}
+                >
+                  {redirecting ? "Redirecting..." : "Manage billing"}
+                </button>
+              ) : null}
 
-          {status === "canceled" ? (
-            <p className="text-[14px] text-[var(--dash-muted)]">
-              Your subscription was canceled. Resubscribe to continue sending review links.
-            </p>
-          ) : null}
+              {(status === "none" || status === "canceled") ? (
+                <button
+                  type="button"
+                  onClick={() => void handleCheckout()}
+                  disabled={redirecting}
+                  className={dashboardButtonClassName({ variant: "primary", size: "sm" })}
+                >
+                  {redirecting ? "Redirecting..." : status === "none" ? "Start free trial" : "Resubscribe"}
+                </button>
+              ) : null}
 
-          {status === "none" ? (
-            <p className="text-[14px] text-[var(--dash-muted)]">
-              You&apos;re not subscribed yet. Start your free trial to begin sending review links.
+              {status === "past_due" ? (
+                <button
+                  type="button"
+                  onClick={() => void handlePortal()}
+                  disabled={redirecting}
+                  className={dashboardButtonClassName({ variant: "primary", size: "sm" })}
+                >
+                  {redirecting ? "Redirecting..." : "Update payment"}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-[16px] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--dash-border)] px-5 py-5">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+              {billingAccessTitle}
             </p>
-          ) : null}
+            <h3 className="mt-2 text-[18px] font-semibold tracking-tight text-[var(--dash-text)]">
+              {business.stripe_customer_id ? "Handle payment details in one place" : "Billing starts in one place"}
+            </h3>
+            <p className="mt-2 max-w-[34ch] text-[12px] leading-relaxed text-[var(--dash-muted)]">
+              {billingAccessDescription}
+            </p>
+          </div>
+          <StatusPill status={status} className="shrink-0" />
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-3">
-          {(status === "none" || status === "canceled") ? (
-            <button
-              type="button"
-              onClick={() => void handleCheckout()}
-              disabled={redirecting}
-              className={dashboardButtonClassName({ variant: "primary" })}
-            >
-              {redirecting ? "Redirecting..." : status === "none" ? "Start free trial" : "Resubscribe"}
-            </button>
-          ) : null}
+        <div className="divide-y divide-[var(--dash-border)]">
+          {billingAccessRows.map((row) => (
+            <div key={row.title} className="flex items-start justify-between gap-4 px-5 py-4">
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-[var(--dash-text)]">{row.title}</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">{row.detail}</p>
+              </div>
+              <span className="shrink-0 rounded-full border border-[#E6DDD0] bg-[#FCFAF6] px-3 py-1 text-[11px] font-medium text-[var(--dash-text)]">
+                {row.value}
+              </span>
+            </div>
+          ))}
+        </div>
 
-          {status === "past_due" ? (
-            <button
-              type="button"
-              onClick={() => void handlePortal()}
-              disabled={redirecting}
-              className={dashboardButtonClassName({ variant: "primary" })}
-            >
-              {redirecting ? "Redirecting..." : "Update payment method"}
-            </button>
-          ) : null}
-
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--dash-border)] bg-[#FCFAF6] px-5 py-4">
+          <p
+            className={`max-w-[34ch] text-[12px] leading-relaxed ${
+              status === "past_due" ? "text-[#C04E31]" : "text-[var(--dash-muted)]"
+            }`}
+          >
+            {billingFooterNote}
+          </p>
           {business.stripe_customer_id ? (
             <button
               type="button"
               onClick={() => void handlePortal()}
               disabled={redirecting}
-              className={dashboardButtonClassName({ variant: "accent" })}
+              className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
             >
-              {redirecting ? "Redirecting..." : "Manage billing"}
+              {redirecting ? "Redirecting..." : "Open billing portal"}
             </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void handleCheckout()}
+              disabled={redirecting}
+              className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
+            >
+              {redirecting ? "Redirecting..." : "Start plan"}
+            </button>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function AccountDataSection({
+  business,
+  onDeleteRequested,
+}: {
+  business: Business;
+  onDeleteRequested: () => void;
+}) {
+  const hasGoogle = Boolean(business.google_place_id || business.google_review_url?.trim());
+  const crmCount = business.connected_crms ? Object.keys(business.connected_crms).length : 0;
+
+  return (
+    <div className="overflow-hidden rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]">
+      <div className="border-b border-[var(--dash-border)] px-6 py-5">
+        <h2 className="text-[16px] font-semibold text-[var(--dash-text)]">Your data</h2>
+        <p className="mt-1 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+          Billing documents, connected systems, and the permanent account actions live here.
+        </p>
+      </div>
+
+      <div className="divide-y divide-[var(--dash-border)]">
+        <div className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Billing documents</p>
+            <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">
+              {business.stripe_customer_id ? "Invoices available in Stripe" : "No billing documents yet"}
+            </p>
+            <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
+              {business.stripe_customer_id
+                ? "Open the billing portal to download receipts and invoice history."
+                : "Start the plan first, then invoices and receipts will live in the billing portal."}
+            </p>
+          </div>
+          {business.stripe_customer_id ? (
+            <Link href="/dashboard/more/account#billing" className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}>
+              Open billing
+            </Link>
           ) : null}
+        </div>
+
+        <div className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Connected systems</p>
+            <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">
+              {hasGoogle ? "Google Business Profile connected" : "Google Business Profile pending"}
+            </p>
+            <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
+              {crmCount > 0
+                ? `${crmCount} CRM integration${crmCount === 1 ? "" : "s"} connected.`
+                : "No CRM integrations connected yet."}
+            </p>
+          </div>
+          <StatusPill status={hasGoogle ? "connected" : "pending"} />
         </div>
       </div>
 
-      <div className="space-y-5">
-        <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
-          <h3 className="text-[15px] font-semibold text-[var(--dash-text)]">This month&apos;s usage</h3>
-          <div className="mt-4">
-            {loading ? (
-              <SkeletonCard className="max-w-[300px]" />
-            ) : (
-              <StatCard
-                className="max-w-[300px]"
-                icon={
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 2L11 13" />
-                    <path d="M22 2L15 22l-4-9-9-4 20-7z" />
-                  </svg>
-                }
-                label="Review requests sent"
-                value={usageCount}
-              />
-            )}
+      <div className="border-t border-[var(--dash-border)] bg-[#FFF8F4] px-6 py-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#BC4A2F]">Danger zone</p>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[14px] font-medium text-[var(--dash-text)]">Delete account and data</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+              This removes the business, review links, and billing records. It cannot be undone.
+            </p>
           </div>
-        </div>
-
-        <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
-          <h3 className="text-[15px] font-semibold text-[var(--dash-text)]">Invoice history</h3>
-          <div className="mt-3">
-            {business.stripe_customer_id ? (
-              <p className="text-[13px] leading-relaxed text-[var(--dash-muted)]">
-                View and download invoices in the{" "}
-                <button
-                  type="button"
-                  onClick={() => void handlePortal()}
-                  className={dashboardUtilityLinkClassName()}
-                >
-                  billing portal
-                </button>
-                .
-              </p>
-            ) : (
-              <p className="text-[13px] text-[var(--dash-muted)]">
-                No invoices yet. Subscribe to start your billing history.
-              </p>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={onDeleteRequested}
+            className={dashboardButtonClassName({ variant: "danger", size: "sm" })}
+          >
+            Delete account
+          </button>
         </div>
       </div>
     </div>
@@ -1914,11 +2180,9 @@ export function BillingSummarySection({ business }: { business: Business }) {
 export function AccountControlsSection({
   session,
   signOut,
-  onDeleteRequested,
 }: {
   session: Session | null;
   signOut: () => Promise<void>;
-  onDeleteRequested: () => void;
 }) {
   const { toast } = useToast();
 
@@ -1973,25 +2237,6 @@ export function AccountControlsSection({
             className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}
           >
             Sign out
-          </button>
-        </div>
-      </div>
-
-      <div className="border-t border-[var(--dash-border)] bg-[#FFF8F4] px-6 py-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#BC4A2F]">Danger zone</p>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[14px] font-medium text-[var(--dash-text)]">Delete account and data</p>
-            <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">
-              This removes the business, review links, and subscription records. It cannot be undone.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onDeleteRequested}
-            className={dashboardButtonClassName({ variant: "danger", size: "sm" })}
-          >
-            Delete account
           </button>
         </div>
       </div>

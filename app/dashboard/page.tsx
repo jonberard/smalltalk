@@ -9,26 +9,23 @@ import { capture } from "@/lib/posthog";
 import { dashboardButtonClassName, dashboardUtilityLinkClassName } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { SkeletonCard, SkeletonRow } from "@/components/dashboard/skeleton";
-import { StatCard } from "@/components/dashboard/stat-card";
 import { StatusPill } from "@/components/dashboard/status-pill";
 
 type DashboardStats = {
-  reviewsThisMonth: number;
+  reviewsLast30: number;
   avgRating: number;
-  completionRate: number;
-  totalLinks: number;
+  avgRatingDelta: number | null;
+  reviewDelta: number | null;
+  responseRate: number;
+  responseRateDelta: number | null;
   replyRate: number;
+  repliedPublicCount: number;
+  publicReviewCount: number;
+  ratingTrend: number[];
+  reviewTrend: number[];
+  responseTrend: number[];
+  replyTrend: number[];
 };
-
-type FunnelData = {
-  sent: number;
-  opened: number;
-  started: number;
-  drafted: number;
-  posted: number;
-};
-
-type FunnelFilter = "week" | "month" | "all";
 
 type AttentionItem = {
   name: string;
@@ -69,6 +66,11 @@ type PrivateFeedbackItem = {
   customerContact: string | null;
   status: "new" | "handled";
   handledAt: string | null;
+};
+
+type RecentLinkRow = {
+  id: string;
+  created_at: string;
 };
 
 function timeAgo(dateStr: string): string {
@@ -161,38 +163,125 @@ function formatCustomerContact(contact: string | null) {
   };
 }
 
-function getGreeting(): string {
+function getTimeOfDayGreeting(): string {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return "Good morning";
-  if (hour >= 12 && hour < 17) return "Good afternoon";
-  return "Good evening";
+  if (hour >= 5 && hour < 12) return "Morning";
+  if (hour >= 12 && hour < 17) return "Afternoon";
+  return "Evening";
 }
 
-function CalendarIcon() {
+function formatDashboardDate(date = new Date()) {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(date);
+}
+
+function getOwnerFirstName(user: { email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined) {
+  const metadata = user?.user_metadata ?? {};
+  const candidates = [
+    typeof metadata.first_name === "string" ? metadata.first_name : null,
+    typeof metadata.name === "string" ? metadata.name : null,
+    typeof metadata.full_name === "string" ? metadata.full_name : null,
+  ].filter(Boolean) as string[];
+
+  const raw = candidates[0];
+  if (!raw) return null;
+
+  const first = raw.trim().split(/\s+/)[0];
+  return first ? first[0].toUpperCase() + first.slice(1) : null;
+}
+
+function Sparkline({
+  points,
+  color = "#E05A3D",
+}: {
+  points: number[];
+  color?: string;
+}) {
+  const width = 72;
+  const height = 24;
+  const safePoints = points.length > 1 ? points : [0, 0];
+  const min = Math.min(...safePoints);
+  const max = Math.max(...safePoints);
+  const range = max - min || 1;
+
+  const path = safePoints
+    .map((point, index) => {
+      const x = (index / (safePoints.length - 1)) * width;
+      const y = height - ((point - min) / range) * (height - 2) - 1;
+      return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(" ");
+
   return (
-    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+      <path
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
 
-function StarIcon() {
-  return (
-    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-    </svg>
+function buildTrendSeries(
+  recentLinks: RecentLinkRow[],
+  sessions: Array<{
+    status: string;
+    feedback_type: "public" | "private";
+    updated_at: string;
+    replied_at: string | null;
+    star_rating: number | null;
+  }>,
+) {
+  const now = Date.now();
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  const start = now - thirtyDaysMs;
+  const step = thirtyDaysMs / 6;
+  const recentPublicSessions = sessions.filter(
+    (session) =>
+      session.feedback_type !== "private" &&
+      new Date(session.updated_at).getTime() >= start,
   );
-}
 
-function ChartIcon() {
-  return (
-    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#E05A3D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-    </svg>
-  );
+  const snapshots = Array.from({ length: 7 }, (_, index) => start + step * index).map((cutoff) => {
+    const sent = recentLinks.filter((link) => new Date(link.created_at).getTime() <= cutoff).length;
+    const responded = recentPublicSessions.filter(
+      (session) =>
+        isAtOrBeyond(session.status, "in_progress") &&
+        new Date(session.updated_at).getTime() <= cutoff,
+    ).length;
+    const copied = recentPublicSessions.filter(
+      (session) =>
+        session.status === "copied" &&
+        new Date(session.updated_at).getTime() <= cutoff,
+    );
+    const replied = copied.filter(
+      (session) => session.replied_at && new Date(session.replied_at).getTime() <= cutoff,
+    ).length;
+    const ratings = copied
+      .map((session) => session.star_rating)
+      .filter((rating): rating is number => rating !== null);
+
+    return {
+      rating: ratings.length > 0 ? Number((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length).toFixed(1)) : 0,
+      reviews: copied.length,
+      responseRate: sent > 0 ? Math.round((responded / sent) * 100) : 0,
+      replyRate: copied.length > 0 ? Math.round((replied / copied.length) * 100) : 0,
+    };
+  });
+
+  return {
+    ratingTrend: snapshots.map((snapshot) => snapshot.rating),
+    reviewTrend: snapshots.map((snapshot) => snapshot.reviews),
+    responseTrend: snapshots.map((snapshot) => snapshot.responseRate),
+    replyTrend: snapshots.map((snapshot) => snapshot.replyRate),
+  };
 }
 
 function MiniStars({ rating }: { rating: number }) {
@@ -204,30 +293,6 @@ function MiniStars({ rating }: { rating: number }) {
         </svg>
       ))}
     </div>
-  );
-}
-
-function ProgressRing({ percentage }: { percentage: number }) {
-  const radius = 18;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (percentage / 100) * circumference;
-
-  return (
-    <svg width={44} height={44} viewBox="0 0 44 44">
-      <circle cx="22" cy="22" r={radius} fill="none" stroke="#E8E5E0" strokeWidth="3" />
-      <circle
-        cx="22"
-        cy="22"
-        r={radius}
-        fill="none"
-        stroke="#E05A3D"
-        strokeWidth="3"
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        strokeLinecap="round"
-        transform="rotate(-90 22 22)"
-      />
-    </svg>
   );
 }
 
@@ -247,94 +312,6 @@ function RatingBadge({ rating }: { rating: number }) {
   );
 }
 
-function HomeRailCard({
-  eyebrow,
-  title,
-  count,
-  tone,
-  summary,
-  href,
-  linkLabel,
-  onClick,
-}: {
-  eyebrow: string;
-  title: string;
-  count: number;
-  tone: "blue" | "green" | "amber";
-  summary: string;
-  href: string;
-  linkLabel: string;
-  onClick?: () => void;
-}) {
-  const toneClasses =
-    tone === "blue"
-      ? "text-[#2563EB] bg-[#EFF6FF]"
-      : tone === "green"
-        ? "text-[#059669] bg-[#ECFDF5]"
-        : "text-[#B45309] bg-[#FFF7ED]";
-
-  const content = (
-    <div className="rounded-[var(--dash-radius-sm)] border border-white/60 bg-white/85 p-4 transition-all duration-200 hover:-translate-y-[1px] hover:border-[#E05A3D]/20">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
-            {eyebrow}
-          </p>
-          <h3 className="mt-2 text-[18px] font-semibold tracking-tight text-[var(--dash-text)]">
-            {title}
-          </h3>
-        </div>
-        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${toneClasses}`}>
-          {count}
-        </span>
-      </div>
-      <p className="mt-3 text-[13px] leading-relaxed text-[var(--dash-muted)]">{summary}</p>
-      <div className="mt-4 text-[12px] font-semibold text-[var(--dash-text)]">{linkLabel}</div>
-    </div>
-  );
-
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className="w-full text-left">
-        {content}
-      </button>
-    );
-  }
-
-  return <Link href={href}>{content}</Link>;
-}
-
-function QuickActionCard({
-  href,
-  title,
-  description,
-  badge,
-}: {
-  href: string;
-  title: string;
-  description: string;
-  badge?: string | null;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group rounded-[var(--dash-radius-sm)] border border-[var(--dash-border)] bg-[#FCFAF6] p-4 transition-all duration-200 hover:border-[#E05A3D]/25 hover:bg-white"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-[14px] font-semibold text-[var(--dash-text)]">{title}</h3>
-          <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">{description}</p>
-        </div>
-        {badge ? (
-          <span className="rounded-full bg-[#F4EFE8] px-2 py-0.5 text-[11px] font-semibold text-[var(--dash-text)]">
-            {badge}
-          </span>
-        ) : null}
-      </div>
-    </Link>
-  );
-}
-
 const STATUS_PROGRESSION = ["created", "in_progress", "drafted", "copied"];
 
 function isAtOrBeyond(status: string, target: string): boolean {
@@ -345,21 +322,20 @@ function isAtOrBeyond(status: string, target: string): boolean {
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>({
-    reviewsThisMonth: 0,
+    reviewsLast30: 0,
     avgRating: 0,
-    completionRate: 0,
-    totalLinks: 0,
+    avgRatingDelta: null,
+    reviewDelta: null,
+    responseRate: 0,
+    responseRateDelta: null,
     replyRate: 0,
+    repliedPublicCount: 0,
+    publicReviewCount: 0,
+    ratingTrend: [0, 0, 0, 0, 0, 0, 0],
+    reviewTrend: [0, 0, 0, 0, 0, 0, 0],
+    responseTrend: [0, 0, 0, 0, 0, 0, 0],
+    replyTrend: [0, 0, 0, 0, 0, 0, 0],
   });
-  const [funnel, setFunnel] = useState<FunnelData>({
-    sent: 0,
-    opened: 0,
-    started: 0,
-    drafted: 0,
-    posted: 0,
-  });
-  const [funnelFilter, setFunnelFilter] = useState<FunnelFilter>("month");
-  const [funnelLoading, setFunnelLoading] = useState(true);
   const [attention, setAttention] = useState<AttentionItem[]>([]);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [privateFeedbackItems, setPrivateFeedbackItems] = useState<PrivateFeedbackItem[]>([]);
@@ -373,7 +349,7 @@ export default function Dashboard() {
   const [privateFeedbackActionLoading, setPrivateFeedbackActionLoading] = useState(false);
   const [privateFeedbackActionError, setPrivateFeedbackActionError] = useState("");
   const [queuedInitialCount, setQueuedInitialCount] = useState(0);
-  const { business } = useAuth();
+  const { business, session } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const feedbackParam = searchParams.get("feedback");
@@ -402,23 +378,29 @@ export default function Dashboard() {
 
     async function fetchAll() {
       const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const current30Start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const previous30Start = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+      const current30StartIso = current30Start.toISOString();
+      const previous30StartIso = previous30Start.toISOString();
 
-      const { count: totalLinks } = await supabase
-        .from("review_links")
-        .select("*", { count: "exact", head: true })
-        .eq("business_id", businessId);
+      const [{ count: queuedInitial }, { data: recentLinksData }] = await Promise.all([
+        supabase
+          .from("review_message_deliveries")
+          .select("*", { count: "exact", head: true })
+          .eq("business_id", businessId)
+          .eq("channel", "sms")
+          .eq("kind", "initial")
+          .eq("status", "pending"),
+        supabase
+          .from("review_links")
+          .select("id, created_at")
+          .eq("business_id", businessId)
+          .gte("created_at", previous30StartIso)
+          .order("created_at", { ascending: true }),
+      ]);
 
-      const { count: queuedInitial } = await supabase
-        .from("review_message_deliveries")
-        .select("*", { count: "exact", head: true })
-        .eq("business_id", businessId)
-        .eq("channel", "sms")
-        .eq("kind", "initial")
-        .eq("status", "pending");
-
-      const linkCount = totalLinks ?? 0;
       setQueuedInitialCount(queuedInitial ?? 0);
+      const recentLinks = (recentLinksData as RecentLinkRow[] | null) ?? [];
 
       const { data: allSessions } = await supabase
         .from("review_sessions")
@@ -429,21 +411,95 @@ export default function Dashboard() {
       const sessions = allSessions || [];
 
       const completedSessions = sessions.filter((session) => session.status === "copied");
-      const reviewsThisMonth = completedSessions.filter((session) => session.created_at >= monthStart).length;
-      const ratings = completedSessions
+      const publicReviews = completedSessions.filter((session) => session.feedback_type !== "private");
+      const ratings = publicReviews
         .map((session) => session.star_rating)
         .filter((rating): rating is number => rating !== null);
       const avgRating = ratings.length > 0
         ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
         : 0;
-      const completionRate = linkCount > 0
-        ? Math.round((completedSessions.length / linkCount) * 100)
+      const currentPublicReviews = publicReviews.filter(
+        (session) => new Date(session.updated_at).getTime() >= current30Start.getTime(),
+      );
+      const previousPublicReviews = publicReviews.filter((session) => {
+        const updatedAt = new Date(session.updated_at).getTime();
+        return updatedAt >= previous30Start.getTime() && updatedAt < current30Start.getTime();
+      });
+      const currentRatings = currentPublicReviews
+        .map((session) => session.star_rating)
+        .filter((rating): rating is number => rating !== null);
+      const previousRatings = previousPublicReviews
+        .map((session) => session.star_rating)
+        .filter((rating): rating is number => rating !== null);
+      const currentRespondedSessions = sessions.filter(
+        (session) =>
+          session.feedback_type !== "private" &&
+          isAtOrBeyond(session.status, "in_progress") &&
+          new Date(session.updated_at).getTime() >= current30Start.getTime(),
+      );
+      const previousRespondedSessions = sessions.filter((session) => {
+        const updatedAt = new Date(session.updated_at).getTime();
+        return (
+          session.feedback_type !== "private" &&
+          isAtOrBeyond(session.status, "in_progress") &&
+          updatedAt >= previous30Start.getTime() &&
+          updatedAt < current30Start.getTime()
+        );
+      });
+      const currentLinks = recentLinks.filter(
+        (link) => new Date(link.created_at).getTime() >= current30Start.getTime(),
+      );
+      const previousLinks = recentLinks.filter((link) => {
+        const createdAt = new Date(link.created_at).getTime();
+        return createdAt >= previous30Start.getTime() && createdAt < current30Start.getTime();
+      });
+      const currentReviewsCount = currentPublicReviews.length;
+      const previousReviewsCount = previousPublicReviews.length;
+      const currentResponseRate = currentLinks.length > 0
+        ? Math.round((currentRespondedSessions.length / currentLinks.length) * 100)
         : 0;
-      const publicReviews = completedSessions.filter((session) => session.feedback_type !== "private");
-      const repliedPublic = publicReviews.filter((session) => !!session.replied_at).length;
-      const replyRate = publicReviews.length > 0 ? Math.round((repliedPublic / publicReviews.length) * 100) : 0;
+      const previousResponseRate = previousLinks.length > 0
+        ? Math.round((previousRespondedSessions.length / previousLinks.length) * 100)
+        : 0;
+      const repliedPublic = currentPublicReviews.filter((session) => !!session.replied_at).length;
+      const replyRate = currentPublicReviews.length > 0 ? Math.round((repliedPublic / currentPublicReviews.length) * 100) : 0;
+      const trendSeries = buildTrendSeries(
+        recentLinks,
+        sessions.map((session) => ({
+          status: session.status,
+          feedback_type: session.feedback_type ?? "public",
+          updated_at: session.updated_at,
+          replied_at: session.replied_at ?? null,
+          star_rating: session.star_rating,
+        })),
+      );
 
-      setStats({ reviewsThisMonth, avgRating, completionRate, totalLinks: linkCount, replyRate });
+      setStats({
+        reviewsLast30: currentReviewsCount,
+        avgRating,
+        avgRatingDelta:
+          currentRatings.length > 0 && previousRatings.length > 0
+            ? Number(
+                (
+                  currentRatings.reduce((sum, rating) => sum + rating, 0) / currentRatings.length -
+                  previousRatings.reduce((sum, rating) => sum + rating, 0) / previousRatings.length
+                ).toFixed(1),
+              )
+            : null,
+        reviewDelta: currentReviewsCount - previousReviewsCount,
+        responseRate: currentResponseRate,
+        responseRateDelta:
+          previousLinks.length > 0 || currentLinks.length > 0
+            ? currentResponseRate - previousResponseRate
+            : null,
+        replyRate,
+        repliedPublicCount: repliedPublic,
+        publicReviewCount: currentPublicReviews.length,
+        ratingTrend: trendSeries.ratingTrend,
+        reviewTrend: trendSeries.reviewTrend,
+        responseTrend: trendSeries.responseTrend,
+        replyTrend: trendSeries.replyTrend,
+      });
 
       const privateFeedback = sessions
         .filter(
@@ -560,61 +616,6 @@ export default function Dashboard() {
 
     fetchAll();
   }, [business, feedbackParam]);
-
-  useEffect(() => {
-    if (!business) return;
-    const businessId = business.id;
-
-    async function fetchFunnel() {
-      setFunnelLoading(true);
-
-      let dateFrom: string | null = null;
-      const now = new Date();
-
-      if (funnelFilter === "month") {
-        dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      } else if (funnelFilter === "week") {
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
-        dateFrom = startOfWeek.toISOString();
-      }
-
-      let linksQuery = supabase
-        .from("review_links")
-        .select("*", { count: "exact", head: true })
-        .eq("business_id", businessId);
-
-      if (dateFrom) {
-        linksQuery = linksQuery.gte("created_at", dateFrom);
-      }
-
-      const { count: sentCount } = await linksQuery;
-      const sent = sentCount ?? 0;
-
-      let sessionsQuery = supabase
-        .from("review_sessions")
-        .select("status, review_links!inner(business_id)")
-        .eq("review_links.business_id", businessId);
-
-      if (dateFrom) {
-        sessionsQuery = sessionsQuery.gte("created_at", dateFrom);
-      }
-
-      const { data: funnelSessions } = await sessionsQuery;
-      const sessions = funnelSessions || [];
-
-      const opened = sessions.filter((session) => isAtOrBeyond(session.status, "created")).length;
-      const started = sessions.filter((session) => isAtOrBeyond(session.status, "in_progress")).length;
-      const drafted = sessions.filter((session) => isAtOrBeyond(session.status, "drafted")).length;
-      const posted = sessions.filter((session) => session.status === "copied").length;
-
-      setFunnel({ sent, opened, started, drafted, posted });
-      setFunnelLoading(false);
-    }
-
-    fetchFunnel();
-  }, [business, funnelFilter]);
 
   async function generateReplyForItem(item: ActivityItem) {
     setReplyModal(item);
@@ -759,8 +760,6 @@ export default function Dashboard() {
       !item.repliedAt,
   ).slice(0, 3);
   const stalledRequests = attention.slice(0, 3);
-  const openedRate = funnel.sent > 0 ? Math.round((funnel.opened / funnel.sent) * 100) : 0;
-  const responseRate = funnel.sent > 0 ? Math.round((funnel.started / funnel.sent) * 100) : 0;
   const attentionBuckets = [
     newPrivateFeedback.length > 0,
     replyQueue.length > 0,
@@ -840,24 +839,72 @@ export default function Dashboard() {
       tone: "forest" as const,
     },
   ];
+  const ownerFirstName = getOwnerFirstName(session?.user);
+  const homeTitle = ownerFirstName
+    ? `${getTimeOfDayGreeting()}, ${ownerFirstName}.`
+    : `${getTimeOfDayGreeting()}.`;
+  const metricCards = [
+    {
+      label: "Google rating",
+      value: stats.avgRating > 0 ? stats.avgRating.toFixed(1) : "—",
+      subcopy:
+        stats.avgRatingDelta !== null
+          ? `${stats.avgRatingDelta >= 0 ? "+" : ""}${stats.avgRatingDelta.toFixed(1)} this month`
+          : stats.reviewsLast30 > 0
+            ? `${stats.reviewsLast30} reviews in the last 30 days`
+            : "Waiting on your first posted review",
+      trend: stats.ratingTrend,
+      emphasizeSubcopy: stats.avgRatingDelta !== null || stats.reviewsLast30 > 0,
+    },
+    {
+      label: "New reviews · 30d",
+      value: `${stats.reviewDelta && stats.reviewDelta >= 0 ? "+" : ""}${stats.reviewsLast30}`,
+      subcopy:
+        stats.reviewDelta !== null
+          ? `${stats.reviewDelta >= 0 ? "+" : ""}${stats.reviewDelta} more than last month`
+          : "No prior month to compare",
+      trend: stats.reviewTrend,
+      emphasizeSubcopy: stats.reviewDelta !== null,
+    },
+    {
+      label: "Response rate",
+      value: `${stats.responseRate}%`,
+      subcopy:
+        stats.responseRateDelta !== null
+          ? `${stats.responseRateDelta >= 0 ? "+" : ""}${stats.responseRateDelta} pts`
+          : "Recent response trend",
+      trend: stats.responseTrend,
+      emphasizeSubcopy: stats.responseRateDelta !== null,
+    },
+    {
+      label: "Reply rate",
+      value: `${stats.replyRate}%`,
+      subcopy:
+        stats.publicReviewCount > 0
+          ? `You replied to ${stats.repliedPublicCount} of ${stats.publicReviewCount}`
+          : "No public replies yet",
+      trend: stats.replyTrend,
+      emphasizeSubcopy: stats.publicReviewCount > 0,
+    },
+  ];
 
   return (
     <main className="min-h-dvh bg-[var(--dash-bg)] sm:pl-[220px]">
       <div className="dash-page-enter mx-auto max-w-[1120px] px-5 pb-32 pt-8 sm:pb-16">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--dash-muted)]">Home</p>
+            <p className="text-[12px] font-medium text-[var(--dash-muted)]">{formatDashboardDate()}</p>
             <h1 className="mt-2 text-balance font-heading text-[32px] font-semibold leading-[0.98] tracking-[-0.03em] text-[var(--dash-text)] sm:text-[38px]">
-              {getGreeting()}.
+              {homeTitle}
             </h1>
             <p className="mt-2 max-w-[50ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
               Three things want your attention. Everything else is moving on its own.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <Link
               href="/dashboard/send/jobs"
-              className={dashboardButtonClassName({ variant: "primary", size: "lg" })}
+              className={`${dashboardButtonClassName({ variant: "primary", size: "lg" })} w-full justify-center sm:w-auto`}
             >
               + New request
             </Link>
@@ -865,7 +912,7 @@ export default function Dashboard() {
         </div>
 
         <section className="rounded-[18px] bg-[var(--dash-primary)] px-6 py-6 text-white shadow-[0_18px_42px_rgba(224,90,61,0.18)]">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-4 min-[1180px]:flex-row min-[1180px]:items-center min-[1180px]:justify-between">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">
                 Needs you · {attentionBuckets}
@@ -874,10 +921,10 @@ export default function Dashboard() {
                 {bannerText}
               </h2>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
               <Link
                 href="/dashboard/inbox"
-                className="inline-flex min-h-[42px] items-center rounded-[10px] bg-white px-4 py-2 text-[13px] font-semibold text-[#A33A21] transition-transform hover:-translate-y-[1px]"
+                className="inline-flex min-h-[42px] w-full items-center justify-center rounded-[10px] bg-white px-4 py-2 text-[13px] font-semibold text-[#A33A21] shadow-[0_4px_14px_rgba(123,46,22,0.08)] transition-transform hover:-translate-y-[1px] sm:w-auto"
               >
                 Open inbox
               </Link>
@@ -885,14 +932,14 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => generateReplyForItem(replyQueue[0])}
-                  className="inline-flex min-h-[42px] items-center rounded-[10px] border border-white/30 bg-white/10 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-white/16"
+                  className="inline-flex min-h-[42px] w-full items-center justify-center rounded-[10px] border border-white/70 bg-white px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] shadow-[0_4px_14px_rgba(123,46,22,0.08)] transition-all hover:-translate-y-[1px] hover:bg-white sm:w-auto"
                 >
                   Draft replies
                 </button>
               ) : (
                 <Link
                   href="/dashboard/send/jobs"
-                  className="inline-flex min-h-[42px] items-center rounded-[10px] border border-white/30 bg-white/10 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-white/16"
+                  className="inline-flex min-h-[42px] w-full items-center justify-center rounded-[10px] border border-white/70 bg-white px-4 py-2 text-[13px] font-semibold text-[var(--dash-text)] shadow-[0_4px_14px_rgba(123,46,22,0.08)] transition-all hover:-translate-y-[1px] hover:bg-white sm:w-auto"
                 >
                   Open send
                 </Link>
@@ -903,53 +950,49 @@ export default function Dashboard() {
 
         <section className="mt-5 overflow-hidden rounded-[16px] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
           <div className="grid gap-0 md:grid-cols-4">
-            {loading || funnelLoading ? (
+            {loading ? (
               Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="border-b border-[var(--dash-border)] px-5 py-5 md:border-b-0 md:border-r last:border-r-0">
+                <div
+                  key={index}
+                  className={`px-5 py-5 border-b border-[var(--dash-border)] md:border-b-0 ${
+                    index < 3 ? "md:border-r" : "md:border-r-0"
+                  }`}
+                >
                   <SkeletonCard />
                 </div>
               ))
             ) : (
-              [
-                {
-                  label: "Google rating",
-                  value: stats.avgRating > 0 ? stats.avgRating.toFixed(1) : "—",
-                  detail: stats.avgRating > 0 ? `${stats.reviewsThisMonth} new this month` : "Waiting on your first posted review",
-                  progress: stats.avgRating > 0 ? Math.min(100, (stats.avgRating / 5) * 100) : 8,
-                },
-                {
-                  label: "New reviews · month",
-                  value: `+${stats.reviewsThisMonth}`,
-                  detail: stats.reviewsThisMonth > 0 ? "Copied and handed off" : "Nothing new yet",
-                  progress: Math.min(100, stats.reviewsThisMonth * 10),
-                },
-                {
-                  label: "Response rate",
-                  value: `${responseRate}%`,
-                  detail: funnel.sent > 0 ? `${funnel.started} people responded to ${funnel.sent} requests` : "No sends yet",
-                  progress: responseRate,
-                },
-                {
-                  label: "Reply rate",
-                  value: `${stats.replyRate}%`,
-                  detail: replyQueue.length > 0 ? `${replyQueue.length} still waiting on you` : "Public replies are caught up",
-                  progress: stats.replyRate || 8,
-                },
-              ].map((metric, index) => (
+              metricCards.map((metric, index) => (
                 <div
                   key={metric.label}
-                  className={`px-5 py-5 ${index < 3 ? "border-b border-[var(--dash-border)] md:border-b-0 md:border-r" : ""}`}
+                  className={`px-5 py-5 border-b border-[var(--dash-border)] md:border-b-0 ${
+                    index < 3 ? "md:border-r" : "md:border-r-0"
+                  } ${
+                    index === metricCards.length - 1 ? "border-b-0" : ""
+                  }`}
                 >
-                  <p className="text-[12px] text-[var(--dash-muted)]">{metric.label}</p>
-                  <p className="mt-3 font-heading text-[42px] font-semibold leading-none tracking-[-0.04em] text-[var(--dash-text)]">
-                    {metric.value}
-                  </p>
-                  <p className="mt-2 text-[12px] leading-relaxed text-[var(--dash-muted)]">{metric.detail}</p>
-                  <div className="mt-4 h-[3px] overflow-hidden rounded-full bg-[#EFE8DA]">
-                    <div
-                      className="h-full rounded-full bg-[var(--dash-primary)]"
-                      style={{ width: `${metric.progress}%` }}
-                    />
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[14px] font-medium tracking-[-0.01em] text-[var(--dash-text)]/72">
+                        {metric.label}
+                      </p>
+                      <p className="mt-3 font-heading text-[42px] font-semibold leading-none tracking-[-0.04em] text-[var(--dash-text)]">
+                        {metric.value}
+                      </p>
+                    </div>
+                    <div className="mt-2 shrink-0 text-[var(--dash-primary)]">
+                      <Sparkline points={metric.trend} />
+                    </div>
+                  </div>
+                  <div
+                    className={`mt-3 flex items-start gap-1.5 text-[13px] leading-relaxed ${
+                      metric.emphasizeSubcopy ? "text-[#557565]" : "text-[var(--dash-muted)]"
+                    }`}
+                  >
+                    {metric.emphasizeSubcopy ? (
+                      <span className="mt-[1px] text-[11px] leading-none text-[#6B8B76]">▲</span>
+                    ) : null}
+                    <span>{metric.subcopy}</span>
                   </div>
                 </div>
               ))
@@ -957,7 +1000,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[1.35fr,0.95fr]">
+        <div className="mt-6 grid gap-6 min-[1180px]:grid-cols-[1.35fr_0.95fr]">
           <section>
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-[12px] font-medium text-[var(--dash-muted)]">

@@ -385,7 +385,7 @@ export default function ReviewFlowSetupPage() {
           </div>
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[1.05fr,0.95fr]">
+        <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
           <div className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
             <div className="flex items-start justify-between gap-3">
               <div>
