@@ -25,7 +25,7 @@ export function SetupPageShell({
   const isDetail = headerTone === "detail";
 
   return (
-    <main className="min-h-dvh bg-[var(--dash-bg)] sm:pl-[220px]">
+    <main className="min-h-dvh bg-[var(--dash-bg)] font-dashboard sm:pl-[220px]">
       <div className="dash-page-enter mx-auto max-w-[1040px] px-5 pb-32 pt-8 sm:pb-16">
         <div className="mb-6">
           <Link

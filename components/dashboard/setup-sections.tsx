@@ -1223,7 +1223,7 @@ export function ReviewRequestMessagingSection({
               value={emailIntroTemplate}
               onChange={(event) => setEmailIntroTemplate(event.target.value)}
               rows={5}
-              placeholder="{{business_name}} would love your feedback. Tap the button below to share your experience - takes 30 seconds."
+              placeholder="{{business_name}} would love your feedback. Tap the button below to answer a few quick questions - no writing required, takes about 30 seconds."
               className="w-full resize-none rounded-[10px] border border-[var(--dash-border)] bg-[var(--dash-bg)] px-3.5 py-3 text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-muted)] transition-colors focus:border-[#E05A3D]/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(224,90,61,0.08)]"
             />
             <p className="mt-2 text-[12px] leading-relaxed text-[var(--dash-muted)]">
@@ -1760,6 +1760,9 @@ export function BillingSummarySection({ business }: { business: Business }) {
   const [teamCount, setTeamCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
+  const [billingActionError, setBillingActionError] = useState("");
+  const [billingSyncing, setBillingSyncing] = useState(false);
+  const hasAttemptedBillingSync = useRef(false);
 
   useEffect(() => {
     async function fetchUsage() {
@@ -1793,44 +1796,88 @@ export function BillingSummarySection({ business }: { business: Business }) {
     void fetchUsage();
   }, [business.id]);
 
+  const status = business.subscription_status ?? "none";
+  const hasBillingRelationship =
+    status === "trialing" ||
+    status === "active" ||
+    status === "past_due" ||
+    status === "paused" ||
+    status === "incomplete" ||
+    Boolean(business.stripe_customer_id);
+
+  useEffect(() => {
+    if (!hasBillingRelationship || business.stripe_customer_id || hasAttemptedBillingSync.current) {
+      return;
+    }
+
+    hasAttemptedBillingSync.current = true;
+    setBillingSyncing(true);
+
+    fetchWithAuth("/api/verify-subscription", { method: "POST" })
+      .then((res) => res.json())
+      .then((data: { updated?: boolean; stripe_customer_id?: string | null; subscription_status?: string }) => {
+        if (data.updated && (data.stripe_customer_id || data.subscription_status !== status)) {
+          window.location.reload();
+        }
+      })
+      .catch(() => {
+        // Silent fallback: the page still renders the current billing state,
+        // and the owner can refresh or reopen the account page.
+      })
+      .finally(() => {
+        setBillingSyncing(false);
+      });
+  }, [business.stripe_customer_id, hasBillingRelationship, status]);
+
   async function handleCheckout() {
+    setBillingActionError("");
     setRedirecting(true);
     try {
       const res = await fetchWithAuth("/api/checkout", { method: "POST" });
-      const data = (await res.json()) as { url?: string };
-      if (data.url) {
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (res.ok && data.url) {
         window.location.href = data.url;
       } else {
+        setBillingActionError(
+          data.error || "We couldn't open Stripe right now. Please try again in a moment.",
+        );
         setRedirecting(false);
       }
     } catch {
+      setBillingActionError("We couldn't open Stripe right now. Please try again in a moment.");
       setRedirecting(false);
     }
   }
 
   async function handlePortal() {
     if (!business.stripe_customer_id) return;
+    setBillingActionError("");
     setRedirecting(true);
     try {
       const res = await fetchWithAuth("/api/billing-portal", { method: "POST" });
-      const data = (await res.json()) as { url?: string };
-      if (data.url) {
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (res.ok && data.url) {
         window.location.href = data.url;
       } else {
+        setBillingActionError(
+          data.error || "We couldn't open the billing portal right now. Please try again in a moment.",
+        );
         setRedirecting(false);
       }
     } catch {
+      setBillingActionError(
+        "We couldn't open the billing portal right now. Please try again in a moment.",
+      );
       setRedirecting(false);
     }
   }
 
-  const status = business.subscription_status ?? "none";
   const trialEndsAt = business.trial_ends_at ? new Date(business.trial_ends_at) : null;
   const daysRemaining = trialEndsAt ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 0;
   const planName =
-    status === "trial" || status === "trialing"
+    status === "trial"
       ? "Trial"
-      : status === "active"
+      : status === "trialing" || status === "active"
         ? "Pro"
         : status === "past_due"
           ? "Past due"
@@ -1844,10 +1891,14 @@ export function BillingSummarySection({ business }: { business: Business }) {
   const badgeLabel =
     status === "active"
       ? "Active"
-      : status === "trial" || status === "trialing"
+      : status === "trialing"
         ? trialEndsAt
           ? `Trial ends ${trialEndsAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-          : "Trialing"
+          : "Trial active"
+        : status === "trial"
+          ? trialEndsAt
+            ? `Trial ends ${trialEndsAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+            : "Free trial"
         : status === "past_due"
           ? "Payment issue"
           : status === "canceled"
@@ -1881,7 +1932,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
       detail: teamCount > 0 ? "On your account" : "Add from Team & Services",
     },
   ];
-  const billingAccessRows = business.stripe_customer_id
+  const billingAccessRows = hasBillingRelationship
     ? [
         {
           title: "Invoices & receipts",
@@ -1896,12 +1947,14 @@ export function BillingSummarySection({ business }: { business: Business }) {
         {
           title: "Plan changes",
           detail:
-            status === "trial" || status === "trialing"
-              ? "Upgrade from trial whenever you're ready."
+            status === "trialing"
+              ? "Your Pro plan is in its trial period. Card details and future invoices live in Stripe."
+              : status === "trial"
+                ? "Upgrade from trial whenever you're ready."
               : status === "canceled"
                 ? "Resume the plan without losing history."
                 : "Change plans or review subscription details in Stripe.",
-          value: status === "trial" || status === "trialing" ? "Trial" : status === "canceled" ? "Paused" : "Manage",
+          value: status === "trialing" ? "Trial active" : status === "trial" ? "Trial" : status === "canceled" ? "Paused" : "Manage",
         },
       ]
     : [
@@ -1916,7 +1969,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
             status === "trial" || status === "trialing"
               ? `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in the trial.`
               : "No paid billing activity yet.",
-          value: status === "trial" || status === "trialing" ? "Trial" : "Not started",
+          value: status === "trialing" ? "Trial active" : status === "trial" ? "Trial" : "Not started",
         },
         {
           title: "Team members",
@@ -1924,8 +1977,8 @@ export function BillingSummarySection({ business }: { business: Business }) {
           value: teamCount > 0 ? `${teamCount}` : "—",
         },
       ];
-  const billingAccessTitle = business.stripe_customer_id ? "Billing access" : "Billing setup";
-  const billingAccessDescription = business.stripe_customer_id
+  const billingAccessTitle = hasBillingRelationship ? "Billing access" : "Billing setup";
+  const billingAccessDescription = hasBillingRelationship
     ? "The billing portal handles invoices, cards, and plan changes in one place."
     : "Stripe opens when you're ready to start the plan and save billing details.";
   const billingFooterNote =
@@ -1991,11 +2044,18 @@ export function BillingSummarySection({ business }: { business: Business }) {
               <p className="text-[13px] text-[var(--dash-text)]">
                 {business.stripe_customer_id
                   ? "Billing details, invoices, and payment methods live in Stripe."
-                  : "Start the plan when you’re ready to unlock live sending."}
+                  : hasBillingRelationship
+                    ? "Your subscription trial is live. Stripe billing details are still syncing into the account."
+                    : "Start the plan when you’re ready to unlock live sending."}
               </p>
               {(status === "trial" || status === "trialing") && trialEndsAt ? (
                 <p className="mt-1 text-[12px] text-[#9B5C2E]">
                   {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} left in the trial.
+                </p>
+              ) : null}
+              {billingSyncing && !business.stripe_customer_id ? (
+                <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
+                  Finishing the Stripe link for invoices and card management...
                 </p>
               ) : null}
             </div>
@@ -2011,14 +2071,20 @@ export function BillingSummarySection({ business }: { business: Business }) {
                 </button>
               ) : null}
 
-              {(status === "none" || status === "canceled") ? (
+              {(status === "trial" || status === "none" || status === "canceled") ? (
                 <button
                   type="button"
                   onClick={() => void handleCheckout()}
                   disabled={redirecting}
                   className={dashboardButtonClassName({ variant: "primary", size: "sm" })}
                 >
-                  {redirecting ? "Redirecting..." : status === "none" ? "Start free trial" : "Resubscribe"}
+                  {redirecting
+                    ? "Redirecting..."
+                    : status === "none"
+                      ? "Start free trial"
+                      : status === "trial"
+                        ? "Start plan"
+                        : "Resubscribe"}
                 </button>
               ) : null}
 
@@ -2044,7 +2110,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
               {billingAccessTitle}
             </p>
             <h3 className="mt-2 text-[18px] font-semibold tracking-tight text-[var(--dash-text)]">
-              {business.stripe_customer_id ? "Handle payment details in one place" : "Billing starts in one place"}
+              {hasBillingRelationship ? "Handle payment details in one place" : "Billing starts in one place"}
             </h3>
             <p className="mt-2 max-w-[34ch] text-[12px] leading-relaxed text-[var(--dash-muted)]">
               {billingAccessDescription}
@@ -2067,33 +2133,44 @@ export function BillingSummarySection({ business }: { business: Business }) {
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--dash-border)] bg-[#FCFAF6] px-5 py-4">
-          <p
-            className={`max-w-[34ch] text-[12px] leading-relaxed ${
-              status === "past_due" ? "text-[#C04E31]" : "text-[var(--dash-muted)]"
-            }`}
-          >
-            {billingFooterNote}
-          </p>
-          {business.stripe_customer_id ? (
-            <button
-              type="button"
-              onClick={() => void handlePortal()}
-              disabled={redirecting}
-              className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
+        <div className="border-t border-[var(--dash-border)] bg-[#FCFAF6] px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <p
+              className={`max-w-[34ch] text-[12px] leading-relaxed ${
+                status === "past_due" ? "text-[#C04E31]" : "text-[var(--dash-muted)]"
+              }`}
             >
-              {redirecting ? "Redirecting..." : "Open billing portal"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void handleCheckout()}
-              disabled={redirecting}
-              className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
-            >
-              {redirecting ? "Redirecting..." : "Start plan"}
-            </button>
-          )}
+              {billingFooterNote}
+            </p>
+            {business.stripe_customer_id ? (
+              <button
+                type="button"
+                onClick={() => void handlePortal()}
+                disabled={redirecting}
+                className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
+              >
+                {redirecting ? "Redirecting..." : "Open billing portal"}
+              </button>
+            ) : hasBillingRelationship ? (
+              <span className="rounded-full border border-[#E6DDD0] bg-white px-3 py-1.5 text-[11px] font-medium text-[var(--dash-muted)]">
+                Syncing Stripe details
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void handleCheckout()}
+                disabled={redirecting}
+                className={dashboardButtonClassName({ variant: "success", size: "sm" })}
+              >
+                {redirecting ? "Redirecting..." : "Start plan"}
+              </button>
+            )}
+          </div>
+          {billingActionError ? (
+            <p className="mt-3 text-[12px] leading-relaxed text-[#A6452E]">
+              {billingActionError}
+            </p>
+          ) : null}
         </div>
       </section>
     </div>
@@ -2109,6 +2186,13 @@ export function AccountDataSection({
 }) {
   const hasGoogle = Boolean(business.google_place_id || business.google_review_url?.trim());
   const crmCount = business.connected_crms ? Object.keys(business.connected_crms).length : 0;
+  const hasBillingDocuments =
+    Boolean(business.stripe_customer_id) ||
+    business.subscription_status === "trialing" ||
+    business.subscription_status === "active" ||
+    business.subscription_status === "past_due" ||
+    business.subscription_status === "paused" ||
+    business.subscription_status === "incomplete";
 
   return (
     <div className="overflow-hidden rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-[var(--dash-surface)] shadow-[var(--dash-shadow)]">
@@ -2124,15 +2208,15 @@ export function AccountDataSection({
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Billing documents</p>
             <p className="mt-2 text-[14px] font-medium text-[var(--dash-text)]">
-              {business.stripe_customer_id ? "Invoices available in Stripe" : "No billing documents yet"}
+              {hasBillingDocuments ? "Invoices available in Stripe" : "No billing documents yet"}
             </p>
             <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
-              {business.stripe_customer_id
+              {hasBillingDocuments
                 ? "Open the billing portal to download receipts and invoice history."
                 : "Start the plan first, then invoices and receipts will live in the billing portal."}
             </p>
           </div>
-          {business.stripe_customer_id ? (
+          {hasBillingDocuments ? (
             <Link href="/dashboard/more/account#billing" className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}>
               Open billing
             </Link>

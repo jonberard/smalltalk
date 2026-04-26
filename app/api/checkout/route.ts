@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getAppBaseUrl } from "@/lib/app-url";
 import { captureServerException } from "@/lib/server-error-reporting";
 import { mapSubscriptionStatus } from "@/lib/stripe-utils";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 function pickMostRelevantSubscription(subscriptions: Stripe.Subscription[]) {
   if (subscriptions.length === 0) return null;
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
   const appBaseUrl = getAppBaseUrl();
 
   try {
-    const { data: business, error: businessError } = await supabase
+    const { data: business, error: businessError } = await supabaseAdmin
       .from("businesses")
       .select("stripe_customer_id")
       .eq("id", user.id)
@@ -112,7 +113,6 @@ export async function POST(req: NextRequest) {
       mode: "subscription",
       line_items: [{ price: STRIPE_PRICE_ID, quantity: 1 }],
       subscription_data: {
-        trial_period_days: 7,
         metadata: {
           userId: user.id,
         },
