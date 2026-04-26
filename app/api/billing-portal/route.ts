@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { getAppBaseUrl } from "@/lib/app-url";
+import { captureServerException } from "@/lib/server-error-reporting";
 
 export async function POST(req: NextRequest) {
   const { STRIPE_SECRET_KEY } = process.env;
@@ -44,6 +45,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
+    captureServerException(err, {
+      route: "/api/billing-portal",
+      tags: { business_id: user.id },
+    });
     const stripeErr = err as { message?: string };
     return NextResponse.json(
       { error: stripeErr.message || "Failed to create portal session" },

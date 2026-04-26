@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { getAppBaseUrl } from "@/lib/app-url";
+import { captureServerException } from "@/lib/server-error-reporting";
 import { mapSubscriptionStatus } from "@/lib/stripe-utils";
 
 function pickMostRelevantSubscription(subscriptions: Stripe.Subscription[]) {
@@ -65,6 +66,10 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (businessError) {
+      captureServerException(new Error(businessError.message), {
+        route: "/api/checkout",
+        tags: { business_id: user.id },
+      });
       return NextResponse.json({ error: "Failed to load billing state" }, { status: 500 });
     }
 
@@ -122,6 +127,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
+    captureServerException(err, {
+      route: "/api/checkout",
+      tags: { business_id: user.id },
+    });
     const stripeErr = err as { message?: string };
     return NextResponse.json(
       { error: stripeErr.message || "Failed to create checkout session" },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { captureServerException } from "@/lib/server-error-reporting";
 import { mapSubscriptionStatus } from "@/lib/stripe-utils";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -103,6 +104,10 @@ export async function POST(req: NextRequest) {
   try {
     lockState = await acquireWebhookEvent(event);
   } catch (err: unknown) {
+    captureServerException(err, {
+      route: "/api/webhooks/stripe",
+      tags: { stripe_event_type: event.type, stripe_event_id: event.id },
+    });
     const message = err instanceof Error ? err.message : "Failed to acquire Stripe webhook lock";
     console.error("[stripe-webhook]", message);
     return NextResponse.json({ error: message }, { status: 500 });
@@ -247,6 +252,10 @@ export async function POST(req: NextRequest) {
     await markWebhookProcessed(event.id);
     return NextResponse.json({ received: true });
   } catch (err: unknown) {
+    captureServerException(err, {
+      route: "/api/webhooks/stripe",
+      tags: { stripe_event_type: event.type, stripe_event_id: event.id },
+    });
     const message = err instanceof Error ? err.message : "Stripe webhook processing failed";
     console.error("[stripe-webhook]", message);
     await releaseWebhookEvent(event.id);

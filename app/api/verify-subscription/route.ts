@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { captureServerException } from "@/lib/server-error-reporting";
 import { mapSubscriptionStatus } from "@/lib/stripe-utils";
 
 const SUBSCRIPTION_PRIORITY: Record<string, number> = {
@@ -205,6 +206,15 @@ export async function POST(req: NextRequest) {
     .eq("id", user.id);
 
   if (updateError) {
+    captureServerException(new Error(updateError.message), {
+      route: "/api/verify-subscription",
+      tags: { business_id: user.id },
+      extras: {
+        subscription_status: status,
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscriptionId,
+      },
+    });
     console.error(`[verify-subscription] Failed to update business ${user.id}:`, updateError.message);
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
   }

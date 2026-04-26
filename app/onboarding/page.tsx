@@ -318,7 +318,7 @@ function StepBusiness({
           onClick={onSkip}
           className="text-[13px] font-medium text-muted transition-colors hover:text-text"
         >
-          Skip for now
+          I&rsquo;ll connect this later
         </button>
         <p className="text-center text-[12px] text-muted/70">
           You&rsquo;ll need this before sending review links.
@@ -419,8 +419,11 @@ function StepServices({
           onClick={onSkip}
           className="text-[13px] font-medium text-muted transition-colors hover:text-text"
         >
-          Skip &mdash; I&rsquo;ll add these later
+          I&rsquo;ll add services later
         </button>
+        <p className="text-center text-[12px] text-muted/70">
+          Add one now, or skip and finish the rest of setup first.
+        </p>
       </div>
     </div>
   );
@@ -514,15 +517,11 @@ function StepTeam({
           onClick={onSkip}
           className="text-[13px] font-medium text-muted transition-colors hover:text-text"
         >
-          Just me
+          I&rsquo;ll add people later
         </button>
-        <button
-          type="button"
-          onClick={onSkip}
-          className="text-[13px] font-medium text-muted/70 transition-colors hover:text-text"
-        >
-          Skip &mdash; I&rsquo;ll add these later
-        </button>
+        <p className="text-center text-[12px] text-muted/70">
+          Add one now, or skip and come back when your setup details are ready.
+        </p>
       </div>
     </div>
   );
@@ -604,8 +603,11 @@ function StepNeighborhoods({
           onClick={onSkip}
           className="text-[13px] font-medium text-muted transition-colors hover:text-text"
         >
-          Skip &mdash; I&rsquo;ll add these later
+          I&rsquo;ll add areas later
         </button>
+        <p className="text-center text-[12px] text-muted/70">
+          Add one now, or skip and fill in your service areas later.
+        </p>
       </div>
     </div>
   );

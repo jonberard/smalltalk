@@ -19,6 +19,7 @@ import { serverCapture } from "@/lib/posthog-server";
 import { DEFAULT_BUSINESS_TIME_ZONE, getNextBatchSendAt, sanitizeTimeZone } from "@/lib/quiet-hours";
 import { queueReminderDeliveries } from "@/lib/review-message-deliveries";
 import { consumeBusinessRateLimit } from "@/lib/business-rate-limit";
+import { captureServerException } from "@/lib/server-error-reporting";
 import {
   REVIEW_REQUEST_HOURLY_CAP,
   REVIEW_REQUEST_HOURLY_WINDOW_SECONDS,
@@ -156,6 +157,10 @@ export async function POST(req: NextRequest) {
       windowSeconds: REVIEW_REQUEST_HOURLY_WINDOW_SECONDS,
     });
   } catch (error) {
+    captureServerException(error, {
+      route: "/api/send-review-request",
+      tags: { business_id: business.id, limit_bucket: "review_request_create" },
+    });
     const message =
       error instanceof Error ? error.message : "Could not verify your send limit.";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -217,6 +222,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (error?.code !== "23505") {
+      captureServerException(new Error(error.message), {
+        route: "/api/send-review-request",
+        tags: { business_id: business.id, channel },
+        extras: { stage: "create_review_link" },
+      });
       return NextResponse.json(
         { error: `Failed to create review link: ${error.message}` },
         { status: 500 },
@@ -225,6 +235,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (!reviewLink) {
+    captureServerException(new Error("Could not generate a unique review link after retries"), {
+      route: "/api/send-review-request",
+      tags: { business_id: business.id, channel },
+      extras: { stage: "generate_unique_code" },
+    });
     return NextResponse.json(
       { error: "Could not generate a unique review link. Please try again." },
       { status: 500 },
@@ -276,6 +291,14 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (initialDeliveryError || !initialDelivery) {
+    captureServerException(
+      new Error(initialDeliveryError?.message || "Failed to create initial delivery record"),
+      {
+        route: "/api/send-review-request",
+        tags: { business_id: business.id, channel },
+        extras: { stage: "log_initial_delivery", review_link_id: reviewLink.id },
+      },
+    );
     return NextResponse.json(
       { error: `Failed to log delivery: ${initialDeliveryError?.message || "unknown error"}` },
       { status: 500 },

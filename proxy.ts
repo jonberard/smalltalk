@@ -11,14 +11,33 @@ function getRateLimitKey(req: NextRequest): string {
   return ip;
 }
 
-export function middleware(req: NextRequest) {
-  // Only rate-limit API routes
-  if (!req.nextUrl.pathname.startsWith("/api/")) {
-    return NextResponse.next();
+function shouldSetNoIndex(pathname: string) {
+  return (
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/onboarding") ||
+    pathname.startsWith("/r/")
+  );
+}
+
+function withNoIndex(response: NextResponse, pathname: string) {
+  if (shouldSetNoIndex(pathname)) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
+  return response;
+}
+
+export function proxy(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  if (!pathname.startsWith("/api/")) {
+    return withNoIndex(NextResponse.next(), pathname);
   }
 
   // Exempt webhook routes (Stripe verifies via signature)
-  if (req.nextUrl.pathname.startsWith("/api/webhooks/")) {
+  if (pathname.startsWith("/api/webhooks/")) {
     return NextResponse.next();
   }
 
@@ -44,5 +63,13 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  matcher: [
+    "/api/:path*",
+    "/dashboard/:path*",
+    "/admin/:path*",
+    "/login",
+    "/signup",
+    "/onboarding/:path*",
+    "/r/:path*",
+  ],
 };
