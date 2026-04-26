@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
+import { getAppBaseUrl } from "@/lib/app-url";
 
 export async function POST(req: NextRequest) {
   const { STRIPE_SECRET_KEY } = process.env;
@@ -33,12 +34,12 @@ export async function POST(req: NextRequest) {
   }
 
   const stripe = new Stripe(STRIPE_SECRET_KEY);
-  const origin = req.headers.get("origin") || "https://usesmalltalk.com";
+  const appBaseUrl = getAppBaseUrl();
 
   try {
     const session = await stripe.billingPortal.sessions.create({
       customer: stripe_customer_id,
-      return_url: `${origin}/dashboard/more/account`,
+      return_url: `${appBaseUrl}/dashboard/more/account`,
     });
 
     return NextResponse.json({ url: session.url });

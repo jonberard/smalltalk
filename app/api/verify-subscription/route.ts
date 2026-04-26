@@ -3,6 +3,92 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { mapSubscriptionStatus } from "@/lib/stripe-utils";
 
+const SUBSCRIPTION_PRIORITY: Record<string, number> = {
+  active: 6,
+  trialing: 5,
+  past_due: 4,
+  incomplete: 3,
+  incomplete_expired: 2,
+  unpaid: 1,
+  canceled: 0,
+  paused: 0,
+};
+
+function pickMostRelevantSubscription(subscriptions: Stripe.Subscription[]) {
+  if (subscriptions.length === 0) return null;
+
+  return [...subscriptions].sort((left, right) => {
+    const priorityDelta =
+      (SUBSCRIPTION_PRIORITY[right.status] ?? -1) - (SUBSCRIPTION_PRIORITY[left.status] ?? -1);
+
+    if (priorityDelta !== 0) return priorityDelta;
+    return right.created - left.created;
+  })[0];
+}
+
+async function findSubscriptionForCustomer(stripe: Stripe, customerId: string) {
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 10,
+  });
+
+  return pickMostRelevantSubscription(subscriptions.data);
+}
+
+async function findCustomerAndSubscriptionByEmail(stripe: Stripe, email: string) {
+  const customers = await stripe.customers.list({ email, limit: 10 });
+
+  let bestMatch:
+    | {
+        customerId: string;
+        subscription: Stripe.Subscription;
+      }
+    | null = null;
+
+  for (const customer of customers.data) {
+    if (customer.deleted) continue;
+
+    const subscription = await findSubscriptionForCustomer(stripe, customer.id);
+    if (!subscription) continue;
+
+    if (!bestMatch) {
+      bestMatch = { customerId: customer.id, subscription };
+      continue;
+    }
+
+    const currentPriority = SUBSCRIPTION_PRIORITY[bestMatch.subscription.status] ?? -1;
+    const nextPriority = SUBSCRIPTION_PRIORITY[subscription.status] ?? -1;
+
+    if (
+      nextPriority > currentPriority ||
+      (nextPriority === currentPriority && subscription.created > bestMatch.subscription.created)
+    ) {
+      bestMatch = { customerId: customer.id, subscription };
+    }
+  }
+
+  return bestMatch;
+}
+
+async function findCheckoutSessionMatch(stripe: Stripe, userId: string) {
+  let scanned = 0;
+
+  for await (const session of stripe.checkout.sessions.list({ limit: 100 })) {
+    scanned += 1;
+
+    if (session.client_reference_id === userId && session.status === "complete") {
+      return session;
+    }
+
+    if (scanned >= 200) {
+      break;
+    }
+  }
+
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   const { STRIPE_SECRET_KEY } = process.env;
 
@@ -54,29 +140,53 @@ export async function POST(req: NextRequest) {
 
   // Path A: We already have a stripe_customer_id — look up subscription directly
   if (customerId) {
-    const subs = await stripe.subscriptions.list({ customer: customerId, limit: 1 });
-    if (subs.data.length > 0) {
-      const sub = subs.data[0];
+    let storedSubscription: Stripe.Subscription | null = null;
+
+    if (subscriptionId) {
+      try {
+        storedSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+      } catch {
+        storedSubscription = null;
+      }
+    }
+
+    const listedSubscription = await findSubscriptionForCustomer(stripe, customerId);
+    const sub = pickMostRelevantSubscription(
+      [storedSubscription, listedSubscription].filter(Boolean) as Stripe.Subscription[],
+    );
+
+    if (sub) {
       subscriptionId = sub.id;
       status = mapSubscriptionStatus(sub.status);
     }
   } else {
-    // Path B: No stripe_customer_id yet — search recent checkout sessions
-    const sessions = await stripe.checkout.sessions.list({ limit: 10 });
-    const match = sessions.data.find(
-      (s) => s.client_reference_id === user.id && s.status === "complete",
-    );
+    // Path B1: No stripe_customer_id yet — try to recover from the account email first
+    if (user.email) {
+      const emailMatch = await findCustomerAndSubscriptionByEmail(stripe, user.email);
 
-    if (match) {
-      customerId = match.customer as string;
-      subscriptionId = match.subscription as string;
-
-      // Look up the actual subscription status
-      if (subscriptionId) {
-        const sub = await stripe.subscriptions.retrieve(subscriptionId);
-        status = mapSubscriptionStatus(sub.status);
+      if (emailMatch) {
+        customerId = emailMatch.customerId;
+        subscriptionId = emailMatch.subscription.id;
+        status = mapSubscriptionStatus(emailMatch.subscription.status);
       }
-    } else {
+    }
+
+    // Path B2: Still nothing — scan a bounded set of checkout sessions by client_reference_id
+    if (!customerId) {
+      const match = await findCheckoutSessionMatch(stripe, user.id);
+
+      if (match) {
+        customerId = (match.customer as string | null) ?? null;
+        subscriptionId = (match.subscription as string | null) ?? null;
+
+        if (subscriptionId) {
+          const sub = await stripe.subscriptions.retrieve(subscriptionId);
+          status = mapSubscriptionStatus(sub.status);
+        }
+      }
+    }
+
+    if (!customerId && !subscriptionId) {
       return NextResponse.json({
         updated: false,
         subscription_status: status,
