@@ -21,13 +21,16 @@ export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [businessName, setBusinessName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setVerificationMessage("");
     setLoading(true);
 
     try {
@@ -106,6 +109,13 @@ export default function SignupPage() {
       // 4. Identify and redirect to onboarding
       identify(userId, { subscription_status: "trial" });
       capture("signup_completed");
+
+      if (!authData.session) {
+        setVerificationMessage("Check your email to verify your account, then sign in to continue.");
+        setLoading(false);
+        return;
+      }
+
       router.push("/onboarding");
     } catch {
       setError("Something went wrong. Please try again.");
@@ -135,6 +145,12 @@ export default function SignupPage() {
               </div>
             )}
 
+            {verificationMessage && (
+              <div className="rounded-[8px] border border-[#059669]/20 bg-[#ECFDF5] px-4 py-3 text-[13px] text-[#059669]">
+                {verificationMessage}
+              </div>
+            )}
+
             <div>
               <label htmlFor="email" className="mb-1.5 block text-[13px] font-medium text-text">
                 Email
@@ -155,17 +171,27 @@ export default function SignupPage() {
               <label htmlFor="password" className="mb-1.5 block text-[13px] font-medium text-text">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
-                autoComplete="new-password"
-                className="w-full rounded-[8px] border border-accent bg-surface px-3.5 py-2.5 text-[14px] text-text placeholder-muted outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                  className="w-full rounded-[8px] border border-accent bg-surface px-3.5 py-2.5 pr-16 text-[14px] text-text placeholder-muted outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-medium text-muted transition-colors hover:text-text"
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
             </div>
 
             <div>

@@ -85,6 +85,31 @@ function getTier(rating: number): "positive" | "neutral" | "negative" {
   return "negative";
 }
 
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => setPrefersReducedMotion(mediaQuery.matches);
+
+    updatePreference();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updatePreference);
+      return () => mediaQuery.removeEventListener("change", updatePreference);
+    }
+
+    mediaQuery.addListener(updatePreference);
+    return () => mediaQuery.removeListener(updatePreference);
+  }, []);
+
+  return prefersReducedMotion;
+}
+
 
 /* ═══════════════════════════════════════════════════
    FLOW STATE
@@ -698,6 +723,7 @@ function VoiceInputScreen({
   onCancel: () => void;
   data: ReviewData;
 }) {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [interimText, setInterimText] = useState("");
@@ -828,8 +854,12 @@ function VoiceInputScreen({
         >
           {listening && (
             <>
-              <span className="absolute inset-0 animate-[voice-pulse_2s_ease-in-out_infinite] rounded-full bg-primary/20" />
-              <span className="absolute inset-[-8px] animate-[voice-pulse_2s_ease-in-out_0.5s_infinite] rounded-full bg-primary/10" />
+              <span
+                className={`absolute inset-0 rounded-full bg-primary/20 ${prefersReducedMotion ? "" : "animate-[voice-pulse_2s_ease-in-out_infinite]"}`}
+              />
+              <span
+                className={`absolute inset-[-8px] rounded-full bg-primary/10 ${prefersReducedMotion ? "" : "animate-[voice-pulse_2s_ease-in-out_0.5s_infinite]"}`}
+              />
             </>
           )}
           <svg
@@ -849,7 +879,7 @@ function VoiceInputScreen({
             <line x1="8" y1="23" x2="16" y2="23" />
           </svg>
         </button>
-        <p className="mt-3 text-[13px] font-medium text-muted">
+        <p aria-live="polite" role="status" className="mt-3 text-[13px] font-medium text-muted">
           {listening ? "Listening..." : error ? "" : "Tap to start again"}
         </p>
       </div>
@@ -864,9 +894,9 @@ function VoiceInputScreen({
             )}
           </p>
         ) : error ? (
-          <p className="text-[14px] text-center text-red-500">{error}</p>
+          <p aria-live="polite" role="status" className="text-[14px] text-center text-red-500">{error}</p>
         ) : (
-          <p className="text-[14px] text-center text-muted/60">
+          <p aria-live="polite" role="status" className="text-[14px] text-center text-muted/60">
             {listening ? "Start speaking..." : "No speech detected"}
           </p>
         )}
@@ -954,6 +984,7 @@ function FollowUpScreen({
               key={opt}
               type="button"
               onClick={() => handleSelect(opt)}
+              aria-label={`${topic.label}: ${opt}`}
               className={`w-full rounded-card border px-5 py-3.5 text-left text-[15px] font-medium transition-all duration-200 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isSelected ? "border-primary bg-primary/10 text-primary" : "border-accent bg-surface text-text"}`}
             >
               {opt}
@@ -999,6 +1030,7 @@ function DetailScreen({
   data: ReviewData;
   hasSpeechSupport?: boolean;
 }) {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
   const [interimText, setInterimText] = useState("");
@@ -1108,37 +1140,42 @@ function DetailScreen({
       </div>
 
       {hasSpeechSupport && (
-        <button
-          type="button"
-          onClick={listening ? stopListening : startListening}
-          aria-label={listening ? "Stop recording" : "Start voice input"}
-          className={`flex items-center gap-2 self-center rounded-pill border px-5 py-2.5 text-[13px] font-medium transition-all duration-200 active:scale-[0.98] ${listening ? "border-primary bg-primary/10 text-primary" : "border-accent bg-surface text-muted hover:border-primary hover:text-primary"}`}
-        >
-          {listening ? (
-            <>
-              <span className="relative flex h-4 w-4 items-center justify-center">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-40" />
+        <div className="flex flex-col items-center">
+          <button
+            type="button"
+            onClick={listening ? stopListening : startListening}
+            aria-label={listening ? "Stop recording" : "Start voice input"}
+            className={`flex items-center gap-2 self-center rounded-pill border px-5 py-2.5 text-[13px] font-medium transition-all duration-200 active:scale-[0.98] ${listening ? "border-primary bg-primary/10 text-primary" : "border-accent bg-surface text-muted hover:border-primary hover:text-primary"}`}
+          >
+            {listening ? (
+              <>
+                <span className="relative flex h-4 w-4 items-center justify-center">
+                  <span className={`absolute inline-flex h-full w-full rounded-full bg-primary opacity-40 ${prefersReducedMotion ? "" : "animate-ping"}`} />
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="23" />
+                    <line x1="8" y1="23" x2="16" y2="23" />
+                  </svg>
+                </span>
+                Listening — tap to stop
+              </>
+            ) : (
+              <>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
                   <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                   <line x1="12" y1="19" x2="12" y2="23" />
                   <line x1="8" y1="23" x2="16" y2="23" />
                 </svg>
-              </span>
-              Listening — tap to stop
-            </>
-          ) : (
-            <>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="23" />
-                <line x1="8" y1="23" x2="16" y2="23" />
-              </svg>
-              Or just tell us — tap to speak
-            </>
-          )}
-        </button>
+                Or just tell us — tap to speak
+              </>
+            )}
+          </button>
+          <p aria-live="polite" role="status" className="mt-2 text-[12px] text-muted">
+            {listening ? "Voice input is listening." : "Voice input is ready."}
+          </p>
+        </div>
       )}
 
       <ButtonRow>
@@ -1502,6 +1539,7 @@ function InterstitialScreen({
   data: ReviewData;
   onContinue: () => void;
 }) {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const isMobile = useMemo(() => {
     if (typeof window === "undefined") return false;
     return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -1517,6 +1555,12 @@ function InterstitialScreen({
 
   // Phase machine — advance through phases on a timer loop
   useEffect(() => {
+    if (prefersReducedMotion) {
+      setFilledStars(animStars);
+      setPhase("post-tap");
+      return;
+    }
+
     const idx = PHASE_ORDER.indexOf(phase);
     const duration = PHASE_DURATIONS[phase];
 
@@ -1538,7 +1582,7 @@ function InterstitialScreen({
       }
     }, duration);
     return () => clearTimeout(timer);
-  }, [phase, filledStars, animStars]);
+  }, [phase, filledStars, animStars, prefersReducedMotion]);
 
   function handleOpenGoogle() {
     let url: string;
@@ -1578,14 +1622,14 @@ function InterstitialScreen({
 
   // Derived animation state from phase
   const phaseIdx = PHASE_ORDER.indexOf(phase);
-  const showCursor = phase === "cursor-text" || phase === "paste" || phase === "paste-tap" || phase === "cursor-stars" || phase === "cursor-post";
-  const showPaste = phase === "paste" || phase === "paste-tap";
+  const showCursor = !prefersReducedMotion && (phase === "cursor-text" || phase === "paste" || phase === "paste-tap" || phase === "cursor-stars" || phase === "cursor-post");
+  const showPaste = !prefersReducedMotion && (phase === "paste" || phase === "paste-tap");
   const pasteTapped = phase === "paste-tap";
   const showText = phaseIdx >= PHASE_ORDER.indexOf("text-fill") && phase !== "fade-out";
   const showStars = phaseIdx >= PHASE_ORDER.indexOf("stars-fill") && phase !== "fade-out";
-  const photoPulse = phase !== "empty" && phase !== "cursor-text" && phase !== "fade-out";
+  const photoPulse = !prefersReducedMotion && phase !== "empty" && phase !== "cursor-text" && phase !== "fade-out";
   const postActive = phaseIdx >= PHASE_ORDER.indexOf("cursor-post") && phase !== "fade-out";
-  const cardFaded = phase === "fade-out";
+  const cardFaded = !prefersReducedMotion && phase === "fade-out";
 
   // Cursor position per phase
   let cursorX = "50%";
@@ -1750,6 +1794,7 @@ function InterstitialScreen({
    ═══════════════════════════════════════════════════ */
 
 function Confetti() {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const pieces = useRef(
     Array.from({ length: 40 }, (_, i) => ({
       id: i,
@@ -1763,6 +1808,10 @@ function Confetti() {
       shape: Math.random() > 0.5 ? "circle" : "rect",
     }))
   ).current;
+
+  if (prefersReducedMotion) {
+    return null;
+  }
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">

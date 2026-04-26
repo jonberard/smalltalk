@@ -1,6 +1,19 @@
 "use client";
 
-export default function Error({ reset }: { reset: () => void }) {
+import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background px-4 font-body">
       <div className="w-full max-w-[420px] text-center">
