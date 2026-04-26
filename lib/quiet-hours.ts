@@ -7,9 +7,25 @@ type ZonedDateParts = {
   second: number;
 };
 
+export const DEFAULT_BUSINESS_TIME_ZONE = "America/Chicago";
+
+export function sanitizeTimeZone(timeZone: string | null | undefined) {
+  if (!timeZone) {
+    return DEFAULT_BUSINESS_TIME_ZONE;
+  }
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone }).format(new Date());
+    return timeZone;
+  } catch {
+    return DEFAULT_BUSINESS_TIME_ZONE;
+  }
+}
+
 function getZonedParts(date: Date, timeZone: string): ZonedDateParts {
+  const safeTimeZone = sanitizeTimeZone(timeZone);
   const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone,
+    timeZone: safeTimeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -89,7 +105,8 @@ function isHourInQuietHours(hour: number, start: number, end: number) {
 }
 
 export function isInQuietHours(date: Date, timeZone: string, quietHoursStart: number, quietHoursEnd: number) {
-  const parts = getZonedParts(date, timeZone);
+  const safeTimeZone = sanitizeTimeZone(timeZone);
+  const parts = getZonedParts(date, safeTimeZone);
   return isHourInQuietHours(parts.hour, quietHoursStart, quietHoursEnd);
 }
 
@@ -99,7 +116,8 @@ export function getNextAllowedSendAt(
   quietHoursStart: number,
   quietHoursEnd: number,
 ) {
-  const parts = getZonedParts(date, timeZone);
+  const safeTimeZone = sanitizeTimeZone(timeZone);
+  const parts = getZonedParts(date, safeTimeZone);
 
   if (!isHourInQuietHours(parts.hour, quietHoursStart, quietHoursEnd)) {
     return date;
@@ -123,7 +141,7 @@ export function getNextAllowedSendAt(
       minute: 0,
       second: 0,
     },
-    timeZone,
+    safeTimeZone,
   );
 }
 
@@ -134,7 +152,8 @@ export function getNextBatchSendAt(
   quietHoursStart: number,
   quietHoursEnd: number,
 ) {
-  const parts = getZonedParts(date, timeZone);
+  const safeTimeZone = sanitizeTimeZone(timeZone);
+  const parts = getZonedParts(date, safeTimeZone);
 
   let targetParts: ZonedDateParts = {
     ...parts,
@@ -143,7 +162,7 @@ export function getNextBatchSendAt(
     second: 0,
   };
 
-  let candidate = zonedDateTimeToUtc(targetParts, timeZone);
+  let candidate = zonedDateTimeToUtc(targetParts, safeTimeZone);
 
   if (candidate.getTime() <= date.getTime()) {
     targetParts = {
@@ -152,8 +171,8 @@ export function getNextBatchSendAt(
       minute: 0,
       second: 0,
     };
-    candidate = zonedDateTimeToUtc(targetParts, timeZone);
+    candidate = zonedDateTimeToUtc(targetParts, safeTimeZone);
   }
 
-  return getNextAllowedSendAt(candidate, timeZone, quietHoursStart, quietHoursEnd);
+  return getNextAllowedSendAt(candidate, safeTimeZone, quietHoursStart, quietHoursEnd);
 }

@@ -5,6 +5,7 @@ import { HeroCTA, FinalCTA } from "@/components/landing/auth-cta";
 import ReplyDemo from "@/components/landing/reply-demo";
 import LandingDemo from "@/components/landing-demo";
 import PricingButton from "@/components/landing/pricing-button";
+import { getReviewRequestHourlyCapCopy } from "@/lib/review-request-limits";
 
 /* ═══════════════════════════════════════════════════
    SHARED PRESENTATIONAL (server-safe)
@@ -688,6 +689,9 @@ export default function LandingPage() {
             <PricingButton />
             <p className="mt-4 text-center text-[13px] text-muted">
               No annual contract. No setup fee. No review gating.
+            </p>
+            <p className="mt-2 text-center text-[12px] leading-relaxed text-muted">
+              {getReviewRequestHourlyCapCopy()}
             </p>
           </div>
         </div>

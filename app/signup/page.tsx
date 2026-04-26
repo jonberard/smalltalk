@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { capture, identify } from "@/lib/posthog";
+import { getReviewRequestHourlyCapCopy } from "@/lib/review-request-limits";
 
 function friendlyError(message: string): string {
   if (message.includes("User already registered")) {
@@ -190,6 +191,10 @@ export default function SignupPage() {
             >
               {loading ? "Creating account..." : "Create account"}
             </button>
+
+            <p className="text-center text-[12px] leading-relaxed text-muted">
+              {getReviewRequestHourlyCapCopy()}
+            </p>
           </form>
         </div>
 

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAppBaseUrl } from "@/lib/app-url";
-import { getNextAllowedSendAt, isInQuietHours } from "@/lib/quiet-hours";
+import {
+  DEFAULT_BUSINESS_TIME_ZONE,
+  getNextAllowedSendAt,
+  isInQuietHours,
+  sanitizeTimeZone,
+} from "@/lib/quiet-hours";
 import { queueReminderDeliveries } from "@/lib/review-message-deliveries";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendReviewSms } from "@/lib/twilio-send";
@@ -81,7 +86,9 @@ function getQuietHoursConfig(reviewLink: ReviewLinkContext) {
   return {
     start: reviewLink.businesses?.quiet_hours_start ?? 21,
     end: reviewLink.businesses?.quiet_hours_end ?? 9,
-    timeZone: reviewLink.businesses?.business_timezone || "America/Chicago",
+    timeZone: sanitizeTimeZone(
+      reviewLink.businesses?.business_timezone ?? DEFAULT_BUSINESS_TIME_ZONE,
+    ),
   };
 }
 
@@ -116,7 +123,7 @@ async function evaluateDelivery(delivery: DeliveryRow) {
     return { action: "skip" as const, reason: "opted_out" };
   }
 
-  try {
+  {
     const quietHours = getQuietHoursConfig(reviewLink);
     const now = new Date();
 
@@ -131,8 +138,6 @@ async function evaluateDelivery(delivery: DeliveryRow) {
         ).toISOString(),
       };
     }
-  } catch {
-    // Fall through and attempt the send if timezone data is invalid.
   }
 
   if (!delivery.message_body) {

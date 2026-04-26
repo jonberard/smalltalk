@@ -16,8 +16,13 @@ import {
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendReviewSms } from "@/lib/twilio-send";
 import { serverCapture } from "@/lib/posthog-server";
-import { getNextBatchSendAt } from "@/lib/quiet-hours";
+import { DEFAULT_BUSINESS_TIME_ZONE, getNextBatchSendAt, sanitizeTimeZone } from "@/lib/quiet-hours";
 import { queueReminderDeliveries } from "@/lib/review-message-deliveries";
+import { consumeBusinessRateLimit } from "@/lib/business-rate-limit";
+import {
+  REVIEW_REQUEST_HOURLY_CAP,
+  REVIEW_REQUEST_HOURLY_WINDOW_SECONDS,
+} from "@/lib/review-request-limits";
 
 type SendRequestBody = {
   customer_name?: string;
@@ -27,7 +32,6 @@ type SendRequestBody = {
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 function generateCode() {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   const bytes = crypto.getRandomValues(new Uint8Array(8));
@@ -142,10 +146,45 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  let rateLimit;
+
+  try {
+    rateLimit = await consumeBusinessRateLimit({
+      businessId: business.id,
+      bucket: "review_request_create",
+      maxCount: REVIEW_REQUEST_HOURLY_CAP,
+      windowSeconds: REVIEW_REQUEST_HOURLY_WINDOW_SECONDS,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Could not verify your send limit.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        error:
+          "You’ve hit this hour’s send limit. Please wait a bit before sending more review requests.",
+        retry_after_seconds: rateLimit.retryAfterSeconds,
+        current_count: rateLimit.currentCount,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": `${rateLimit.retryAfterSeconds}`,
+        },
+      },
+    );
+  }
+
   const reminderSequenceEnabled = business.reminder_sequence_enabled ?? true;
   const batchInitialSmsEnabled =
     channel === "sms" && (business.batch_initial_sms_enabled ?? false);
   const batchInitialSmsHour = business.batch_initial_sms_hour ?? 18;
+  const businessTimeZone = sanitizeTimeZone(
+    business.business_timezone ?? DEFAULT_BUSINESS_TIME_ZONE,
+  );
   const normalizedContact = channel === "sms" ? normalizedPhone! : normalizedEmail;
 
   let reviewLink:
@@ -213,7 +252,7 @@ export async function POST(req: NextRequest) {
     batchInitialSmsEnabled
       ? getNextBatchSendAt(
           new Date(),
-          business.business_timezone ?? "America/Chicago",
+          businessTimeZone,
           batchInitialSmsHour,
           business.quiet_hours_start ?? 21,
           business.quiet_hours_end ?? 9,

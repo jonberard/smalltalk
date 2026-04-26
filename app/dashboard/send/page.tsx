@@ -12,6 +12,7 @@ import {
   TrialRemainingBanner,
   useSendWorkspace,
 } from "@/components/dashboard/send-sections";
+import { getReviewRequestHourlyCapCopy } from "@/lib/review-request-limits";
 
 function SendUseCaseCard({
   title,
@@ -137,6 +138,9 @@ export default function SendPage() {
             </h1>
             <p className="mt-2 max-w-[58ch] text-[14px] leading-relaxed text-[var(--dash-muted)]">
               Two ways to ask. A personalized text or email tied to a real visit, or a stable QR code your customers can scan from anywhere.
+            </p>
+            <p className="mt-2 max-w-[58ch] text-[12px] leading-relaxed text-[var(--dash-muted)]">
+              {getReviewRequestHourlyCapCopy()}
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
