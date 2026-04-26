@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import type { Business } from "@/lib/types";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
@@ -38,6 +39,18 @@ type PlaceResult = {
   user_ratings_total: number;
 };
 
+type OffboardingAction = "pause" | "cancel" | "delete";
+type OffboardingExperience = "" | "easy" | "mixed" | "confusing";
+type OffboardingReason =
+  | ""
+  | "seasonal"
+  | "too_expensive"
+  | "missing_features"
+  | "not_enough_usage"
+  | "switching_tools"
+  | "just_testing"
+  | "other";
+
 export type BusinessProfilePreviewSnapshot = {
   name: string;
   logo_url: string | null;
@@ -68,11 +81,134 @@ const TIER_META: { key: string; label: string; color: string; chipBg: string; do
   { key: "negative", label: "1-2 stars", color: "#DC2626", chipBg: "#FEF2F2", dotColor: "#EF4444" },
 ];
 
+const OFFBOARDING_EXPERIENCE_OPTIONS: {
+  value: Exclude<OffboardingExperience, "">;
+  label: string;
+}[] = [
+  { value: "easy", label: "Easy overall" },
+  { value: "mixed", label: "A little mixed" },
+  { value: "confusing", label: "Confusing" },
+];
+
+const OFFBOARDING_REASON_OPTIONS: {
+  value: Exclude<OffboardingReason, "">;
+  label: string;
+}[] = [
+  { value: "seasonal", label: "Seasonal downtime" },
+  { value: "too_expensive", label: "Too expensive" },
+  { value: "missing_features", label: "Missing features" },
+  { value: "not_enough_usage", label: "Not enough usage" },
+  { value: "switching_tools", label: "Switching tools" },
+  { value: "just_testing", label: "Just testing" },
+  { value: "other", label: "Other" },
+];
+
+const OFFBOARDING_ACTION_LABELS: Record<OffboardingAction, string> = {
+  pause: "Pause",
+  cancel: "Cancel",
+  delete: "Delete",
+};
+
+const OFFBOARDING_EXPERIENCE_LABELS: Record<Exclude<OffboardingExperience, "">, string> = {
+  easy: "Easy overall",
+  mixed: "A little mixed",
+  confusing: "Confusing",
+};
+
+const OFFBOARDING_REASON_LABELS: Record<Exclude<OffboardingReason, "">, string> = {
+  seasonal: "Seasonal downtime",
+  too_expensive: "Too expensive",
+  missing_features: "Missing features",
+  not_enough_usage: "Not enough usage",
+  switching_tools: "Switching tools",
+  just_testing: "Just testing",
+  other: "Other",
+};
+
 function formatHourLabel(hour: number) {
   if (hour === 0) return "12:00 AM";
   if (hour < 12) return `${hour}:00 AM`;
   if (hour === 12) return "12:00 PM";
   return `${hour - 12}:00 PM`;
+}
+
+function buildOffboardingFeedbackMessage({
+  action,
+  experience,
+  reason,
+  note,
+  pauseMonths,
+}: {
+  action: OffboardingAction;
+  experience: OffboardingExperience;
+  reason: OffboardingReason;
+  note: string;
+  pauseMonths?: number;
+}) {
+  const trimmedNote = note.trim();
+
+  if (!experience && !reason && !trimmedNote) {
+    return "";
+  }
+
+  const lines = [`Offboarding feedback`, `Action: ${OFFBOARDING_ACTION_LABELS[action]}`];
+
+  if (action === "pause" && pauseMonths) {
+    lines.push(`Pause length: ${pauseMonths} month${pauseMonths === 1 ? "" : "s"}`);
+  }
+
+  if (experience) {
+    lines.push(`Product experience: ${OFFBOARDING_EXPERIENCE_LABELS[experience]}`);
+  }
+
+  if (reason) {
+    lines.push(`Main reason: ${OFFBOARDING_REASON_LABELS[reason]}`);
+  }
+
+  if (trimmedNote) {
+    lines.push("", `Extra note:`, trimmedNote);
+  }
+
+  return lines.join("\n");
+}
+
+async function submitOptionalOffboardingFeedback({
+  action,
+  experience,
+  reason,
+  note,
+  pauseMonths,
+}: {
+  action: OffboardingAction;
+  experience: OffboardingExperience;
+  reason: OffboardingReason;
+  note: string;
+  pauseMonths?: number;
+}) {
+  const message = buildOffboardingFeedbackMessage({
+    action,
+    experience,
+    reason,
+    note,
+    pauseMonths,
+  });
+
+  if (!message) {
+    return;
+  }
+
+  try {
+    await fetchWithAuth("/api/support-message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        category: "billing",
+        message,
+      }),
+    });
+  } catch {
+    // Optional feedback should never block the primary account action.
+  }
 }
 
 export function BusinessProfile({
@@ -1762,6 +1898,8 @@ export function BillingSummarySection({ business }: { business: Business }) {
   const [redirecting, setRedirecting] = useState(false);
   const [billingActionError, setBillingActionError] = useState("");
   const [billingSyncing, setBillingSyncing] = useState(false);
+  const [showPauseDialog, setShowPauseDialog] = useState(false);
+  const [showCancelPlanDialog, setShowCancelPlanDialog] = useState(false);
   const hasAttemptedBillingSync = useRef(false);
 
   useEffect(() => {
@@ -1797,16 +1935,17 @@ export function BillingSummarySection({ business }: { business: Business }) {
   }, [business.id]);
 
   const status = business.subscription_status ?? "none";
-  const hasBillingRelationship =
+  const pausedUntil = business.paused_until ? new Date(business.paused_until) : null;
+  const hasPaidSubscription =
     status === "trialing" ||
     status === "active" ||
     status === "past_due" ||
-    status === "paused" ||
-    status === "incomplete" ||
-    Boolean(business.stripe_customer_id);
+    status === "incomplete";
+  const hasPortalAccess = Boolean(business.stripe_customer_id);
+  const hasSavedOffboardingState = status === "paused" || status === "canceled";
 
   useEffect(() => {
-    if (!hasBillingRelationship || business.stripe_customer_id || hasAttemptedBillingSync.current) {
+    if (!hasPaidSubscription || business.stripe_customer_id || hasAttemptedBillingSync.current) {
       return;
     }
 
@@ -1827,7 +1966,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
       .finally(() => {
         setBillingSyncing(false);
       });
-  }, [business.stripe_customer_id, hasBillingRelationship, status]);
+  }, [business.stripe_customer_id, hasPaidSubscription, status]);
 
   async function handleCheckout() {
     setBillingActionError("");
@@ -1874,11 +2013,17 @@ export function BillingSummarySection({ business }: { business: Business }) {
 
   const trialEndsAt = business.trial_ends_at ? new Date(business.trial_ends_at) : null;
   const daysRemaining = trialEndsAt ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 0;
+  const isFreeTrial = status === "trial";
+  const isStripeTrial = status === "trialing";
+  const trialRequestsRemaining = Math.max(0, business.trial_requests_remaining);
+  const trialRequestLimit = 10;
   const planName =
     status === "trial"
       ? "Trial"
       : status === "trialing" || status === "active"
         ? "Pro"
+        : status === "paused"
+          ? "Paused"
         : status === "past_due"
           ? "Past due"
           : status === "canceled"
@@ -1895,10 +2040,14 @@ export function BillingSummarySection({ business }: { business: Business }) {
         ? trialEndsAt
           ? `Trial ends ${trialEndsAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
           : "Trial active"
+        : status === "paused"
+          ? pausedUntil
+            ? `Paused until ${pausedUntil.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+            : "Paused"
         : status === "trial"
-          ? trialEndsAt
-            ? `Trial ends ${trialEndsAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-            : "Free trial"
+          ? trialRequestsRemaining > 0
+            ? `${trialRequestsRemaining} request${trialRequestsRemaining === 1 ? "" : "s"} left`
+            : "Trial used"
         : status === "past_due"
           ? "Payment issue"
           : status === "canceled"
@@ -1911,14 +2060,18 @@ export function BillingSummarySection({ business }: { business: Business }) {
         ? "bg-[#F3E7C7] text-[#8A651F]"
         : status === "past_due" || status === "canceled"
           ? "bg-[#FBE3DA] text-[#A6452E]"
+          : status === "paused"
+            ? "bg-[#EEF1ED] text-[#4A5D53]"
           : "bg-[#F4EFE5] text-[var(--dash-muted)]";
   const usageTiles = [
     {
       label: "Requests this month",
       value: loading ? "—" : usageCount.toLocaleString("en-US"),
       detail:
-        status === "trial" || status === "trialing"
-          ? `${business.trial_requests_remaining} trial request${business.trial_requests_remaining === 1 ? "" : "s"} left`
+        isFreeTrial
+          ? `${trialRequestsRemaining} of ${trialRequestLimit} live request${trialRequestsRemaining === 1 ? "" : "s"} left`
+          : isStripeTrial
+            ? "Live review requests unlocked"
           : "Review requests created",
     },
     {
@@ -1932,7 +2085,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
       detail: teamCount > 0 ? "On your account" : "Add from Team & Services",
     },
   ];
-  const billingAccessRows = hasBillingRelationship
+  const billingAccessRows = hasPaidSubscription
     ? [
         {
           title: "Invoices & receipts",
@@ -1949,14 +2102,48 @@ export function BillingSummarySection({ business }: { business: Business }) {
           detail:
             status === "trialing"
               ? "Your Pro plan is in its trial period. Card details and future invoices live in Stripe."
-              : status === "trial"
-                ? "Upgrade from trial whenever you're ready."
-              : status === "canceled"
-                ? "Resume the plan without losing history."
-                : "Change plans or review subscription details in Stripe.",
-          value: status === "trialing" ? "Trial active" : status === "trial" ? "Trial" : status === "canceled" ? "Paused" : "Manage",
+              : "Change plans or review subscription details in Stripe.",
+          value: status === "trialing" ? "Trial active" : "Manage",
         },
       ]
+    : status === "paused"
+      ? [
+          {
+            title: "Sending paused",
+            detail: "Review requests and reminders stay off while the account is paused.",
+            value: "Paused",
+          },
+          {
+            title: "Your data",
+            detail: pausedUntil
+              ? `Business setup, review links, and history stay saved through ${pausedUntil.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
+              : "Business setup, review links, and history stay saved while paused.",
+            value: "Saved",
+          },
+          {
+            title: "Resume anytime",
+            detail: "When you're ready, start the plan again with the same login and pick up where you left off.",
+            value: "Resume",
+          },
+        ]
+      : status === "canceled"
+        ? [
+            {
+              title: "Plan ended",
+              detail: "Billing has stopped and no new sends will go out.",
+              value: "Canceled",
+            },
+            {
+              title: "Your data",
+              detail: "Business setup, review links, and customer history stay saved if you come back later.",
+              value: "Saved",
+            },
+            {
+              title: "Resume anytime",
+              detail: "Sign back in and start the plan again without redoing the full business setup.",
+              value: "Resume",
+            },
+          ]
     : [
         {
           title: "Start billing",
@@ -1967,7 +2154,9 @@ export function BillingSummarySection({ business }: { business: Business }) {
           title: "Current status",
           detail:
             status === "trial" || status === "trialing"
-              ? `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in the trial.`
+              ? isFreeTrial
+                ? `${trialRequestsRemaining} of ${trialRequestLimit} live requests left. The free trial also ends in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}.`
+                : `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in the Stripe trial.`
               : "No paid billing activity yet.",
           value: status === "trialing" ? "Trial active" : status === "trial" ? "Trial" : "Not started",
         },
@@ -1977,25 +2166,45 @@ export function BillingSummarySection({ business }: { business: Business }) {
           value: teamCount > 0 ? `${teamCount}` : "—",
         },
       ];
-  const billingAccessTitle = hasBillingRelationship ? "Billing access" : "Billing setup";
-  const billingAccessDescription = hasBillingRelationship
+  const billingAccessTitle =
+    hasPaidSubscription
+      ? "Billing access"
+      : status === "paused"
+        ? "Account paused"
+        : status === "canceled"
+          ? "Plan canceled"
+          : "Billing setup";
+  const billingAccessDescription = hasPaidSubscription
     ? "The billing portal handles invoices, cards, and plan changes in one place."
+    : status === "paused"
+      ? "Your data is saved and sending is paused while you step away."
+      : status === "canceled"
+        ? "Billing has stopped, but the account and its history stay saved."
     : "Stripe opens when you're ready to start the plan and save billing details.";
   const billingFooterNote =
     status === "active"
       ? "Your plan is active. Review requests and follow-ups keep running as normal."
       : status === "trial" || status === "trialing"
-        ? trialEndsAt
-          ? `Trial ends on ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
-          : "Trial is active."
+        ? isFreeTrial
+          ? trialEndsAt
+            ? `You have ${trialRequestsRemaining} of ${trialRequestLimit} live requests left. The free trial also ends on ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
+            : `You have ${trialRequestsRemaining} of ${trialRequestLimit} live requests left in the free trial.`
+          : trialEndsAt
+            ? `Your paid plan is in its Stripe trial period until ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
+            : "Trial is active."
+        : status === "paused"
+          ? pausedUntil
+            ? `Everything stays saved through ${pausedUntil.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. Resume anytime before or after that date.`
+            : "Everything stays saved while the account is paused. Resume anytime."
         : status === "past_due"
           ? "A recent payment failed. Update the billing method to keep sending without interruption."
           : status === "canceled"
-            ? "Sending is paused until you resubscribe. Historic requests and replies stay on the account."
+            ? "Billing is off, but your historic requests, replies, and business setup stay on the account."
             : "Start the plan when you're ready to send live requests and follow-ups to real customers.";
 
   return (
-    <div className="grid gap-5 min-[1180px]:grid-cols-[1.1fr_0.9fr]">
+    <>
+      <div className="grid gap-5 min-[1180px]:grid-cols-[1.1fr_0.9fr]">
       <section className="relative overflow-hidden rounded-[16px] border border-[var(--dash-border)] bg-white px-7 py-7 shadow-[var(--dash-shadow)]">
         <div className="pointer-events-none absolute right-[-38px] top-[-56px] h-[200px] w-[200px] rounded-full bg-[radial-gradient(circle,rgba(224,90,61,0.16)_0%,rgba(224,90,61,0.05)_34%,transparent_68%)]" />
         <div className="relative">
@@ -2042,15 +2251,21 @@ export function BillingSummarySection({ business }: { business: Business }) {
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-dashed border-[#D9CFB6] pt-4">
             <div>
               <p className="text-[13px] text-[var(--dash-text)]">
-                {business.stripe_customer_id
+                {hasPortalAccess
                   ? "Billing details, invoices, and payment methods live in Stripe."
-                  : hasBillingRelationship
+                  : hasPaidSubscription
                     ? "Your subscription trial is live. Stripe billing details are still syncing into the account."
-                    : "Start the plan when you’re ready to unlock live sending."}
+                    : hasSavedOffboardingState
+                      ? "Your account data is still here whenever you're ready to come back."
+                      : isFreeTrial
+                        ? "Use the free trial to send real requests first. Start the plan when you're ready to keep going."
+                        : "Start the plan when you’re ready to unlock live sending."}
               </p>
               {(status === "trial" || status === "trialing") && trialEndsAt ? (
                 <p className="mt-1 text-[12px] text-[#9B5C2E]">
-                  {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} left in the trial.
+                  {isFreeTrial
+                    ? `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in the free trial window.`
+                    : `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in the Stripe trial.`}
                 </p>
               ) : null}
               {billingSyncing && !business.stripe_customer_id ? (
@@ -2060,18 +2275,18 @@ export function BillingSummarySection({ business }: { business: Business }) {
               ) : null}
             </div>
             <div className="flex flex-wrap gap-2.5">
-              {business.stripe_customer_id ? (
+              {hasPortalAccess ? (
                 <button
                   type="button"
                   onClick={() => void handlePortal()}
                   disabled={redirecting}
                   className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}
                 >
-                  {redirecting ? "Redirecting..." : "Manage billing"}
+                  {redirecting ? "Redirecting..." : hasPaidSubscription ? "Manage billing" : "Billing history"}
                 </button>
               ) : null}
 
-              {(status === "trial" || status === "none" || status === "canceled") ? (
+              {(status === "trial" || status === "none" || status === "canceled" || status === "paused") ? (
                 <button
                   type="button"
                   onClick={() => void handleCheckout()}
@@ -2084,7 +2299,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
                       ? "Start free trial"
                       : status === "trial"
                         ? "Start plan"
-                        : "Resubscribe"}
+                        : "Resume plan"}
                 </button>
               ) : null}
 
@@ -2103,14 +2318,23 @@ export function BillingSummarySection({ business }: { business: Business }) {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[16px] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]">
+      <section
+        id="billing"
+        className="overflow-hidden rounded-[16px] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]"
+      >
         <div className="flex items-start justify-between gap-3 border-b border-[var(--dash-border)] px-5 py-5">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
               {billingAccessTitle}
             </p>
             <h3 className="mt-2 text-[18px] font-semibold tracking-tight text-[var(--dash-text)]">
-              {hasBillingRelationship ? "Handle payment details in one place" : "Billing starts in one place"}
+              {hasPaidSubscription
+                ? "Handle payment details in one place"
+                : status === "paused"
+                  ? "Everything stays saved while you're away"
+                  : status === "canceled"
+                    ? "Come back without starting from scratch"
+                    : "Billing starts when you’re ready"}
             </h3>
             <p className="mt-2 max-w-[34ch] text-[12px] leading-relaxed text-[var(--dash-muted)]">
               {billingAccessDescription}
@@ -2142,16 +2366,33 @@ export function BillingSummarySection({ business }: { business: Business }) {
             >
               {billingFooterNote}
             </p>
-            {business.stripe_customer_id ? (
+            {hasPaidSubscription ? (
+              <div className="flex flex-wrap gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowPauseDialog(true)}
+                  className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}
+                >
+                  Pause account
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCancelPlanDialog(true)}
+                  className={dashboardButtonClassName({ variant: "danger", size: "sm" })}
+                >
+                  Cancel plan
+                </button>
+              </div>
+            ) : hasPortalAccess && hasSavedOffboardingState ? (
               <button
                 type="button"
                 onClick={() => void handlePortal()}
                 disabled={redirecting}
                 className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
               >
-                {redirecting ? "Redirecting..." : "Open billing portal"}
+                {redirecting ? "Redirecting..." : "Open billing history"}
               </button>
-            ) : hasBillingRelationship ? (
+            ) : billingSyncing ? (
               <span className="rounded-full border border-[#E6DDD0] bg-white px-3 py-1.5 text-[11px] font-medium text-[var(--dash-muted)]">
                 Syncing Stripe details
               </span>
@@ -2173,7 +2414,16 @@ export function BillingSummarySection({ business }: { business: Business }) {
           ) : null}
         </div>
       </section>
-    </div>
+      </div>
+      <PauseAccountDialog
+        open={showPauseDialog}
+        onClose={() => setShowPauseDialog(false)}
+      />
+      <CancelPlanDialog
+        open={showCancelPlanDialog}
+        onClose={() => setShowCancelPlanDialog(false)}
+      />
+    </>
   );
 }
 
@@ -2243,9 +2493,9 @@ export function AccountDataSection({
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#BC4A2F]">Danger zone</p>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-[14px] font-medium text-[var(--dash-text)]">Delete account and data</p>
+            <p className="text-[14px] font-medium text-[var(--dash-text)]">Delete permanently</p>
             <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">
-              This removes the business, review links, and billing records. It cannot be undone.
+              This removes your small Talk account, business setup, review links, and customer history. If you only want to stop billing for a while, use pause or cancel above instead.
             </p>
           </div>
           <button
@@ -2253,7 +2503,7 @@ export function AccountDataSection({
             onClick={onDeleteRequested}
             className={dashboardButtonClassName({ variant: "danger", size: "sm" })}
           >
-            Delete account
+            Delete permanently
           </button>
         </div>
       </div>
@@ -2328,6 +2578,338 @@ export function AccountControlsSection({
   );
 }
 
+function OffboardingFeedbackFields({
+  action,
+  open,
+  onToggle,
+  experience,
+  onExperienceChange,
+  reason,
+  onReasonChange,
+  note,
+  onNoteChange,
+}: {
+  action: OffboardingAction;
+  open: boolean;
+  onToggle: () => void;
+  experience: OffboardingExperience;
+  onExperienceChange: (value: OffboardingExperience) => void;
+  reason: OffboardingReason;
+  onReasonChange: (value: OffboardingReason) => void;
+  note: string;
+  onNoteChange: (value: string) => void;
+}) {
+  return (
+    <div className="mt-4 rounded-[14px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-4">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between text-left"
+      >
+        <div>
+          <p className="text-[13px] font-medium text-[var(--dash-text)]">
+            Share quick feedback
+          </p>
+          <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
+            Optional. If you leave anything here, it goes straight to the founder inbox.
+          </p>
+        </div>
+        <span className="text-[12px] font-medium text-[var(--dash-muted)]">
+          {open ? "Hide" : "Optional"}
+        </span>
+      </button>
+
+      {open ? (
+        <div className="mt-4 space-y-4">
+          <div>
+            <p className="text-[12px] font-medium text-[var(--dash-text)]">
+              How has small Talk felt to use so far?
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {OFFBOARDING_EXPERIENCE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() =>
+                    onExperienceChange(experience === option.value ? "" : option.value)
+                  }
+                  className={`rounded-full border px-3 py-2 text-[12px] font-medium transition-colors ${
+                    experience === option.value
+                      ? "border-[#D2C19A] bg-[#FFF7E8] text-[var(--dash-text)]"
+                      : "border-[var(--dash-border)] bg-white text-[var(--dash-muted)] hover:bg-[#F8F4EC]"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[12px] font-medium text-[var(--dash-text)]">
+              {action === "pause"
+                ? "What led you to pause?"
+                : action === "delete"
+                  ? "What led you to leave?"
+                  : "What led you to cancel?"}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {OFFBOARDING_REASON_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onReasonChange(reason === option.value ? "" : option.value)}
+                  className={`rounded-full border px-3 py-2 text-[12px] font-medium transition-colors ${
+                    reason === option.value
+                      ? "border-[#D2C19A] bg-[#FFF7E8] text-[var(--dash-text)]"
+                      : "border-[var(--dash-border)] bg-white text-[var(--dash-muted)] hover:bg-[#F8F4EC]"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[12px] font-medium text-[var(--dash-text)]" htmlFor={`offboarding-note-${action}`}>
+              Anything else?
+            </label>
+            <textarea
+              id={`offboarding-note-${action}`}
+              value={note}
+              onChange={(event) => onNoteChange(event.target.value)}
+              placeholder="Anything you'd want me to know about the product, pricing, or what made you step away?"
+              className="mt-2 min-h-[92px] w-full rounded-[12px] border border-[var(--dash-border)] bg-white px-3 py-3 text-[13px] text-[var(--dash-text)] outline-none transition focus:border-[#D2C19A] focus:ring-2 focus:ring-[#F3E7C7]"
+            />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function PauseAccountDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [months, setMonths] = useState<1 | 2 | 3>(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [experience, setExperience] = useState<OffboardingExperience>("");
+  const [reason, setReason] = useState<OffboardingReason>("");
+  const [note, setNote] = useState("");
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 font-dashboard"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !submitting) onClose();
+      }}
+    >
+      <div role="dialog" aria-modal="true" aria-label="Pause account confirmation" className="mx-4 w-full max-w-[430px] rounded-[var(--dash-radius)] bg-white p-6 shadow-lg">
+        <h3 className="text-[16px] font-bold text-[var(--dash-text)]">Pause account</h3>
+        <p className="mt-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+          This stops review requests and reminders for a set time while keeping your business setup, review links, and history saved.
+        </p>
+        <div className="mt-4 grid grid-cols-3 gap-2.5">
+          {[1, 2, 3].map((value) => (
+            <button
+              key={value}
+              type="button"
+              disabled={submitting}
+              onClick={() => setMonths(value as 1 | 2 | 3)}
+              className={`rounded-[12px] border px-3 py-3 text-[13px] font-medium transition-colors ${
+                months === value
+                  ? "border-[#D2C19A] bg-[#FFF7E8] text-[var(--dash-text)]"
+                  : "border-[var(--dash-border)] bg-white text-[var(--dash-muted)] hover:bg-[#FCFAF6]"
+              }`}
+            >
+              {value} month{value === 1 ? "" : "s"}
+            </button>
+          ))}
+        </div>
+        <p className="mt-3 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+          Billing stops now, your data stays saved, and you can resume anytime with the same login.
+        </p>
+        <OffboardingFeedbackFields
+          action="pause"
+          open={showFeedback}
+          onToggle={() => setShowFeedback((current) => !current)}
+          experience={experience}
+          onExperienceChange={setExperience}
+          reason={reason}
+          onReasonChange={setReason}
+          note={note}
+          onNoteChange={setNote}
+        />
+        {error ? (
+          <p className="mt-3 text-[12px] leading-relaxed text-[#A6452E]">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-5 flex gap-3">
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={onClose}
+            className={`flex-1 ${dashboardButtonClassName()}`}
+          >
+            Keep active
+          </button>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={async () => {
+              setSubmitting(true);
+              setError("");
+
+              try {
+                const res = await fetchWithAuth("/api/account/pause", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ months }),
+                });
+                const body = (await res.json().catch(() => ({}))) as { error?: string };
+
+                if (!res.ok) {
+                  throw new Error(body.error || "We couldn't pause the account right now.");
+                }
+
+                await submitOptionalOffboardingFeedback({
+                  action: "pause",
+                  experience,
+                  reason,
+                  note,
+                  pauseMonths: months,
+                });
+                window.location.reload();
+              } catch (err) {
+                const message =
+                  err instanceof Error
+                    ? err.message
+                    : "We couldn't pause the account right now.";
+
+                setError(message);
+                setSubmitting(false);
+              }
+            }}
+            className={`flex-1 ${dashboardButtonClassName({ variant: "secondary" })}`}
+          >
+            {submitting ? "Pausing..." : "Pause account"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function CancelPlanDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [experience, setExperience] = useState<OffboardingExperience>("");
+  const [reason, setReason] = useState<OffboardingReason>("");
+  const [note, setNote] = useState("");
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 font-dashboard"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !submitting) onClose();
+      }}
+    >
+      <div role="dialog" aria-modal="true" aria-label="Cancel plan confirmation" className="mx-4 w-full max-w-[430px] rounded-[var(--dash-radius)] bg-white p-6 shadow-lg">
+        <h3 className="text-[16px] font-bold text-[var(--dash-text)]">Cancel plan, keep data</h3>
+        <p className="mt-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+          Billing stops and no new sends will go out, but your business setup, review links, and history stay saved if you come back later.
+        </p>
+        <p className="mt-3 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+          If you return, you can sign in and start the plan again without redoing the full business setup.
+        </p>
+        <OffboardingFeedbackFields
+          action="cancel"
+          open={showFeedback}
+          onToggle={() => setShowFeedback((current) => !current)}
+          experience={experience}
+          onExperienceChange={setExperience}
+          reason={reason}
+          onReasonChange={setReason}
+          note={note}
+          onNoteChange={setNote}
+        />
+        {error ? (
+          <p className="mt-3 text-[12px] leading-relaxed text-[#A6452E]">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-5 flex gap-3">
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={onClose}
+            className={`flex-1 ${dashboardButtonClassName()}`}
+          >
+            Keep plan
+          </button>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={async () => {
+              setSubmitting(true);
+              setError("");
+
+              try {
+                const res = await fetchWithAuth("/api/account/cancel-plan", {
+                  method: "POST",
+                });
+                const body = (await res.json().catch(() => ({}))) as { error?: string };
+
+                if (!res.ok) {
+                  throw new Error(body.error || "We couldn't cancel the plan right now.");
+                }
+
+                await submitOptionalOffboardingFeedback({
+                  action: "cancel",
+                  experience,
+                  reason,
+                  note,
+                });
+                window.location.reload();
+              } catch (err) {
+                const message =
+                  err instanceof Error
+                    ? err.message
+                    : "We couldn't cancel the plan right now.";
+
+                setError(message);
+                setSubmitting(false);
+              }
+            }}
+            className={`flex-1 ${dashboardButtonClassName({ variant: "danger" })}`}
+          >
+            {submitting ? "Canceling..." : "Cancel plan"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DeleteAccountDialog({
   open,
   onClose,
@@ -2336,6 +2918,13 @@ export function DeleteAccountDialog({
   onClose: () => void;
 }) {
   const { toast } = useToast();
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [experience, setExperience] = useState<OffboardingExperience>("");
+  const [reason, setReason] = useState<OffboardingReason>("");
+  const [note, setNote] = useState("");
 
   if (!open) return null;
 
@@ -2349,11 +2938,28 @@ export function DeleteAccountDialog({
       <div role="dialog" aria-modal="true" aria-label="Delete account confirmation" className="mx-4 w-full max-w-[400px] rounded-[var(--dash-radius)] bg-white p-6 shadow-lg">
         <h3 className="text-[16px] font-bold text-[var(--dash-text)]">Delete your account?</h3>
         <p className="mt-2 text-[13px] text-[var(--dash-muted)]">
-          This will permanently delete your business, all review links, and cancel your subscription. This action cannot be undone.
+          This permanently deletes your business, review links, customer history, and login. If you come back later, you'll need to set up the business again from scratch. This action cannot be undone.
         </p>
+        <OffboardingFeedbackFields
+          action="delete"
+          open={showFeedback}
+          onToggle={() => setShowFeedback((current) => !current)}
+          experience={experience}
+          onExperienceChange={setExperience}
+          reason={reason}
+          onReasonChange={setReason}
+          note={note}
+          onNoteChange={setNote}
+        />
+        {error ? (
+          <p className="mt-3 text-[12px] leading-relaxed text-[#A6452E]">
+            {error}
+          </p>
+        ) : null}
         <div className="mt-5 flex gap-3">
           <button
             type="button"
+            disabled={deleting}
             onClick={onClose}
             className={`flex-1 ${dashboardButtonClassName()}`}
           >
@@ -2361,13 +2967,43 @@ export function DeleteAccountDialog({
           </button>
           <button
             type="button"
-            onClick={() => {
-              onClose();
-              toast("Your account deletion has been requested. We'll process this within 48 hours and email you a confirmation.", "info");
+            disabled={deleting}
+            onClick={async () => {
+              setDeleting(true);
+              setError("");
+
+              try {
+                await submitOptionalOffboardingFeedback({
+                  action: "delete",
+                  experience,
+                  reason,
+                  note,
+                });
+
+                const res = await fetchWithAuth("/api/account/delete", { method: "POST" });
+                const body = (await res.json().catch(() => ({}))) as { error?: string };
+
+                if (!res.ok) {
+                  throw new Error(body.error || "We couldn't delete the account right now.");
+                }
+
+                await supabase.auth.signOut();
+                toast("Account deleted.", "success");
+                onClose();
+                router.replace("/signup");
+              } catch (err) {
+                const message =
+                  err instanceof Error
+                    ? err.message
+                    : "We couldn't delete the account right now.";
+
+                setError(message);
+                setDeleting(false);
+              }
             }}
             className={`flex-1 ${dashboardButtonClassName({ variant: "danger" })}`}
           >
-            Delete account
+            {deleting ? "Deleting..." : "Delete account"}
           </button>
         </div>
       </div>

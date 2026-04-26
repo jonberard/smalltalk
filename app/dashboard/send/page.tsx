@@ -158,13 +158,14 @@ export default function SendPage() {
 
           {effectiveTier === "expired" ? (
             <div className="rounded-[20px] border border-[var(--dash-border)] bg-white p-6 shadow-[var(--dash-shadow)]">
-              <Paywall
-                hadTrial={
-                  business.subscription_status === "trial" ||
-                  business.subscription_status === "trialing" ||
-                  business.subscription_status === "canceled"
-                }
-              />
+                <Paywall
+                  hadTrial={
+                    business.subscription_status === "trial" ||
+                    business.subscription_status === "trialing" ||
+                    business.subscription_status === "paused" ||
+                    business.subscription_status === "canceled"
+                  }
+                />
             </div>
           ) : (
             <>

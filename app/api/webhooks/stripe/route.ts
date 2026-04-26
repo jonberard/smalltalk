@@ -20,6 +20,39 @@ async function updateByCustomerId(customerId: string, fields: Record<string, unk
   }
 }
 
+async function handleEndedSubscription(customerId: string) {
+  const { data: business, error: businessError } = await supabaseAdmin
+    .from("businesses")
+    .select("id, paused_until")
+    .eq("stripe_customer_id", customerId)
+    .maybeSingle();
+
+  if (businessError) {
+    throw new Error(`Failed to load business for ended subscription ${customerId}: ${businessError.message}`);
+  }
+
+  if (!business) {
+    throw new Error(`No business found for Stripe customer ${customerId}`);
+  }
+
+  const isPaused =
+    Boolean(business.paused_until) &&
+    new Date(business.paused_until).getTime() > Date.now();
+
+  const { error: updateError } = await supabaseAdmin
+    .from("businesses")
+    .update({
+      subscription_status: isPaused ? "paused" : "canceled",
+      stripe_subscription_id: null,
+      paused_until: isPaused ? business.paused_until : null,
+    })
+    .eq("id", business.id);
+
+  if (updateError) {
+    throw new Error(`Failed to update ended subscription state for ${customerId}: ${updateError.message}`);
+  }
+}
+
 async function acquireWebhookEvent(event: Stripe.Event) {
   const { error } = await supabaseAdmin.from("processed_webhook_events").insert({
     event_id: event.id,
@@ -136,12 +169,13 @@ export async function POST(req: NextRequest) {
           subscriptionStatus = mapSubscriptionStatus(subscription.status);
         }
 
-        const updateFields: Record<string, string> = {
+        const updateFields: Record<string, string | null> = {
           subscription_status: subscriptionStatus,
         };
 
         if (customerId) updateFields.stripe_customer_id = customerId;
         if (subscriptionId) updateFields.stripe_subscription_id = subscriptionId;
+        updateFields.paused_until = null;
 
         const { data, error } = await supabaseAdmin
           .from("businesses")
@@ -168,6 +202,7 @@ export async function POST(req: NextRequest) {
         await updateByCustomerId(customerId, {
           stripe_subscription_id: sub.id,
           subscription_status: status,
+          paused_until: null,
         });
         break;
       }
@@ -180,6 +215,7 @@ export async function POST(req: NextRequest) {
         await updateByCustomerId(customerId, {
           stripe_subscription_id: sub.id,
           subscription_status: status,
+          paused_until: null,
         });
         break;
       }
@@ -188,7 +224,7 @@ export async function POST(req: NextRequest) {
         const sub = event.data.object as Stripe.Subscription;
         const customerId = sub.customer as string;
 
-        await updateByCustomerId(customerId, { subscription_status: "canceled" });
+        await handleEndedSubscription(customerId);
         break;
       }
 
@@ -205,7 +241,10 @@ export async function POST(req: NextRequest) {
         const customerId = sub.customer as string;
         const status = mapSubscriptionStatus(sub.status);
 
-        await updateByCustomerId(customerId, { subscription_status: status });
+        await updateByCustomerId(customerId, {
+          subscription_status: status,
+          paused_until: null,
+        });
         break;
       }
 
@@ -229,7 +268,10 @@ export async function POST(req: NextRequest) {
         }
 
         if (biz && (biz.subscription_status === "past_due" || biz.subscription_status === "active")) {
-          await updateByCustomerId(customerId, { subscription_status: "active" });
+          await updateByCustomerId(customerId, {
+            subscription_status: "active",
+            paused_until: null,
+          });
         }
         break;
       }

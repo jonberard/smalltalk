@@ -85,6 +85,7 @@ export default function SendJobsPage() {
               hadTrial={
                 business.subscription_status === "trial" ||
                 business.subscription_status === "trialing" ||
+                business.subscription_status === "paused" ||
                 business.subscription_status === "canceled"
               }
             />

@@ -16,6 +16,7 @@ export type Business = {
   subscription_status: string;
   trial_requests_remaining: number;
   trial_ends_at: string | null;
+  paused_until: string | null;
   api_key: string | null;
   api_key_hash: string | null;
   api_key_last_four: string | null;
@@ -49,6 +50,7 @@ export type BusinessInsert = {
   subscription_status?: string;
   trial_requests_remaining?: number;
   trial_ends_at?: string | null;
+  paused_until?: string | null;
   api_key?: string | null;
   api_key_hash?: string | null;
   api_key_last_four?: string | null;

@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
   // Fetch current business record
   const { data: business, error: bizError } = await supabaseAdmin
     .from("businesses")
-    .select("id, stripe_customer_id, stripe_subscription_id, subscription_status")
+    .select("id, stripe_customer_id, stripe_subscription_id, subscription_status, paused_until")
     .eq("id", user.id)
     .single();
 
@@ -138,6 +138,7 @@ export async function POST(req: NextRequest) {
   let customerId = business.stripe_customer_id as string | null;
   let subscriptionId = business.stripe_subscription_id as string | null;
   let status = business.subscription_status as string;
+  const pausedUntil = business.paused_until as string | null;
 
   // Path A: We already have a stripe_customer_id — look up subscription directly
   if (customerId) {
@@ -196,9 +197,19 @@ export async function POST(req: NextRequest) {
   }
 
   // Update the business record
-  const updateFields: Record<string, string> = { subscription_status: status };
+  const isPausedWindowActive =
+    pausedUntil !== null && new Date(pausedUntil).getTime() > Date.now();
+
+  if (status === "canceled" && isPausedWindowActive) {
+    status = "paused";
+  }
+
+  const updateFields: Record<string, string | null> = { subscription_status: status };
   if (customerId) updateFields.stripe_customer_id = customerId;
   if (subscriptionId) updateFields.stripe_subscription_id = subscriptionId;
+  if (["active", "trialing", "past_due", "incomplete"].includes(status)) {
+    updateFields.paused_until = null;
+  }
 
   const { error: updateError } = await supabaseAdmin
     .from("businesses")

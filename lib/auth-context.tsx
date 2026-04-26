@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function fetchBusiness(userId: string, hasRetriedRecovery = false) {
     const { data, error } = await supabase
       .from("businesses")
-      .select("id, name, owner_email, logo_url, google_review_url, google_place_id, business_city, neighborhoods, subscription_status, trial_requests_remaining, trial_ends_at, reply_voice_id, custom_reply_voice, review_request_sms_template, review_request_email_subject_template, review_request_email_intro_template, connected_crms, created_at, stripe_customer_id, stripe_subscription_id, onboarding_completed, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone, batch_initial_sms_enabled, batch_initial_sms_hour")
+      .select("id, name, owner_email, logo_url, google_review_url, google_place_id, business_city, neighborhoods, subscription_status, trial_requests_remaining, trial_ends_at, paused_until, reply_voice_id, custom_reply_voice, review_request_sms_template, review_request_email_subject_template, review_request_email_intro_template, connected_crms, created_at, stripe_customer_id, stripe_subscription_id, onboarding_completed, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone, batch_initial_sms_enabled, batch_initial_sms_hour")
       .eq("id", userId)
       .single();
 

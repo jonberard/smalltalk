@@ -1,4 +1,4 @@
-type DashboardButtonVariant = "primary" | "secondary" | "accent" | "danger";
+type DashboardButtonVariant = "primary" | "secondary" | "accent" | "success" | "danger";
 type DashboardButtonSize = "sm" | "md" | "lg";
 
 export function dashboardButtonClassName({
@@ -25,6 +25,8 @@ export function dashboardButtonClassName({
       ? "border-[#D9593B] bg-[#E05A3D] text-white shadow-[0_2px_0_rgba(201,78,50,0.18),0_10px_18px_rgba(224,90,61,0.10)] hover:-translate-y-[1px] hover:border-[#C94E32] hover:bg-[#D65438] hover:shadow-[0_3px_0_rgba(201,78,50,0.2),0_12px_22px_rgba(224,90,61,0.12)]"
       : variant === "accent"
         ? "border-[#F0C7B7] bg-[#FFF4ED] text-[#BC4A2F] shadow-[0_1px_0_rgba(240,199,183,0.85),0_6px_14px_rgba(26,29,32,0.04)] hover:-translate-y-[1px] hover:border-[#E3B19D] hover:bg-[#FFEBDD] hover:shadow-[0_1px_0_rgba(240,199,183,0.85),0_8px_16px_rgba(26,29,32,0.05)]"
+        : variant === "success"
+          ? "border-[#365347] bg-[#446457] text-white shadow-[0_2px_0_rgba(43,69,56,0.2),0_10px_18px_rgba(54,83,71,0.12)] hover:-translate-y-[1px] hover:border-[#2D473B] hover:bg-[#365347] hover:shadow-[0_3px_0_rgba(43,69,56,0.22),0_12px_22px_rgba(54,83,71,0.14)]"
         : variant === "danger"
           ? "border-[#D93636] bg-[#D93636] text-white shadow-[0_2px_0_rgba(198,40,40,0.18),0_10px_18px_rgba(217,54,54,0.10)] hover:-translate-y-[1px] hover:border-[#C62828] hover:bg-[#C62828] hover:shadow-[0_3px_0_rgba(198,40,40,0.2),0_12px_22px_rgba(217,54,54,0.12)]"
           : "border-[#DDD2C3] bg-white text-[var(--dash-text)] shadow-[0_1px_0_rgba(221,210,195,0.9),0_6px_14px_rgba(26,29,32,0.04)] hover:-translate-y-[1px] hover:border-[#CFC1AF] hover:bg-[#FBF7F1] hover:shadow-[0_1px_0_rgba(221,210,195,0.9),0_8px_16px_rgba(26,29,32,0.05)]";

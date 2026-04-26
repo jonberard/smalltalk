@@ -67,6 +67,8 @@ export default function SignupPage() {
           id: userId,
           name: businessName,
           owner_email: email,
+          // Google connection happens during onboarding, so start blank.
+          google_review_url: "",
           subscription_status: "trial",
           trial_ends_at: trialEndsAt,
           trial_requests_remaining: 10,

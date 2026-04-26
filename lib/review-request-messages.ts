@@ -197,7 +197,7 @@ export function buildReviewRequestEmailPreview({
     "{{business_name}} would love your feedback";
   const introTemplate =
     normalizeTemplate(emailIntroTemplate) ??
-    "{{business_name}} would love your feedback. Tap the button below to share your experience - takes 30 seconds.";
+    "{{business_name}} would love your feedback. Tap the button below to answer a few quick questions - no writing required, takes about 30 seconds.";
 
   return {
     subject: renderReviewRequestTemplate(subjectTemplate, context),

@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { getAppBaseUrl } from "@/lib/app-url";
 import { captureServerException } from "@/lib/server-error-reporting";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(req: NextRequest) {
   const { STRIPE_SECRET_KEY } = process.env;
@@ -23,11 +24,19 @@ export async function POST(req: NextRequest) {
   }
 
   // Derive stripe_customer_id from the authenticated user's business record
-  const { data: business } = await supabase
+  const { data: business, error: businessError } = await supabaseAdmin
     .from("businesses")
     .select("stripe_customer_id")
     .eq("id", user.id)
     .single();
+
+  if (businessError) {
+    captureServerException(new Error(businessError.message), {
+      route: "/api/billing-portal",
+      tags: { business_id: user.id },
+    });
+    return NextResponse.json({ error: "Failed to load billing state" }, { status: 500 });
+  }
 
   const stripe_customer_id = business?.stripe_customer_id;
   if (!stripe_customer_id) {

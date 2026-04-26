@@ -37,6 +37,7 @@ type ReviewLinkContext = {
   created_at: string;
   businesses: {
     name: string;
+    subscription_status: string;
     reminder_sequence_enabled: boolean | null;
     quiet_hours_start: number | null;
     quiet_hours_end: number | null;
@@ -63,7 +64,7 @@ async function loadReviewLinkContext(reviewLinkId: string) {
   const { data } = await supabaseAdmin
     .from("review_links")
     .select(
-      "id, business_id, customer_name, unique_code, is_generic, reminder_sequence_enabled, sequence_completed, initial_sent_at, created_at, businesses(name, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone)",
+      "id, business_id, customer_name, unique_code, is_generic, reminder_sequence_enabled, sequence_completed, initial_sent_at, created_at, businesses(name, subscription_status, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone)",
     )
     .eq("id", reviewLinkId)
     .maybeSingle();
@@ -97,6 +98,14 @@ async function evaluateDelivery(delivery: DeliveryRow) {
 
   if (!reviewLink || !reviewLink.businesses) {
     return { action: "skip" as const, reason: "missing_link" };
+  }
+
+  if (
+    !["active", "trial", "trialing"].includes(
+      reviewLink.businesses.subscription_status,
+    )
+  ) {
+    return { action: "skip" as const, reason: "inactive_plan" };
   }
 
   if (delivery.kind !== "initial" && reviewLink.sequence_completed) {

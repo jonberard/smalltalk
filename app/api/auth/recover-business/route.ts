@@ -124,6 +124,8 @@ export async function POST(req: NextRequest) {
         id: user.id,
         name: deriveBusinessName(user.email, user.user_metadata),
         owner_email: user.email ?? null,
+        // Google connection happens during onboarding, so start blank.
+        google_review_url: "",
         subscription_status: "trial",
         trial_ends_at: trialEndsAt,
         trial_requests_remaining: 10,
