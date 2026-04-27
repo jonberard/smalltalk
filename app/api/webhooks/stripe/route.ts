@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { captureServerException } from "@/lib/server-error-reporting";
-import { mapSubscriptionStatus } from "@/lib/stripe-utils";
+import { getSubscriptionCurrentPeriodEnd, mapSubscriptionStatus } from "@/lib/stripe-utils";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 async function updateByCustomerId(customerId: string, fields: Record<string, unknown>) {
@@ -45,6 +45,7 @@ async function handleEndedSubscription(customerId: string) {
       subscription_status: isPaused ? "paused" : "canceled",
       stripe_subscription_id: null,
       paused_until: isPaused ? business.paused_until : null,
+      cancel_scheduled_for: null,
     })
     .eq("id", business.id);
 
@@ -164,13 +165,20 @@ export async function POST(req: NextRequest) {
         }
 
         let subscriptionStatus = "active";
+        let cancelScheduledFor: string | null = null;
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
           subscriptionStatus = mapSubscriptionStatus(subscription.status);
+          const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(subscription);
+          cancelScheduledFor = subscription.cancel_at_period_end
+            && currentPeriodEnd
+            ? new Date(currentPeriodEnd * 1000).toISOString()
+            : null;
         }
 
         const updateFields: Record<string, string | null> = {
           subscription_status: subscriptionStatus,
+          cancel_scheduled_for: cancelScheduledFor,
         };
 
         if (customerId) updateFields.stripe_customer_id = customerId;
@@ -203,6 +211,14 @@ export async function POST(req: NextRequest) {
           stripe_subscription_id: sub.id,
           subscription_status: status,
           paused_until: null,
+          cancel_scheduled_for: sub.cancel_at_period_end
+            ? (() => {
+                const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(sub);
+                return currentPeriodEnd
+                  ? new Date(currentPeriodEnd * 1000).toISOString()
+                  : null;
+              })()
+            : null,
         });
         break;
       }
@@ -216,6 +232,14 @@ export async function POST(req: NextRequest) {
           stripe_subscription_id: sub.id,
           subscription_status: status,
           paused_until: null,
+          cancel_scheduled_for: sub.cancel_at_period_end
+            ? (() => {
+                const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(sub);
+                return currentPeriodEnd
+                  ? new Date(currentPeriodEnd * 1000).toISOString()
+                  : null;
+              })()
+            : null,
         });
         break;
       }
@@ -232,7 +256,10 @@ export async function POST(req: NextRequest) {
         const sub = event.data.object as Stripe.Subscription;
         const customerId = sub.customer as string;
 
-        await updateByCustomerId(customerId, { subscription_status: "paused" });
+        await updateByCustomerId(customerId, {
+          subscription_status: "paused",
+          cancel_scheduled_for: null,
+        });
         break;
       }
 
@@ -244,6 +271,14 @@ export async function POST(req: NextRequest) {
         await updateByCustomerId(customerId, {
           subscription_status: status,
           paused_until: null,
+          cancel_scheduled_for: sub.cancel_at_period_end
+            ? (() => {
+                const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(sub);
+                return currentPeriodEnd
+                  ? new Date(currentPeriodEnd * 1000).toISOString()
+                  : null;
+              })()
+            : null,
         });
         break;
       }
@@ -267,10 +302,11 @@ export async function POST(req: NextRequest) {
           throw new Error(`Failed to load business for invoice.paid ${customerId}: ${error.message}`);
         }
 
-        if (biz && (biz.subscription_status === "past_due" || biz.subscription_status === "active")) {
+        if (biz?.subscription_status === "past_due") {
           await updateByCustomerId(customerId, {
             subscription_status: "active",
             paused_until: null,
+            cancel_scheduled_for: null,
           });
         }
         break;

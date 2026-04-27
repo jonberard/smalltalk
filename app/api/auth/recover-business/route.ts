@@ -30,20 +30,6 @@ function deriveBusinessName(email: string | null | undefined, metadata: unknown)
 }
 
 async function seedDefaultTopicsIfMissing(businessId: string) {
-  const { data: existingTopics, error: existingTopicsError } = await supabaseAdmin
-    .from("topics")
-    .select("id")
-    .eq("business_id", businessId)
-    .limit(1);
-
-  if (existingTopicsError) {
-    return { success: false, error: existingTopicsError.message };
-  }
-
-  if ((existingTopics ?? []).length > 0) {
-    return { success: true };
-  }
-
   const { data: defaultTopics, error: defaultTopicsError } = await supabaseAdmin
     .from("topics")
     .select("label, tier, follow_up_question, follow_up_options, sort_order")
@@ -68,7 +54,10 @@ async function seedDefaultTopicsIfMissing(businessId: string) {
 
   const { error: insertTopicsError } = await supabaseAdmin
     .from("topics")
-    .insert(seededTopics);
+    .upsert(seededTopics, {
+      onConflict: "business_id,label,tier",
+      ignoreDuplicates: true,
+    });
 
   if (insertTopicsError) {
     return { success: false, error: insertTopicsError.message };
@@ -120,7 +109,7 @@ export async function POST(req: NextRequest) {
 
     const { error: insertBusinessError } = await supabaseAdmin
       .from("businesses")
-      .insert({
+      .upsert({
         id: user.id,
         name: deriveBusinessName(user.email, user.user_metadata),
         owner_email: user.email ?? null,
@@ -130,6 +119,9 @@ export async function POST(req: NextRequest) {
         trial_ends_at: trialEndsAt,
         trial_requests_remaining: 10,
         onboarding_completed: false,
+      }, {
+        onConflict: "id",
+        ignoreDuplicates: true,
       });
 
     if (insertBusinessError) {

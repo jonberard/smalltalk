@@ -1,20 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import {
   AccountDataSection,
   AccountControlsSection,
   BillingSummarySection,
-  DeleteAccountDialog,
 } from "@/components/dashboard/setup-sections";
 import { SetupPageShell } from "@/components/dashboard/setup-shell";
 import { dashboardButtonClassName } from "@/components/dashboard/button";
 
 export default function AccountSetupPage() {
   const { business, session, signOut } = useAuth();
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   if (!business) return null;
 
@@ -43,18 +40,10 @@ export default function AccountSetupPage() {
             />
           </section>
           <section className="scroll-mt-24">
-            <AccountDataSection
-              business={business}
-              onDeleteRequested={() => setShowDeleteConfirm(true)}
-            />
+            <AccountDataSection business={business} />
           </section>
         </div>
       </div>
-
-      <DeleteAccountDialog
-        open={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-      />
     </SetupPageShell>
   );
 }

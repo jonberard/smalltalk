@@ -3,7 +3,8 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { captureServerException } from "@/lib/server-error-reporting";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { cancelStripeBilling } from "@/lib/stripe-billing";
+import { scheduleStripeBillingCancellation } from "@/lib/stripe-billing";
+import { getSubscriptionCurrentPeriodEnd, mapSubscriptionStatus } from "@/lib/stripe-utils";
 
 async function getAuthenticatedUser(req: NextRequest) {
   const authHeader = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -47,30 +48,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
     }
 
-    if (business.stripe_customer_id || business.stripe_subscription_id) {
-      const { STRIPE_SECRET_KEY } = process.env;
+    const { STRIPE_SECRET_KEY } = process.env;
 
-      if (!STRIPE_SECRET_KEY) {
-        return NextResponse.json(
-          { error: "Stripe is not configured for account changes." },
-          { status: 503 },
-        );
-      }
-
-      const stripe = new Stripe(STRIPE_SECRET_KEY);
-      await cancelStripeBilling(
-        stripe,
-        business.stripe_customer_id ?? null,
-        business.stripe_subscription_id ?? null,
+    if (!STRIPE_SECRET_KEY) {
+      return NextResponse.json(
+        { error: "Stripe is not configured for account changes." },
+        { status: 503 },
       );
     }
+
+    const stripe = new Stripe(STRIPE_SECRET_KEY);
+    const scheduledSubscription = await scheduleStripeBillingCancellation(
+      stripe,
+      business.stripe_customer_id ?? null,
+      business.stripe_subscription_id ?? null,
+    );
+
+    if (!scheduledSubscription) {
+      return NextResponse.json(
+        { error: "No paid subscription was found to cancel." },
+        { status: 400 },
+      );
+    }
+
+    const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(scheduledSubscription);
+
+    if (!currentPeriodEnd) {
+      return NextResponse.json(
+        { error: "Stripe did not return a subscription end date." },
+        { status: 500 },
+      );
+    }
+
+    const cancelScheduledFor = new Date(currentPeriodEnd * 1000).toISOString();
+    const subscriptionStatus = mapSubscriptionStatus(scheduledSubscription.status);
 
     const { error: updateError } = await supabaseAdmin
       .from("businesses")
       .update({
-        subscription_status: "canceled",
+        subscription_status: subscriptionStatus,
         paused_until: null,
-        stripe_subscription_id: null,
+        stripe_subscription_id: scheduledSubscription.id,
+        cancel_scheduled_for: cancelScheduledFor,
       })
       .eq("id", user.id);
 
@@ -78,19 +97,10 @@ export async function POST(req: NextRequest) {
       throw new Error(updateError.message);
     }
 
-    await supabaseAdmin
-      .from("review_message_deliveries")
-      .update({
-        status: "skipped",
-        skipped_reason: "plan_canceled",
-        claimed_at: null,
-      })
-      .eq("business_id", user.id)
-      .eq("status", "pending");
-
     return NextResponse.json({
       success: true,
-      status: "canceled",
+      status: subscriptionStatus,
+      cancel_scheduled_for: cancelScheduledFor,
     });
   } catch (error) {
     captureServerException(error, {

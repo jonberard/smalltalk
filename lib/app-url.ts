@@ -10,3 +10,8 @@ export function getAppBaseUrl() {
 
   return value.replace(/\/+$/, "");
 }
+
+export function getRequestAwareAppBaseUrl(origin?: string | null) {
+  const normalizedOrigin = origin?.trim().replace(/\/+$/, "");
+  return normalizedOrigin || getAppBaseUrl();
+}

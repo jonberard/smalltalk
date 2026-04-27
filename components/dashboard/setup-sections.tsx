@@ -1900,6 +1900,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
   const [billingSyncing, setBillingSyncing] = useState(false);
   const [showPauseDialog, setShowPauseDialog] = useState(false);
   const [showCancelPlanDialog, setShowCancelPlanDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const hasAttemptedBillingSync = useRef(false);
 
   useEffect(() => {
@@ -1936,11 +1937,18 @@ export function BillingSummarySection({ business }: { business: Business }) {
 
   const status = business.subscription_status ?? "none";
   const pausedUntil = business.paused_until ? new Date(business.paused_until) : null;
+  const cancelScheduledFor = business.cancel_scheduled_for
+    ? new Date(business.cancel_scheduled_for)
+    : null;
   const hasPaidSubscription =
     status === "trialing" ||
     status === "active" ||
     status === "past_due" ||
     status === "incomplete";
+  const isCancellationScheduled =
+    hasPaidSubscription &&
+    Boolean(cancelScheduledFor) &&
+    cancelScheduledFor!.getTime() > Date.now();
   const hasPortalAccess = Boolean(business.stripe_customer_id);
   const hasSavedOffboardingState = status === "paused" || status === "canceled";
 
@@ -2034,12 +2042,12 @@ export function BillingSummarySection({ business }: { business: Business }) {
     year: "numeric",
   }).format(new Date(business.created_at));
   const badgeLabel =
-    status === "active"
+    isCancellationScheduled && cancelScheduledFor
+      ? `Ends ${cancelScheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      : status === "active"
       ? "Active"
       : status === "trialing"
-        ? trialEndsAt
-          ? `Trial ends ${trialEndsAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-          : "Trial active"
+        ? "Subscribed"
         : status === "paused"
           ? pausedUntil
             ? `Paused until ${pausedUntil.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
@@ -2054,9 +2062,11 @@ export function BillingSummarySection({ business }: { business: Business }) {
             ? "Canceled"
             : "Not subscribed";
   const badgeToneClassName =
-    status === "active"
+    isCancellationScheduled
+      ? "bg-[#FBE3DA] text-[#A6452E]"
+      : status === "active" || status === "trialing"
       ? "bg-[#DDE5DF] text-[#365347]"
-      : status === "trial" || status === "trialing"
+      : status === "trial"
         ? "bg-[#F3E7C7] text-[#8A651F]"
         : status === "past_due" || status === "canceled"
           ? "bg-[#FBE3DA] text-[#A6452E]"
@@ -2100,10 +2110,19 @@ export function BillingSummarySection({ business }: { business: Business }) {
         {
           title: "Plan changes",
           detail:
-            status === "trialing"
-              ? "Your Pro plan is in its trial period. Card details and future invoices live in Stripe."
+            isCancellationScheduled && cancelScheduledFor
+              ? `Your subscription stays active until ${cancelScheduledFor.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. It will cancel automatically after that.`
+              : status === "trialing"
+              ? trialEndsAt
+                ? `You're subscribed. Your included free trial runs through ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
+                : "You're subscribed. Card details and invoices live in Stripe."
               : "Change plans or review subscription details in Stripe.",
-          value: status === "trialing" ? "Trial active" : "Manage",
+          value:
+            isCancellationScheduled && cancelScheduledFor
+              ? `Ends ${cancelScheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+              : status === "trialing"
+                ? "Subscribed"
+                : "Manage",
         },
       ]
     : status === "paused"
@@ -2156,9 +2175,9 @@ export function BillingSummarySection({ business }: { business: Business }) {
             status === "trial" || status === "trialing"
               ? isFreeTrial
                 ? `${trialRequestsRemaining} of ${trialRequestLimit} live requests left. The free trial also ends in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}.`
-                : `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in the Stripe trial.`
+                : `You're subscribed. Your included trial ends in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}.`
               : "No paid billing activity yet.",
-          value: status === "trialing" ? "Trial active" : status === "trial" ? "Trial" : "Not started",
+          value: status === "trialing" ? "Subscribed" : status === "trial" ? "Trial" : "Not started",
         },
         {
           title: "Team members",
@@ -2175,23 +2194,27 @@ export function BillingSummarySection({ business }: { business: Business }) {
           ? "Plan canceled"
           : "Billing setup";
   const billingAccessDescription = hasPaidSubscription
-    ? "The billing portal handles invoices, cards, and plan changes in one place."
+    ? isCancellationScheduled && cancelScheduledFor
+      ? `Your subscription stays active until ${cancelScheduledFor.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. Billing will not renew after that.`
+      : "The billing portal handles invoices, cards, and plan changes in one place."
     : status === "paused"
       ? "Your data is saved and sending is paused while you step away."
       : status === "canceled"
         ? "Billing has stopped, but the account and its history stay saved."
     : "Stripe opens when you're ready to start the plan and save billing details.";
   const billingFooterNote =
-    status === "active"
+    isCancellationScheduled && cancelScheduledFor
+      ? `Your subscription stays active until ${cancelScheduledFor.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. It will cancel automatically after that.`
+      : status === "active"
       ? "Your plan is active. Review requests and follow-ups keep running as normal."
-      : status === "trial" || status === "trialing"
+        : status === "trial" || status === "trialing"
         ? isFreeTrial
           ? trialEndsAt
             ? `You have ${trialRequestsRemaining} of ${trialRequestLimit} live requests left. The free trial also ends on ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
             : `You have ${trialRequestsRemaining} of ${trialRequestLimit} live requests left in the free trial.`
           : trialEndsAt
-            ? `Your paid plan is in its Stripe trial period until ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
-            : "Trial is active."
+            ? `You're subscribed. Your included free trial runs until ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
+            : "You're subscribed and billing details are saved in Stripe."
         : status === "paused"
           ? pausedUntil
             ? `Everything stays saved through ${pausedUntil.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. Resume anytime before or after that date.`
@@ -2265,7 +2288,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
                 <p className="mt-1 text-[12px] text-[#9B5C2E]">
                   {isFreeTrial
                     ? `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in the free trial window.`
-                    : `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in the Stripe trial.`}
+                    : `First billing date is ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`}
                 </p>
               ) : null}
               {billingSyncing && !business.stripe_customer_id ? (
@@ -2282,35 +2305,13 @@ export function BillingSummarySection({ business }: { business: Business }) {
                   disabled={redirecting}
                   className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}
                 >
-                  {redirecting ? "Redirecting..." : hasPaidSubscription ? "Manage billing" : "Billing history"}
-                </button>
-              ) : null}
-
-              {(status === "trial" || status === "none" || status === "canceled" || status === "paused") ? (
-                <button
-                  type="button"
-                  onClick={() => void handleCheckout()}
-                  disabled={redirecting}
-                  className={dashboardButtonClassName({ variant: "primary", size: "sm" })}
-                >
                   {redirecting
                     ? "Redirecting..."
-                    : status === "none"
-                      ? "Start free trial"
-                      : status === "trial"
-                        ? "Start plan"
-                        : "Resume plan"}
-                </button>
-              ) : null}
-
-              {status === "past_due" ? (
-                <button
-                  type="button"
-                  onClick={() => void handlePortal()}
-                  disabled={redirecting}
-                  className={dashboardButtonClassName({ variant: "primary", size: "sm" })}
-                >
-                  {redirecting ? "Redirecting..." : "Update payment"}
+                    : status === "past_due"
+                      ? "Update payment"
+                      : hasPaidSubscription
+                        ? "Manage billing"
+                        : "Billing history"}
                 </button>
               ) : null}
             </div>
@@ -2366,22 +2367,41 @@ export function BillingSummarySection({ business }: { business: Business }) {
             >
               {billingFooterNote}
             </p>
-            {hasPaidSubscription ? (
-              <div className="flex flex-wrap gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setShowPauseDialog(true)}
-                  className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}
-                >
-                  Pause account
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowCancelPlanDialog(true)}
-                  className={dashboardButtonClassName({ variant: "danger", size: "sm" })}
-                >
-                  Cancel plan
-                </button>
+            {status === "trial" ? (
+              <button
+                type="button"
+                onClick={() => void handleCheckout()}
+                disabled={redirecting}
+                className={dashboardButtonClassName({ variant: "success", size: "sm" })}
+              >
+                {redirecting ? "Redirecting..." : "Start plan"}
+              </button>
+            ) : hasPaidSubscription ? (
+              <div className="flex w-full max-w-[336px] flex-col gap-2.5 sm:items-end">
+                <div className="grid w-full grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowPauseDialog(true)}
+                    className={dashboardButtonClassName({
+                      variant: "warning",
+                      size: "sm",
+                      fullWidth: true,
+                    })}
+                  >
+                    Pause account
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCancelPlanDialog(true)}
+                    className={dashboardButtonClassName({
+                      variant: "danger",
+                      size: "sm",
+                      fullWidth: true,
+                    })}
+                  >
+                    Cancel subscription
+                  </button>
+                </div>
               </div>
             ) : hasPortalAccess && hasSavedOffboardingState ? (
               <button
@@ -2422,18 +2442,20 @@ export function BillingSummarySection({ business }: { business: Business }) {
       <CancelPlanDialog
         open={showCancelPlanDialog}
         onClose={() => setShowCancelPlanDialog(false)}
+        onDeleteRequested={() => {
+          setShowCancelPlanDialog(false);
+          setShowDeleteDialog(true);
+        }}
+      />
+      <DeleteAccountDialog
+        open={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
       />
     </>
   );
 }
 
-export function AccountDataSection({
-  business,
-  onDeleteRequested,
-}: {
-  business: Business;
-  onDeleteRequested: () => void;
-}) {
+export function AccountDataSection({ business }: { business: Business }) {
   const hasGoogle = Boolean(business.google_place_id || business.google_review_url?.trim());
   const crmCount = business.connected_crms ? Object.keys(business.connected_crms).length : 0;
   const hasBillingDocuments =
@@ -2449,7 +2471,7 @@ export function AccountDataSection({
       <div className="border-b border-[var(--dash-border)] px-6 py-5">
         <h2 className="text-[16px] font-semibold text-[var(--dash-text)]">Your data</h2>
         <p className="mt-1 text-[13px] leading-relaxed text-[var(--dash-muted)]">
-          Billing documents, connected systems, and the permanent account actions live here.
+          Billing documents, connected systems, and the details that stay with the account live here.
         </p>
       </div>
 
@@ -2489,23 +2511,18 @@ export function AccountDataSection({
         </div>
       </div>
 
-      <div className="border-t border-[var(--dash-border)] bg-[#FFF8F4] px-6 py-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#BC4A2F]">Danger zone</p>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[14px] font-medium text-[var(--dash-text)]">Delete permanently</p>
-            <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">
-              This removes your small Talk account, business setup, review links, and customer history. If you only want to stop billing for a while, use pause or cancel above instead.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onDeleteRequested}
-            className={dashboardButtonClassName({ variant: "danger", size: "sm" })}
+      <div className="border-t border-[var(--dash-border)] bg-[#FCFAF6] px-6 py-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">Account removal</p>
+        <p className="mt-3 max-w-[56ch] text-[12px] leading-relaxed text-[var(--dash-muted)]">
+          Permanent deletion lives behind{" "}
+          <Link
+            href="/dashboard/more/account#billing"
+            className="font-medium text-[var(--dash-text)] underline decoration-[rgba(26,46,37,0.35)] underline-offset-4 transition hover:decoration-[rgba(26,46,37,0.6)]"
           >
-            Delete permanently
-          </button>
-        </div>
+            cancel plan
+          </Link>{" "}
+          so you do not lose your business setup or customer history by accident.
+        </p>
       </div>
     </div>
   );
@@ -2759,7 +2776,7 @@ export function PauseAccountDialog({
             type="button"
             disabled={submitting}
             onClick={onClose}
-            className={`flex-1 ${dashboardButtonClassName()}`}
+            className={`flex-1 ${dashboardButtonClassName({ variant: "success" })}`}
           >
             Keep active
           </button>
@@ -2813,9 +2830,11 @@ export function PauseAccountDialog({
 export function CancelPlanDialog({
   open,
   onClose,
+  onDeleteRequested,
 }: {
   open: boolean;
   onClose: () => void;
+  onDeleteRequested: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -2833,14 +2852,28 @@ export function CancelPlanDialog({
         if (event.key === "Escape" && !submitting) onClose();
       }}
     >
-      <div role="dialog" aria-modal="true" aria-label="Cancel plan confirmation" className="mx-4 w-full max-w-[430px] rounded-[var(--dash-radius)] bg-white p-6 shadow-lg">
-        <h3 className="text-[16px] font-bold text-[var(--dash-text)]">Cancel plan, keep data</h3>
+      <div role="dialog" aria-modal="true" aria-label="Cancel subscription confirmation" className="mx-4 w-full max-w-[430px] rounded-[var(--dash-radius)] bg-white p-6 shadow-lg">
+        <h3 className="text-[16px] font-bold text-[var(--dash-text)]">Cancel subscription</h3>
         <p className="mt-2 text-[13px] leading-relaxed text-[var(--dash-muted)]">
-          Billing stops and no new sends will go out, but your business setup, review links, and history stay saved if you come back later.
+          Your subscription stays active through the current billing period, then cancels automatically without renewing.
         </p>
         <p className="mt-3 text-[12px] leading-relaxed text-[var(--dash-muted)]">
-          If you return, you can sign in and start the plan again without redoing the full business setup.
+          You can keep using small Talk until that date, and your business setup, review links, and history stay saved if you come back later.
         </p>
+        <div className="mt-4 rounded-[12px] border border-[#F1D7CF] bg-[#FFF8F4] px-4 py-3">
+          <p className="text-[12px] font-medium text-[var(--dash-text)]">Need everything erased instead?</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+            Permanent deletion removes the login, business setup, review links, and customer history.
+          </p>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={onDeleteRequested}
+            className="mt-3 text-[12px] font-medium text-[#BC4A2F] underline decoration-[rgba(188,74,47,0.35)] underline-offset-4 transition hover:decoration-[rgba(188,74,47,0.6)]"
+          >
+            Delete everything permanently
+          </button>
+        </div>
         <OffboardingFeedbackFields
           action="cancel"
           open={showFeedback}
@@ -2862,9 +2895,9 @@ export function CancelPlanDialog({
             type="button"
             disabled={submitting}
             onClick={onClose}
-            className={`flex-1 ${dashboardButtonClassName()}`}
+            className={`flex-1 ${dashboardButtonClassName({ variant: "success" })}`}
           >
-            Keep plan
+            Keep subscription
           </button>
           <button
             type="button"
@@ -2902,7 +2935,7 @@ export function CancelPlanDialog({
             }}
             className={`flex-1 ${dashboardButtonClassName({ variant: "danger" })}`}
           >
-            {submitting ? "Canceling..." : "Cancel plan"}
+            {submitting ? "Canceling..." : "Cancel subscription"}
           </button>
         </div>
       </div>
@@ -2940,6 +2973,14 @@ export function DeleteAccountDialog({
         <p className="mt-2 text-[13px] text-[var(--dash-muted)]">
           This permanently deletes your business, review links, customer history, and login. If you come back later, you'll need to set up the business again from scratch. This action cannot be undone.
         </p>
+        <div className="mt-4 rounded-[12px] border border-[#F1D7CF] bg-[#FFF8F4] px-4 py-3">
+          <p className="text-[12px] font-medium text-[#A6452E]">
+            This closes the account immediately.
+          </p>
+          <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">
+            As soon as you confirm, billing is shut down and you will lose access to the account right away. To keep access until the end of the current paid period, use cancel subscription instead.
+          </p>
+        </div>
         <OffboardingFeedbackFields
           action="delete"
           open={showFeedback}

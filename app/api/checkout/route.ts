@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
-import { getAppBaseUrl } from "@/lib/app-url";
+import { getRequestAwareAppBaseUrl } from "@/lib/app-url";
 import { captureServerException } from "@/lib/server-error-reporting";
-import { mapSubscriptionStatus } from "@/lib/stripe-utils";
+import { getSubscriptionCurrentPeriodEnd, mapSubscriptionStatus } from "@/lib/stripe-utils";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 function pickMostRelevantSubscription(subscriptions: Stripe.Subscription[]) {
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   // Create Stripe checkout session
   const stripe = new Stripe(STRIPE_SECRET_KEY);
-  const appBaseUrl = getAppBaseUrl();
+  const appBaseUrl = getRequestAwareAppBaseUrl(req.nextUrl.origin);
 
   try {
     const { data: business, error: businessError } = await supabaseAdmin
@@ -100,6 +100,37 @@ export async function POST(req: NextRequest) {
         : "none";
 
       if (["active", "trialing", "past_due", "incomplete", "paused"].includes(existingStatus)) {
+        const currentPeriodEnd = existingSubscription
+          ? getSubscriptionCurrentPeriodEnd(existingSubscription)
+          : null;
+        const cancelScheduledFor = existingSubscription?.cancel_at_period_end && currentPeriodEnd
+          ? new Date(currentPeriodEnd * 1000).toISOString()
+          : null;
+
+        const syncFields: Record<string, string | null> = {
+          stripe_customer_id: stripeCustomerId,
+          stripe_subscription_id: existingSubscription?.id ?? null,
+          subscription_status: existingStatus,
+          cancel_scheduled_for: cancelScheduledFor,
+        };
+
+        if (["active", "trialing", "past_due", "incomplete"].includes(existingStatus)) {
+          syncFields.paused_until = null;
+        }
+
+        const { error: syncError } = await supabaseAdmin
+          .from("businesses")
+          .update(syncFields)
+          .eq("id", user.id);
+
+        if (syncError) {
+          captureServerException(new Error(syncError.message), {
+            route: "/api/checkout",
+            tags: { business_id: user.id, sync_state: "existing_subscription" },
+          });
+          return NextResponse.json({ error: "Failed to sync existing billing state" }, { status: 500 });
+        }
+
         const portal = await stripe.billingPortal.sessions.create({
           customer: stripeCustomerId,
           return_url: `${appBaseUrl}/dashboard/more/account`,

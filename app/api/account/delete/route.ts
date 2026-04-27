@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { captureServerException } from "@/lib/server-error-reporting";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { cancelStripeBilling } from "@/lib/stripe-billing";
+import { cancelStripeBilling, findManagedCustomerAndSubscriptionByEmail } from "@/lib/stripe-billing";
 
 async function getAuthenticatedUser(req: NextRequest) {
   const authHeader = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -48,6 +48,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (!business) {
+      if (user.email && process.env.STRIPE_SECRET_KEY) {
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+        const emailMatch = await findManagedCustomerAndSubscriptionByEmail(stripe, user.email);
+
+        if (emailMatch) {
+          await cancelStripeBilling(
+            stripe,
+            emailMatch.customerId,
+            emailMatch.subscription.id,
+          );
+        }
+      }
+
       const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
 
       if (authDeleteError) {
@@ -57,7 +70,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, deleted: true, hadBusiness: false });
     }
 
-    if (business.stripe_customer_id || business.stripe_subscription_id) {
+    if (business.stripe_customer_id || business.stripe_subscription_id || user.email) {
       const { STRIPE_SECRET_KEY } = process.env;
 
       if (!STRIPE_SECRET_KEY) {
@@ -68,10 +81,21 @@ export async function POST(req: NextRequest) {
       }
 
       const stripe = new Stripe(STRIPE_SECRET_KEY);
+      let stripeCustomerId = business.stripe_customer_id ?? null;
+      let stripeSubscriptionId = business.stripe_subscription_id ?? null;
+
+      if ((!stripeCustomerId || !stripeSubscriptionId) && user.email) {
+        const emailMatch = await findManagedCustomerAndSubscriptionByEmail(stripe, user.email);
+        if (emailMatch) {
+          stripeCustomerId = emailMatch.customerId;
+          stripeSubscriptionId = emailMatch.subscription.id;
+        }
+      }
+
       await cancelStripeBilling(
         stripe,
-        business.stripe_customer_id ?? null,
-        business.stripe_subscription_id ?? null,
+        stripeCustomerId,
+        stripeSubscriptionId,
       );
     }
 

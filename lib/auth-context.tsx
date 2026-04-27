@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { fetchWithAuth, supabase } from "@/lib/supabase";
 import { identify as phIdentify, reset as phReset } from "@/lib/posthog";
 import type { Session } from "@supabase/supabase-js";
@@ -27,11 +27,11 @@ export function useAuth() {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
   const [session, setSession] = useState<Session | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const [noBusiness, setNoBusiness] = useState(false);
+  const businessFetchTokenRef = useRef(0);
   const [setupMessage, setSetupMessage] = useState(
     "Your account was created but we couldn’t finish setting up your business profile. Try signing out and back in, or contact us for help.",
   );
@@ -79,13 +79,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function fetchBusiness(userId: string, hasRetriedRecovery = false) {
+    const fetchToken = ++businessFetchTokenRef.current;
+    const isStale = () => fetchToken !== businessFetchTokenRef.current;
+
+    setLoading(true);
+    setNoBusiness(false);
+
     const { data, error } = await supabase
       .from("businesses")
-      .select("id, name, owner_email, logo_url, google_review_url, google_place_id, business_city, neighborhoods, subscription_status, trial_requests_remaining, trial_ends_at, paused_until, reply_voice_id, custom_reply_voice, review_request_sms_template, review_request_email_subject_template, review_request_email_intro_template, connected_crms, created_at, stripe_customer_id, stripe_subscription_id, onboarding_completed, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone, batch_initial_sms_enabled, batch_initial_sms_hour")
+      .select("id, name, owner_email, logo_url, google_review_url, google_place_id, business_city, neighborhoods, subscription_status, trial_requests_remaining, trial_ends_at, paused_until, cancel_scheduled_for, reply_voice_id, custom_reply_voice, review_request_sms_template, review_request_email_subject_template, review_request_email_intro_template, connected_crms, created_at, stripe_customer_id, stripe_subscription_id, onboarding_completed, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone, batch_initial_sms_enabled, batch_initial_sms_hour")
       .eq("id", userId)
       .single();
 
     if (!error && data) {
+      if (isStale()) return;
+
       const biz = data as Business;
       setNoBusiness(false);
       setBusiness(biz);
@@ -114,17 +122,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchBusiness(userId, true);
         return;
       } catch (recoveryError) {
+        if (isStale()) return;
+
         console.error("[auth] Failed to recover business profile:", recoveryError);
         setSetupMessage(
           "We found your login, but your business profile still needs to be rebuilt. Please try again, or contact us if this keeps happening.",
         );
       }
     } else if (error) {
+      if (isStale()) return;
+
       console.error("[auth] Failed to fetch business:", error);
       setSetupMessage(
         "We signed you in, but couldn’t load your business profile right now. Please try again in a moment.",
       );
     }
+
+    if (isStale()) return;
 
     setNoBusiness(true);
     setBusiness(null);

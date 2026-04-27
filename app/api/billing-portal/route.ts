@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
-import { getAppBaseUrl } from "@/lib/app-url";
+import { getRequestAwareAppBaseUrl } from "@/lib/app-url";
 import { captureServerException } from "@/lib/server-error-reporting";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   }
 
   const stripe = new Stripe(STRIPE_SECRET_KEY);
-  const appBaseUrl = getAppBaseUrl();
+  const appBaseUrl = getRequestAwareAppBaseUrl(req.nextUrl.origin);
 
   try {
     const session = await stripe.billingPortal.sessions.create({

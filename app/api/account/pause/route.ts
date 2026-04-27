@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
   try {
     const { data: business, error: businessError } = await supabaseAdmin
       .from("businesses")
-      .select("id, stripe_customer_id, stripe_subscription_id")
+      .select("id, stripe_customer_id, stripe_subscription_id, subscription_status")
       .eq("id", user.id)
       .single();
 
@@ -70,23 +70,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
     }
 
-    if (business.stripe_customer_id || business.stripe_subscription_id) {
-      const { STRIPE_SECRET_KEY } = process.env;
-
-      if (!STRIPE_SECRET_KEY) {
-        return NextResponse.json(
-          { error: "Stripe is not configured for account changes." },
-          { status: 503 },
-        );
-      }
-
-      const stripe = new Stripe(STRIPE_SECRET_KEY);
-      await cancelStripeBilling(
-        stripe,
-        business.stripe_customer_id ?? null,
-        business.stripe_subscription_id ?? null,
+    if (!business.stripe_customer_id && !business.stripe_subscription_id) {
+      return NextResponse.json(
+        { error: "Only paid subscriptions can be paused." },
+        { status: 400 },
       );
     }
+
+    const { STRIPE_SECRET_KEY } = process.env;
+
+    if (!STRIPE_SECRET_KEY) {
+      return NextResponse.json(
+        { error: "Stripe is not configured for account changes." },
+        { status: 503 },
+      );
+    }
+
+    const stripe = new Stripe(STRIPE_SECRET_KEY);
+    await cancelStripeBilling(
+      stripe,
+      business.stripe_customer_id ?? null,
+      business.stripe_subscription_id ?? null,
+    );
 
     const pausedUntil = addMonths(new Date(), months).toISOString();
 
@@ -96,6 +101,7 @@ export async function POST(req: NextRequest) {
         subscription_status: "paused",
         paused_until: pausedUntil,
         stripe_subscription_id: null,
+        cancel_scheduled_for: null,
       })
       .eq("id", user.id);
 

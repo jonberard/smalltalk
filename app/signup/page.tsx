@@ -27,6 +27,26 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState("");
 
+  async function handleGoogleSignup() {
+    setError("");
+    setVerificationMessage("");
+    setLoading(true);
+    capture("signup_started", { method: "google" });
+
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/dashboard")}`;
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+      },
+    });
+
+    if (oauthError) {
+      setError("We couldn't start Google sign-up. Please try again.");
+      setLoading(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -140,6 +160,33 @@ export default function SignupPage() {
 
         {/* Card */}
         <div className="rounded-card border border-accent bg-surface p-8 shadow-card">
+          <button
+            type="button"
+            onClick={() => void handleGoogleSignup()}
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-3 rounded-pill border border-accent bg-white px-4 py-2.5 text-[14px] font-semibold text-text transition-colors hover:bg-[#FCFAF6] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.3-1.7 3.9-5.5 3.9-3.3 0-6-2.8-6-6.2s2.7-6.2 6-6.2c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 2.9 14.7 2 12 2 6.9 2 2.8 6.3 2.8 11.8S6.9 21.5 12 21.5c6.9 0 8.6-6 8.6-8.9 0-.6 0-1-.1-1.4H12Z"/>
+              <path fill="#34A853" d="M3.8 7.3l3.2 2.4c.9-2.1 2.7-3.6 5-3.6 1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 2.9 14.7 2 12 2 8.2 2 4.9 4.2 3.2 7.5l.6-.2Z"/>
+              <path fill="#FBBC05" d="M12 21.5c2.6 0 4.8-.9 6.4-2.5l-3.1-2.6c-.8.6-1.9 1.1-3.3 1.1-3.7 0-5.2-2.6-5.5-3.9l-3.1 2.4C5 19.2 8.2 21.5 12 21.5Z"/>
+              <path fill="#4285F4" d="M20.6 12.6c0-.6 0-1-.1-1.4H12v3.9h5.5c-.3 1.3-1.2 2.4-2.2 3.1l3.1 2.6c1.8-1.7 2.9-4.3 2.9-7.2Z"/>
+            </svg>
+            Continue with Google
+          </button>
+
+          <p className="mt-3 text-center text-[12px] leading-relaxed text-muted">
+            We&apos;ll ask for your business details right after Google sign-in.
+          </p>
+
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-accent" />
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
+              or
+            </span>
+            <div className="h-px flex-1 bg-accent" />
+          </div>
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             {error && (
               <div role="alert" className="rounded-[8px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-600">
