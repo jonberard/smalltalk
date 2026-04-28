@@ -38,19 +38,38 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        password,
+      }),
     });
 
-    if (authError) {
-      if (authError.message === "Invalid login credentials") {
-        setError("That email and password don\u2019t match. Try again?");
-      } else if (authError.message === "Email not confirmed") {
-        setError("Check your inbox \u2014 you need to confirm your email before signing in.");
-      } else {
-        setError("Something went wrong. Please try again.");
-      }
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      session?: {
+        access_token: string;
+        refresh_token: string;
+      };
+    };
+
+    if (!response.ok || !body.session) {
+      setError(body.error || "Something went wrong. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: body.session.access_token,
+      refresh_token: body.session.refresh_token,
+    });
+
+    if (sessionError) {
+      setError("We signed you in, but couldn’t finish the session. Please try again.");
       setLoading(false);
       return;
     }
@@ -76,7 +95,24 @@ export default function LoginPage() {
     }
     setResetLoading(true);
     setError("");
-    await supabase.auth.resetPasswordForEmail(email.trim());
+    const response = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+      }),
+    });
+
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+
+    if (!response.ok) {
+      setError(body.error || "We couldn’t send that reset link right now. Please try again.");
+      setResetLoading(false);
+      return;
+    }
+
     setResetSent(true);
     setResetLoading(false);
   }

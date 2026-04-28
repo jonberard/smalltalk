@@ -74,7 +74,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new Error(body.error || "Could not recover your business profile");
+      const error = new Error(
+        body.error || "Could not recover your business profile",
+      ) as Error & { status?: number };
+      error.status = res.status;
+      throw error;
     }
   }
 
@@ -125,9 +129,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (isStale()) return;
 
         console.error("[auth] Failed to recover business profile:", recoveryError);
-        setSetupMessage(
-          "We found your login, but your business profile still needs to be rebuilt. Please try again, or contact us if this keeps happening.",
-        );
+        const recoveryStatus =
+          recoveryError instanceof Error &&
+          "status" in recoveryError &&
+          typeof recoveryError.status === "number"
+            ? recoveryError.status
+            : null;
+
+        if (recoveryStatus === 429) {
+          setSetupMessage(
+            "We’ve already tried a few times from this browser. Please wait a bit, then try again.",
+          );
+        } else {
+          setSetupMessage(
+            "We found your login, but your business profile still needs to be rebuilt. Please try again, or contact us if this keeps happening.",
+          );
+        }
       }
     } else if (error) {
       if (isStale()) return;

@@ -7,16 +7,6 @@ import { supabase } from "@/lib/supabase";
 import { capture, identify } from "@/lib/posthog";
 import { getReviewRequestHourlyCapCopy } from "@/lib/review-request-limits";
 
-function friendlyError(message: string): string {
-  if (message.includes("User already registered")) {
-    return "That email is already taken. Try signing in instead?";
-  }
-  if (message.includes("Password should be at least")) {
-    return "Use at least 8 characters for your password.";
-  }
-  return "Something went wrong. Please try again.";
-}
-
 export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -56,89 +46,68 @@ export default function SignupPage() {
     try {
       capture("signup_started");
 
-      // 1. Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            business_name: businessName,
-          },
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          email,
+          password,
+          business_name: businessName,
+        }),
       });
 
-      if (authError) {
-        setError(friendlyError(authError.message));
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        success?: boolean;
+        message?: string;
+        requires_email_verification?: boolean;
+        needs_recovery?: boolean;
+        user_id?: string;
+        next_path?: string;
+        session?: {
+          access_token: string;
+          refresh_token: string;
+        };
+      };
+
+      if (!response.ok || !body.success) {
+        setError(body.error || "Something went wrong. Please try again.");
         setLoading(false);
         return;
       }
 
-      const userId = authData.user?.id;
+      const userId = body.user_id;
       if (!userId) {
         setError("Something went wrong. Please try again.");
         setLoading(false);
         return;
       }
 
-      // 2. Insert business row + seed topics (wrapped so orphan auth is handled)
-      try {
-        const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-        const { error: bizError } = await supabase.from("businesses").insert({
-          id: userId,
-          name: businessName,
-          owner_email: email,
-          // Google connection happens during onboarding, so start blank.
-          google_review_url: "",
-          subscription_status: "trial",
-          trial_ends_at: trialEndsAt,
-          trial_requests_remaining: 10,
-        });
+      identify(userId, { subscription_status: "trial" });
+      capture("signup_completed");
 
-        if (bizError) throw bizError;
-
-        // 3. Copy global default topics for this business
-        const { data: defaultTopics, error: topicsReadError } = await supabase
-          .from("topics")
-          .select("label, tier, follow_up_question, follow_up_options, sort_order")
-          .is("business_id", null);
-
-        if (topicsReadError) throw topicsReadError;
-
-        if (defaultTopics && defaultTopics.length > 0) {
-          const seededTopics = defaultTopics.map((t) => ({
-            business_id: userId,
-            label: t.label,
-            tier: t.tier,
-            follow_up_question: t.follow_up_question,
-            follow_up_options: t.follow_up_options,
-            sort_order: t.sort_order,
-          }));
-
-          const { error: topicsWriteError } = await supabase
-            .from("topics")
-            .insert(seededTopics);
-
-          if (topicsWriteError) throw topicsWriteError;
-        }
-      } catch {
-        setError(
-          "Account created but we hit a snag setting up your business. Please try logging in — we'll retry the setup."
+      if (body.requires_email_verification || !body.session) {
+        setVerificationMessage(
+          body.message || "Check your email to verify your account, then sign in to continue.",
         );
         setLoading(false);
         return;
       }
 
-      // 4. Identify and redirect to onboarding
-      identify(userId, { subscription_status: "trial" });
-      capture("signup_completed");
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: body.session.access_token,
+        refresh_token: body.session.refresh_token,
+      });
 
-      if (!authData.session) {
-        setVerificationMessage("Check your email to verify your account, then sign in to continue.");
+      if (sessionError) {
+        setError("Your account is ready, but we couldn’t finish the session. Please try signing in.");
         setLoading(false);
         return;
       }
 
-      router.push("/onboarding");
+      router.push(body.next_path || "/onboarding");
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);

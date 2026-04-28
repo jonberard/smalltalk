@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { captureServerException } from "@/lib/server-error-reporting";
+import { consumePublicRateLimit, getClientIp } from "@/lib/public-rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+
+const RECOVER_BUSINESS_RATE_LIMIT_MAX = 5;
+const RECOVER_BUSINESS_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
+const RECOVER_BUSINESS_LIMIT_ERROR =
+  "We’ve already tried a few times from this browser. Please wait a bit, then try again.";
+const RECOVER_BUSINESS_GENERIC_ERROR =
+  "We couldn’t rebuild your business profile right now. Please try again in a moment.";
 
 function deriveBusinessName(email: string | null | undefined, metadata: unknown) {
   const metadataRecord =
@@ -36,7 +45,11 @@ async function seedDefaultTopicsIfMissing(businessId: string) {
     .is("business_id", null);
 
   if (defaultTopicsError) {
-    return { success: false, error: defaultTopicsError.message };
+    captureServerException(new Error(defaultTopicsError.message), {
+      route: "/api/auth/recover-business",
+      tags: { business_id: businessId, stage: "load_default_topics" },
+    });
+    return { success: false };
   }
 
   if (!defaultTopics || defaultTopics.length === 0) {
@@ -60,13 +73,56 @@ async function seedDefaultTopicsIfMissing(businessId: string) {
     });
 
   if (insertTopicsError) {
-    return { success: false, error: insertTopicsError.message };
+    captureServerException(new Error(insertTopicsError.message), {
+      route: "/api/auth/recover-business",
+      tags: { business_id: businessId, stage: "seed_default_topics" },
+    });
+    return { success: false };
   }
 
   return { success: true };
 }
 
 export async function POST(req: NextRequest) {
+  const clientIp = getClientIp(req);
+  let recoveryLimit;
+
+  try {
+    recoveryLimit = await consumePublicRateLimit({
+      bucket: "auth_recover_business_ip",
+      identifier: clientIp,
+      scopeKey: "global",
+      maxCount: RECOVER_BUSINESS_RATE_LIMIT_MAX,
+      windowSeconds: RECOVER_BUSINESS_RATE_LIMIT_WINDOW_SECONDS,
+    });
+  } catch (error) {
+    captureServerException(error, {
+      route: "/api/auth/recover-business",
+      tags: { stage: "rate_limit_lookup" },
+      extras: { client_ip: clientIp },
+    });
+
+    return NextResponse.json(
+      { error: "We couldn’t verify your account recovery right now. Please try again." },
+      { status: 500 },
+    );
+  }
+
+  if (!recoveryLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: RECOVER_BUSINESS_LIMIT_ERROR,
+        retry_after_seconds: recoveryLimit.retryAfterSeconds,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": `${recoveryLimit.retryAfterSeconds}`,
+        },
+      },
+    );
+  }
+
   const authHeader = req.headers.get("authorization")?.replace("Bearer ", "");
 
   if (!authHeader) {
@@ -94,8 +150,12 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (existingBusinessError) {
+    captureServerException(new Error(existingBusinessError.message), {
+      route: "/api/auth/recover-business",
+      tags: { business_id: user.id, stage: "load_existing_business" },
+    });
     return NextResponse.json(
-      { error: existingBusinessError.message },
+      { error: RECOVER_BUSINESS_GENERIC_ERROR },
       { status: 500 },
     );
   }
@@ -125,8 +185,12 @@ export async function POST(req: NextRequest) {
       });
 
     if (insertBusinessError) {
+      captureServerException(new Error(insertBusinessError.message), {
+        route: "/api/auth/recover-business",
+        tags: { business_id: user.id, stage: "upsert_business" },
+      });
       return NextResponse.json(
-        { error: insertBusinessError.message },
+        { error: RECOVER_BUSINESS_GENERIC_ERROR },
         { status: 500 },
       );
     }
@@ -138,7 +202,7 @@ export async function POST(req: NextRequest) {
 
   if (!topicSeedResult.success) {
     return NextResponse.json(
-      { error: topicSeedResult.error || "Failed to seed default topics" },
+      { error: RECOVER_BUSINESS_GENERIC_ERROR },
       { status: 500 },
     );
   }
