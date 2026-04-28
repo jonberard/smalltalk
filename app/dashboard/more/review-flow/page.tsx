@@ -522,7 +522,7 @@ export default function ReviewFlowSetupPage() {
     setVoiceSaving(false);
 
     if (error) {
-      toast(`Couldn't save voice: ${error.message}`, "error");
+      toast("Couldn't save that voice just yet. Please try again.", "error");
       return;
     }
 

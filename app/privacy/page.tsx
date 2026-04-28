@@ -37,6 +37,25 @@ function BulletList({ items }: { items: React.ReactNode[] }) {
   );
 }
 
+function ExternalLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="font-medium text-primary underline underline-offset-4 hover:no-underline"
+    >
+      {children}
+    </a>
+  );
+}
+
 export default function PrivacyPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-background font-body">
@@ -48,7 +67,7 @@ export default function PrivacyPage() {
 
       <main className="mx-auto w-full max-w-[780px] flex-1 px-6 pb-20 pt-12">
         <p className="text-[13px] font-medium uppercase tracking-[0.14em] text-primary">
-          Last updated April 25, 2026
+          Last updated April 28, 2026
         </p>
         <h1 className="mt-4 font-heading text-[36px] font-bold leading-tight text-text sm:text-[44px]">
           Privacy Policy
@@ -269,6 +288,98 @@ export default function PrivacyPage() {
             retain submitted data according to their own policies and the agreements we have
             with them.
           </p>
+
+          <h3 className="font-heading text-[20px] font-bold text-text">
+            Vendor privacy and DPA resources
+          </h3>
+          <p>
+            We review our vendors regularly, and their legal terms may change over time.
+            These are the current privacy or data-processing resources for the core
+            providers we rely on most:
+          </p>
+          <BulletList
+            items={[
+              <>
+                <strong className="text-text">Supabase</strong>:{" "}
+                <ExternalLink href="https://supabase.com/privacy">
+                  Privacy Policy
+                </ExternalLink>{" "}
+                and{" "}
+                <ExternalLink href="https://supabase.com/legal/dpa">
+                  Data Processing Addendum
+                </ExternalLink>
+                .
+              </>,
+              <>
+                <strong className="text-text">Twilio</strong>:{" "}
+                <ExternalLink href="https://www.twilio.com/en-us/legal/data-protection-addendum">
+                  Data Protection Addendum
+                </ExternalLink>
+                .
+              </>,
+              <>
+                <strong className="text-text">Resend</strong>:{" "}
+                <ExternalLink href="https://resend.com/legal/dpa">
+                  Data Processing Addendum
+                </ExternalLink>
+                .
+              </>,
+              <>
+                <strong className="text-text">Stripe</strong>:{" "}
+                <ExternalLink href="https://stripe.com/legal/dpa">
+                  Data Processing Agreement
+                </ExternalLink>{" "}
+                and{" "}
+                <ExternalLink href="https://stripe.com/privacy">
+                  Privacy Policy
+                </ExternalLink>
+                .
+              </>,
+              <>
+                <strong className="text-text">PostHog</strong>:{" "}
+                <ExternalLink href="https://posthog.com/privacy">
+                  Privacy Policy
+                </ExternalLink>{" "}
+                and{" "}
+                <ExternalLink href="https://posthog.com/dpa">
+                  DPA
+                </ExternalLink>
+                .
+              </>,
+              <>
+                <strong className="text-text">OpenAI</strong>:{" "}
+                <ExternalLink href="https://openai.com/en-GB/policies/data-processing-addendum/">
+                  Data Processing Addendum
+                </ExternalLink>
+                .
+              </>,
+              <>
+                <strong className="text-text">Anthropic</strong>:{" "}
+                <ExternalLink href="https://www.anthropic.com/legal/privacy">
+                  Privacy Policy
+                </ExternalLink>{" "}
+                and{" "}
+                <ExternalLink href="https://support.anthropic.com/en/articles/7996862-how-do-i-view-and-sign-your-data-processing-addendum-dpa">
+                  DPA guidance
+                </ExternalLink>
+                .
+              </>,
+              <>
+                <strong className="text-text">Google Cloud</strong>:{" "}
+                <ExternalLink href="https://cloud.google.com/terms/data-processing-addendum?hl=en_US">
+                  Cloud Data Processing Addendum
+                </ExternalLink>
+                .
+              </>,
+              <>
+                <strong className="text-text">Vercel</strong>:{" "}
+                <ExternalLink href="https://vercel.com/legal/dpa">
+                  Data Processing Addendum
+                </ExternalLink>
+                .
+              </>,
+            ]}
+          />
 
           <h3 className="font-heading text-[20px] font-bold text-text">
             Sharing with businesses

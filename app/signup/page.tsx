@@ -12,7 +12,7 @@ function friendlyError(message: string): string {
     return "That email is already taken. Try signing in instead?";
   }
   if (message.includes("Password should be at least")) {
-    return message;
+    return "Use at least 8 characters for your password.";
   }
   return "Something went wrong. Please try again.";
 }
@@ -154,7 +154,7 @@ export default function SignupPage() {
             Let&rsquo;s get you started.
           </h1>
           <p className="mt-1.5 text-[14px] text-muted">
-            Start getting detailed reviews in minutes.
+            We&rsquo;ll help your customers get past the blank box.
           </p>
         </div>
 
@@ -176,7 +176,7 @@ export default function SignupPage() {
           </button>
 
           <p className="mt-3 text-center text-[12px] leading-relaxed text-muted">
-            We&apos;ll ask for your business details right after Google sign-in.
+            We&apos;ll bring you straight into setup after Google sign-in.
           </p>
 
           <div className="my-5 flex items-center gap-3">

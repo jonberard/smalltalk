@@ -110,6 +110,42 @@ function usePrefersReducedMotion() {
   return prefersReducedMotion;
 }
 
+function getFriendlyPublicFlowError(
+  kind: "load" | "generate" | "private-feedback",
+  rawMessage?: string,
+) {
+  const message = rawMessage?.toLowerCase() ?? "";
+
+  if (message.includes("session expired")) {
+    return "This review link timed out. Reload the page to keep going.";
+  }
+
+  if (message.includes("draft limit")) {
+    return "This review link needs a quick pause before trying again.";
+  }
+
+  if (message.includes("timeout") || message.includes("timed out")) {
+    if (kind === "generate") {
+      return "That draft is taking longer than usual. Tap to try again.";
+    }
+    return "This is taking a little longer than usual. Please try again in a bit.";
+  }
+
+  if (message.includes("failed to fetch") || message.includes("network")) {
+    return "The connection slipped. Please try again.";
+  }
+
+  if (kind === "generate") {
+    return "We hit a snag drafting your review — tap to try again.";
+  }
+
+  if (kind === "private-feedback") {
+    return "We couldn’t send that just yet — please try again.";
+  }
+
+  return "We couldn’t open this review link right now. Please try again in a bit.";
+}
+
 
 /* ═══════════════════════════════════════════════════
    FLOW STATE
@@ -1290,9 +1326,10 @@ function ReviewScreen({
         });
       } catch (error) {
         setError(
-          error instanceof Error
-            ? error.message
-            : "Something went wrong — tap to try again",
+          getFriendlyPublicFlowError(
+            "generate",
+            error instanceof Error ? error.message : undefined,
+          ),
         );
       } finally {
         setGenerating(false);
@@ -2570,9 +2607,10 @@ function ReviewFlowInner({
         });
     } catch (error) {
         setToastMsg(
-          error instanceof Error
-            ? error.message
-            : "Couldn’t save your feedback — please try again.",
+          getFriendlyPublicFlowError(
+            "private-feedback",
+            error instanceof Error ? error.message : undefined,
+          ),
         );
       return;
     }
@@ -2803,7 +2841,7 @@ export default function ReviewFlow() {
         if (message.toLowerCase().includes("not found")) {
           setNotFound(true);
         } else {
-          setLoadError(message);
+          setLoadError(getFriendlyPublicFlowError("load", message));
         }
         setLoading(false);
       }

@@ -744,8 +744,9 @@ export default function Dashboard() {
           : current,
       );
     } catch (error) {
+      console.error("[dashboard] Could not mark private feedback as handled:", error);
       setPrivateFeedbackActionError(
-        error instanceof Error ? error.message : "Couldn’t mark feedback as handled.",
+        "Couldn’t mark that feedback as handled. Please try again.",
       );
     } finally {
       setPrivateFeedbackActionLoading(false);

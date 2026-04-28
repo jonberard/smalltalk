@@ -90,7 +90,7 @@ export default function LoginPage() {
             Welcome back.
           </h1>
           <p className="mt-1.5 text-[14px] text-muted">
-            Sign in to your small Talk account.
+            Pick up where you left off.
           </p>
         </div>
 
@@ -112,7 +112,7 @@ export default function LoginPage() {
           </button>
 
           <p className="mt-3 text-center text-[12px] leading-relaxed text-muted">
-            Signed up with Google? Use this button — you don&apos;t need a small Talk password.
+            Signed up with Google? Use this button — no extra password needed.
           </p>
 
           <div className="my-5 flex items-center gap-3">

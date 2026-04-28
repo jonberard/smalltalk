@@ -265,10 +265,8 @@ export default function FounderSupportPage() {
         "success",
       );
     } catch (error) {
-      toast(
-        error instanceof Error ? error.message : "Could not update support message.",
-        "error",
-      );
+      console.error("[admin-support] Could not update support message:", error);
+      toast("Couldn't update that support message. Please try again.", "error");
     } finally {
       setUpdatingMessageId(null);
     }

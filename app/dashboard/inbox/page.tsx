@@ -546,9 +546,8 @@ export default function InboxPage() {
       );
       setFilter("handled");
     } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : "Couldn’t mark feedback as handled.",
-      );
+      console.error("[inbox] Could not mark private feedback as handled:", error);
+      setActionError("Couldn’t mark that feedback as handled. Please try again.");
     } finally {
       setActionLoading(false);
     }

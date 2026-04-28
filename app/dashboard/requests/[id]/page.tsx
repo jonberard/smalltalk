@@ -633,9 +633,8 @@ export default function RequestDetailPage() {
           : current,
       );
     } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : "Couldn’t mark feedback as handled.",
-      );
+      console.error("[request-detail] Could not mark private feedback as handled:", error);
+      setActionError("Couldn’t mark that feedback as handled. Please try again.");
     } finally {
       setActionLoading(false);
     }

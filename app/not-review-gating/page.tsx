@@ -38,6 +38,25 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+function ExternalLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="font-medium text-primary underline underline-offset-4 hover:no-underline"
+    >
+      {children}
+    </a>
+  );
+}
+
 /* ═══════════════════════════════════════════════════
    GATING FLOW DIAGRAM
    ═══════════════════════════════════════════════════ */
@@ -180,6 +199,40 @@ function AiDiagram() {
   );
 }
 
+function EqualChoiceProof() {
+  return (
+    <div className="rounded-card border border-[#E8E5E0] bg-surface p-6 shadow-[0_8px_30px_rgba(26,46,37,0.08)] sm:p-8">
+      <p className="text-[12px] font-medium uppercase tracking-[0.15em] text-primary">
+        What the low-rating choice looks like
+      </p>
+
+      <div className="mt-6 flex flex-col gap-3">
+        <div className="w-full rounded-card border border-accent bg-surface p-5 text-left">
+          <p className="text-[15px] font-semibold text-text">
+            Share your experience publicly
+          </p>
+          <p className="mt-1 text-[13px] leading-relaxed text-muted">
+            Write an honest review on Google so others know what to expect.
+          </p>
+        </div>
+
+        <div className="w-full rounded-card border border-accent bg-surface p-5 text-left">
+          <p className="text-[15px] font-semibold text-text">
+            Send private feedback
+          </p>
+          <p className="mt-1 text-[13px] leading-relaxed text-muted">
+            Tell the business directly and give them a chance to make it right.
+          </p>
+        </div>
+      </div>
+
+      <p className="mt-5 text-[14px] leading-relaxed text-muted">
+        Same size. Same weight. Same visibility. The customer decides.
+      </p>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════
    FAQ DATA
    ═══════════════════════════════════════════════════ */
@@ -269,9 +322,13 @@ export default function NotReviewGatingPage() {
                   the unhappy customer gets heard privately, everyone wins.
                 </p>
                 <p>
-                  Except Google&rsquo;s review policies prohibit it. And customers
-                  notice. And when your Google reviews don&rsquo;t match your real
-                  reputation, people stop trusting them.
+                  Except{" "}
+                  <ExternalLink href="https://support.google.com/business/answer/2622994?hl=en">
+                    Google&rsquo;s fake engagement policy
+                  </ExternalLink>{" "}
+                  prohibits discouraging negative reviews or selectively soliciting
+                  positive ones. And customers notice. And when your Google reviews
+                  don&rsquo;t match your real reputation, people stop trusting them.
                 </p>
               </div>
 
@@ -279,10 +336,11 @@ export default function NotReviewGatingPage() {
                 And the risks add up.
               </h3>
               <p className="mt-4 text-[17px] leading-[1.7] text-muted">
-                Google&rsquo;s review policies prohibit review gating. Businesses caught doing it can have reviews removed in bulk, lose ranking on Google Maps, or get their Business Profile suspended entirely. In 2019, FashionNova paid $4.2 million to settle FTC charges for hiding negative reviews &mdash; and enforcement has only increased since.
-              </p>
-              <p className="mt-2 text-[12px] leading-relaxed text-muted/60">
-                Sources: Google Business Profile review policies, FTC press release on FashionNova settlement.
+                Google can remove reviews or restrict a Business Profile when it sees
+                fake engagement patterns. The FTC has also treated suppressed negative
+                reviews as deceptive. Fashion Nova paid $4.2 million to settle claims
+                that it hid lower-rated reviews &mdash; and that kind of enforcement
+                is exactly why we built this differently.
               </p>
             </div>
 
@@ -296,6 +354,23 @@ export default function NotReviewGatingPage() {
                   &mdash; and enforcement actions have been brought against businesses
                   that do it.
                 </p>
+                <div className="mt-4 space-y-1 text-[12px] leading-relaxed text-muted">
+                  <p>
+                    <ExternalLink href="https://support.google.com/business/answer/2622994?hl=en">
+                      Google fake engagement policy
+                    </ExternalLink>
+                  </p>
+                  <p>
+                    <ExternalLink href="https://support.google.com/business/answer/14114287?hl=en">
+                      Google Business Profile restrictions for policy violations
+                    </ExternalLink>
+                  </p>
+                  <p>
+                    <ExternalLink href="https://www.ftc.gov/news-events/news/press-releases/2022/03/ftc-finalizes-order-fashion-nova-over-allegations-it-blocked-negative-reviews">
+                      FTC final order with Fashion Nova
+                    </ExternalLink>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -351,6 +426,39 @@ export default function NotReviewGatingPage() {
           <p className="mt-10 text-center font-heading text-[18px] italic text-muted">
             The customer decides. Every time.
           </p>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════
+         SECTION 3.5: PRODUCT PROOF — main bg
+         ════════════════════════════════════════════ */}
+      <section data-fade className="px-6 py-12 sm:py-20">
+        <div className="mx-auto max-w-[1080px]">
+          <div className="grid items-start gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+            <div>
+              <h2 className="font-heading text-[32px] font-semibold leading-[1.15] tracking-tight text-text sm:text-[40px]">
+                Same screen. Same weight. No hidden exit.
+              </h2>
+              <div className="mt-8 space-y-5 text-[17px] leading-[1.7] text-muted">
+                <p>
+                  We didn&rsquo;t stop at saying the right thing. We built the low-rating
+                  step so the public option and the private option are presented with the
+                  same visual weight. Same card size. Same typography. Same placement.
+                </p>
+                <p>
+                  That matters because this is where most tools get slippery. They make
+                  the public path smaller, colder, or harder to find. We don&rsquo;t. If a
+                  customer wants to post publicly, they can. If they want to tell the
+                  business first, they can do that too.
+                </p>
+                <p>
+                  It&rsquo;s a real choice, not a funnel trick. That&rsquo;s the whole point.
+                </p>
+              </div>
+            </div>
+
+            <EqualChoiceProof />
+          </div>
         </div>
       </section>
 
