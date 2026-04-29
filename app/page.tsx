@@ -151,7 +151,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Can I send review requests via text message?",
-    a: "Yes. small Talk sends a text to your customer right after the job. They tap the link, pick what stood out, and get an AI-drafted review in 30 seconds. No app download, no login required.",
+    a: "Yes. small Talk can send the first text while the job is still fresh. If the customer needs a minute to come up for air, the follow-up waits until they’ve had a chance to live with the result. They tap the link, pick what stood out, and get an AI-drafted review in 30 seconds. No app download, no login required.",
   },
 ];
 
@@ -655,6 +655,9 @@ export default function LandingPage() {
           <p className="mx-auto mt-4 max-w-[480px] text-[17px] leading-[1.6] text-muted">
             Built to help real customers finish the review, without turning your follow-up into another dashboard chore.
           </p>
+          <p className="mx-auto mt-4 max-w-[560px] text-[15px] leading-[1.7] text-muted">
+            The first ask can go out while the job is still fresh. The follow-up waits until the customer has had a minute to live with the result.
+          </p>
         </div>
 
         <div className="mx-auto max-w-[480px]">
@@ -675,7 +678,7 @@ export default function LandingPage() {
               {[
                 "Guided review links customers can actually finish",
                 "Detailed drafts built from what your customer really said",
-                "Simple follow-up by text, with reminders included",
+                "One thoughtful follow-up, timed for when the work has had a chance to settle in",
                 "A real private-feedback path when someone is unhappy",
                 "Flat monthly pricing, without add-ons or per-review fees",
                 "Copy the review and open Google in one tap",
