@@ -16,6 +16,9 @@ type GenerateBody = {
   exclude_voice_id?: string;
 };
 
+const MAX_PUBLIC_REGENERATIONS = 3;
+const MAX_PUBLIC_GENERATIONS_PER_SESSION = MAX_PUBLIC_REGENERATIONS + 1;
+
 function sanitizeTopics(value: GenerateBody["topics_selected"]) {
   if (!Array.isArray(value)) {
     return [];
@@ -130,7 +133,7 @@ export async function POST(
     "increment_generation_count",
     {
       p_session_id: sessionContext.session.id,
-      p_max_count: 5,
+      p_max_count: MAX_PUBLIC_GENERATIONS_PER_SESSION,
     },
   );
 
@@ -142,7 +145,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          "You've reached the limit for this review. Please use your current draft or start fresh.",
+          "You've tried a few versions already. Pick the one that feels closest, or edit it from here.",
       },
       { status: 429 },
     );

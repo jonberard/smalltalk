@@ -367,7 +367,10 @@ export async function POST(req: NextRequest) {
         });
 
         if (!reminderError) {
-          serverCapture(userId, "reminder_scheduled", { reminder_count: 2, business_id: business.id });
+          serverCapture(userId, "reminder_scheduled", {
+            reminder_count: 1,
+            business_id: business.id,
+          });
         }
       }
 

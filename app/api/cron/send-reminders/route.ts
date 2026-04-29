@@ -305,7 +305,7 @@ export async function GET(req: NextRequest) {
 
           if (!reminderError) {
             serverCapture(delivery.business_id, "reminder_scheduled", {
-              reminder_count: 2,
+              reminder_count: 1,
               business_id: delivery.business_id,
             });
           }

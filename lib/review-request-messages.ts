@@ -110,7 +110,7 @@ export function buildReminderSmsMessage({
 }) {
   const message =
     kind === "reminder_1"
-      ? `Hi ${customerName} - quick reminder from ${businessName}. If you have a minute to share how we did: ${reviewLinkUrl} (Reply STOP to opt out)`
+      ? `Hi ${customerName} - one quick follow-up from ${businessName}. If you still have a minute to share how we did: ${reviewLinkUrl} (Reply STOP to opt out)`
       : `Hi ${customerName} - one last note from ${businessName}. Your feedback helps a lot: ${reviewLinkUrl}. This is the last message. (Reply STOP to opt out)`;
 
   return toGsmSafeText(message);

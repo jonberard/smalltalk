@@ -243,7 +243,7 @@ function buildDeliveryEvent(delivery: RequestDelivery, index: number): TimelineE
     delivery.kind === "initial"
       ? "Initial request"
       : delivery.kind === "reminder_1"
-        ? "Reminder 1"
+        ? "Reminder"
         : "Reminder 2";
 
   if (delivery.status === "sent") {

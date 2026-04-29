@@ -124,6 +124,14 @@ function getFriendlyPublicFlowError(
     return "This review link needs a quick pause before trying again.";
   }
 
+  if (
+    message.includes("reached the limit for this review") ||
+    message.includes("use your current draft") ||
+    message.includes("tried a few versions already")
+  ) {
+    return "You’ve got a few versions already. Pick the one that feels closest, or edit it from here.";
+  }
+
   if (message.includes("timeout") || message.includes("timed out")) {
     if (kind === "generate") {
       return "That draft is taking longer than usual. Tap to try again.";
@@ -144,6 +152,16 @@ function getFriendlyPublicFlowError(
   }
 
   return "We couldn’t open this review link right now. Please try again in a bit.";
+}
+
+function isGenerationLimitMessage(rawMessage?: string) {
+  const message = rawMessage?.toLowerCase() ?? "";
+
+  return (
+    message.includes("reached the limit for this review") ||
+    message.includes("use your current draft") ||
+    message.includes("tried a few versions already")
+  );
 }
 
 
@@ -1287,6 +1305,8 @@ function ReviewScreen({
   const [voiceId, setVoiceId] = useState<string | null>(initialVoiceId);
   const [generating, setGenerating] = useState(!initialReviewText);
   const [error, setError] = useState("");
+  const [inlineMessage, setInlineMessage] = useState("");
+  const [regenerateLocked, setRegenerateLocked] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1310,6 +1330,7 @@ function ReviewScreen({
     async (excludeVoice?: string) => {
       setGenerating(true);
       setError("");
+      setInlineMessage("");
       try {
         const result = await fetchPublicFlow<{
           review_text: string;
@@ -1320,22 +1341,33 @@ function ReviewScreen({
         });
         setReviewText(result.review_text);
         setVoiceId(result.voice_id);
+        setRegenerateLocked(false);
         capture("review_generated", {
           star_rating: rating,
           word_count: result.review_text.split(/\s+/).length,
         });
       } catch (error) {
+        const rawMessage =
+          error instanceof Error ? error.message : undefined;
+        const friendlyMessage = getFriendlyPublicFlowError(
+          "generate",
+          rawMessage,
+        );
+
+        if (reviewText && isGenerationLimitMessage(rawMessage)) {
+          setInlineMessage(friendlyMessage);
+          setRegenerateLocked(true);
+          return;
+        }
+
         setError(
-          getFriendlyPublicFlowError(
-            "generate",
-            error instanceof Error ? error.message : undefined,
-          ),
+          friendlyMessage,
         );
       } finally {
         setGenerating(false);
       }
     },
-    [buildPayload, code, rating]
+    [buildPayload, code, rating, reviewText]
   );
 
   // Generate on mount
@@ -1475,34 +1507,42 @@ function ReviewScreen({
       </div>
 
       {!generating && !error && !copyFailed && (
-        <ButtonRow>
-          <button
-            type="button"
-            onClick={handleTryAnother}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-pill border border-accent px-6 py-2.5 text-[14px] font-bold text-muted transition-all duration-200 active:scale-[0.98] disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            aria-label="Generate another version"
-          >
-            <svg
-              width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        <>
+          <ButtonRow>
+            <button
+              type="button"
+              onClick={handleTryAnother}
+              disabled={regenerateLocked}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-pill border border-accent px-6 py-2.5 text-[14px] font-bold text-muted transition-all duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              aria-label="Generate another version"
             >
-              <polyline points="23 4 23 10 17 10" />
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-            </svg>
-            Try another
-          </button>
-          <PrimaryButton onClick={handleCopyAndContinue} disabled={copied}>
-            {copied ? (
-              <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-fade-in">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Copied!
-              </>
-            ) : (
-              "Copy review"
-            )}
-          </PrimaryButton>
-        </ButtonRow>
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              Try another
+            </button>
+            <PrimaryButton onClick={handleCopyAndContinue} disabled={copied}>
+              {copied ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-fade-in">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Copied!
+                </>
+              ) : (
+                "Copy review"
+              )}
+            </PrimaryButton>
+          </ButtonRow>
+          {inlineMessage ? (
+            <p className="mt-3 text-center text-[13px] leading-relaxed text-muted">
+              {inlineMessage}
+            </p>
+          ) : null}
+        </>
       )}
 
       {/* Manual copy fallback — shown when clipboard API fails */}

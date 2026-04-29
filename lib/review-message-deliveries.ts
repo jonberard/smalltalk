@@ -24,40 +24,24 @@ export async function queueReminderDeliveries({
   reviewLinkUrl,
   sentAt,
 }: QueueReminderDeliveriesInput) {
-  const { error } = await supabaseAdmin.from("review_message_deliveries").insert([
-    {
-      review_link_id: reviewLinkId,
-      business_id: businessId,
-      channel: "sms",
+  const { error } = await supabaseAdmin.from("review_message_deliveries").insert({
+    review_link_id: reviewLinkId,
+    business_id: businessId,
+    channel: "sms",
+    kind: "reminder_1",
+    status: "pending",
+    scheduled_for: new Date(
+      new Date(sentAt).getTime() + 6 * 24 * 60 * 60 * 1000,
+    ).toISOString(),
+    to_address: customerContact,
+    normalized_phone: normalizedPhone,
+    message_body: buildReminderSmsMessage({
       kind: "reminder_1",
-      status: "pending",
-      scheduled_for: new Date(new Date(sentAt).getTime() + 24 * 60 * 60 * 1000).toISOString(),
-      to_address: customerContact,
-      normalized_phone: normalizedPhone,
-      message_body: buildReminderSmsMessage({
-        kind: "reminder_1",
-        customerName,
-        businessName,
-        reviewLinkUrl,
-      }),
-    },
-    {
-      review_link_id: reviewLinkId,
-      business_id: businessId,
-      channel: "sms",
-      kind: "reminder_2",
-      status: "pending",
-      scheduled_for: new Date(new Date(sentAt).getTime() + 72 * 60 * 60 * 1000).toISOString(),
-      to_address: customerContact,
-      normalized_phone: normalizedPhone,
-      message_body: buildReminderSmsMessage({
-        kind: "reminder_2",
-        customerName,
-        businessName,
-        reviewLinkUrl,
-      }),
-    },
-  ]);
+      customerName,
+      businessName,
+      reviewLinkUrl,
+    }),
+  });
 
   if (error && error.code !== "23505") {
     return { error };

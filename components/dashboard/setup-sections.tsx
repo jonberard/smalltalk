@@ -1696,7 +1696,7 @@ export function AutomatedRemindersSection({
               Send automatic reminders to customers who don&apos;t complete their review
             </p>
             <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">
-              small Talk can send up to two follow-ups, and stops as soon as the customer completes the flow or texts STOP.
+              small Talk can send one thoughtful follow-up, and stops as soon as the customer completes the flow or texts STOP.
             </p>
           </div>
           <button
@@ -1807,15 +1807,9 @@ export function AutomatedRemindersSection({
               </p>
             </div>
             <div className="rounded-[10px] bg-[var(--dash-bg)] px-3.5 py-3">
-              <p className="text-[13px] font-medium text-[var(--dash-text)]">2. First reminder</p>
+              <p className="text-[13px] font-medium text-[var(--dash-text)]">2. Follow-up reminder</p>
               <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
-                Sent 24 hours later if the customer still hasn&apos;t completed the flow.
-              </p>
-            </div>
-            <div className="rounded-[10px] bg-[var(--dash-bg)] px-3.5 py-3">
-              <p className="text-[13px] font-medium text-[var(--dash-text)]">3. Final reminder</p>
-              <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
-                Sent 72 hours after the initial request. That&apos;s the last message.
+                Sent 6 days later if the customer still hasn&apos;t completed the flow. That&apos;s the last message.
               </p>
             </div>
           </div>
@@ -2095,139 +2089,31 @@ export function BillingSummarySection({ business }: { business: Business }) {
       detail: teamCount > 0 ? "On your account" : "Add from Team & Services",
     },
   ];
-  const billingAccessRows = hasPaidSubscription
-    ? [
-        {
-          title: "Invoices & receipts",
-          detail: "Download invoice history and receipts in the billing portal.",
-          value: "In Stripe",
-        },
-        {
-          title: "Payment method",
-          detail: status === "past_due" ? "Update the saved card to clear the payment issue." : "Update the saved card or billing details from the same place.",
-          value: status === "past_due" ? "Needs attention" : "Saved card",
-        },
-        {
-          title: "Plan changes",
-          detail:
-            isCancellationScheduled && cancelScheduledFor
-              ? `Your subscription stays active until ${cancelScheduledFor.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. It will cancel automatically after that.`
-              : status === "trialing"
-              ? trialEndsAt
-                ? `You're subscribed. Your included free trial runs through ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
-                : "You're subscribed. Card details and invoices live in Stripe."
-              : "Change plans or review subscription details in Stripe.",
-          value:
-            isCancellationScheduled && cancelScheduledFor
-              ? `Ends ${cancelScheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-              : status === "trialing"
-                ? "Subscribed"
-                : "Manage",
-        },
-      ]
-    : status === "paused"
-      ? [
-          {
-            title: "Sending paused",
-            detail: "Review requests and reminders stay off while the account is paused.",
-            value: "Paused",
-          },
-          {
-            title: "Your data",
-            detail: pausedUntil
-              ? `Business setup, review links, and history stay saved through ${pausedUntil.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
-              : "Business setup, review links, and history stay saved while paused.",
-            value: "Saved",
-          },
-          {
-            title: "Resume anytime",
-            detail: "When you're ready, start the plan again with the same login and pick up where you left off.",
-            value: "Resume",
-          },
-        ]
-      : status === "canceled"
-        ? [
-            {
-              title: "Plan ended",
-              detail: "Billing has stopped and no new sends will go out.",
-              value: "Canceled",
-            },
-            {
-              title: "Your data",
-              detail: "Business setup, review links, and customer history stay saved if you come back later.",
-              value: "Saved",
-            },
-            {
-              title: "Resume anytime",
-              detail: "Sign back in and start the plan again without redoing the full business setup.",
-              value: "Resume",
-            },
-          ]
-    : [
-        {
-          title: "Start billing",
-          detail: "Checkout opens in Stripe when you're ready to unlock live sending.",
-          value: "Stripe",
-        },
-        {
-          title: "Current status",
-          detail:
-            status === "trial" || status === "trialing"
-              ? isFreeTrial
-                ? `${trialRequestsRemaining} of ${trialRequestLimit} live requests left. The free trial also ends in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}.`
-                : `You're subscribed. Your included trial ends in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}.`
-              : "No paid billing activity yet.",
-          value: status === "trialing" ? "Subscribed" : status === "trial" ? "Trial" : "Not started",
-        },
-        {
-          title: "Team members",
-          detail: teamCount > 0 ? `${teamCount} on the account today.` : "No team members added yet.",
-          value: teamCount > 0 ? `${teamCount}` : "—",
-        },
-      ];
-  const billingAccessTitle =
-    hasPaidSubscription
-      ? "Billing access"
-      : status === "paused"
-        ? "Account paused"
-        : status === "canceled"
-          ? "Plan canceled"
-          : "Billing setup";
-  const billingAccessDescription = hasPaidSubscription
-    ? isCancellationScheduled && cancelScheduledFor
-      ? `Your subscription stays active until ${cancelScheduledFor.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. Billing will not renew after that.`
-      : "The billing portal handles invoices, cards, and plan changes in one place."
-    : status === "paused"
-      ? "Your data is saved and sending is paused while you step away."
-      : status === "canceled"
-        ? "Billing has stopped, but the account and its history stay saved."
-    : "Stripe opens when you're ready to start the plan and save billing details.";
   const billingFooterNote =
     isCancellationScheduled && cancelScheduledFor
-      ? `Your subscription stays active until ${cancelScheduledFor.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. It will cancel automatically after that.`
+      ? `Subscribed through ${cancelScheduledFor.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
       : status === "active"
-      ? "Your plan is active. Review requests and follow-ups keep running as normal."
+      ? "Your subscription is active."
         : status === "trial" || status === "trialing"
         ? isFreeTrial
           ? trialEndsAt
-            ? `You have ${trialRequestsRemaining} of ${trialRequestLimit} live requests left. The free trial also ends on ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
-            : `You have ${trialRequestsRemaining} of ${trialRequestLimit} live requests left in the free trial.`
+            ? `${trialRequestsRemaining} of ${trialRequestLimit} live requests left. Trial ends ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
+            : `${trialRequestsRemaining} of ${trialRequestLimit} live requests left.`
           : trialEndsAt
-            ? `You're subscribed. Your included free trial runs until ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
-            : "You're subscribed and billing details are saved in Stripe."
+            ? `Subscribed. First billing date is ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
+            : "Subscribed."
         : status === "paused"
           ? pausedUntil
-            ? `Everything stays saved through ${pausedUntil.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. Resume anytime before or after that date.`
-            : "Everything stays saved while the account is paused. Resume anytime."
+            ? `Paused until ${pausedUntil.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. Your data stays saved.`
+            : "Paused. Your data stays saved."
         : status === "past_due"
-          ? "A recent payment failed. Update the billing method to keep sending without interruption."
+          ? "Payment update needed to keep sending live."
           : status === "canceled"
-            ? "Billing is off, but your historic requests, replies, and business setup stay on the account."
-            : "Start the plan when you're ready to send live requests and follow-ups to real customers.";
+            ? "Subscription canceled. Your data stays saved."
+            : "Start the plan when you're ready to send live requests.";
 
   return (
     <>
-      <div className="grid gap-5 min-[1180px]:grid-cols-[1.1fr_0.9fr]">
       <section className="relative overflow-hidden rounded-[16px] border border-[var(--dash-border)] bg-white px-7 py-7 shadow-[var(--dash-shadow)]">
         <div className="pointer-events-none absolute right-[-38px] top-[-56px] h-[200px] w-[200px] rounded-full bg-[radial-gradient(circle,rgba(224,90,61,0.16)_0%,rgba(224,90,61,0.05)_34%,transparent_68%)]" />
         <div className="relative">
@@ -2257,7 +2143,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
             </span>
           </div>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 min-[1180px]:grid-cols-3">
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
             {usageTiles.map((tile) => (
               <div key={tile.label} className="rounded-[14px] border border-[var(--dash-border)] bg-[#FCFAF6] px-4 py-3.5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
@@ -2271,170 +2157,98 @@ export function BillingSummarySection({ business }: { business: Business }) {
             ))}
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-dashed border-[#D9CFB6] pt-4">
-            <div>
-              <p className="text-[13px] text-[var(--dash-text)]">
-                {hasPortalAccess
-                  ? "Billing details, invoices, and payment methods live in Stripe."
-                  : hasPaidSubscription
-                    ? "Your subscription trial is live. Stripe billing details are still syncing into the account."
-                    : hasSavedOffboardingState
-                      ? "Your account data is still here whenever you're ready to come back."
-                      : isFreeTrial
-                        ? "Use the free trial to send real requests first. Start the plan when you're ready to keep going."
-                        : "Start the plan when you’re ready to unlock live sending."}
-              </p>
-              {(status === "trial" || status === "trialing") && trialEndsAt ? (
-                <p className="mt-1 text-[12px] text-[#9B5C2E]">
-                  {isFreeTrial
-                    ? `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in the free trial window.`
-                    : `First billing date is ${trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`}
-                </p>
-              ) : null}
-              {billingSyncing && !business.stripe_customer_id ? (
-                <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
-                  Finishing the Stripe link for invoices and card management...
-                </p>
-              ) : null}
-            </div>
-            <div className="flex flex-wrap gap-2.5">
-              {hasPortalAccess ? (
-                <button
-                  type="button"
-                  onClick={() => void handlePortal()}
-                  disabled={redirecting}
-                  className={dashboardButtonClassName({ variant: "secondary", size: "sm" })}
-                >
-                  {redirecting
-                    ? "Redirecting..."
-                    : status === "past_due"
-                      ? "Update payment"
-                      : hasPaidSubscription
-                        ? "Manage billing"
-                        : "Billing history"}
-                </button>
-              ) : null}
+          <div className="mt-6 border-t border-dashed border-[#D9CFB6] pt-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-[560px]">
+                <p className="text-[13px] text-[var(--dash-text)]">{billingFooterNote}</p>
+                {billingSyncing && !business.stripe_customer_id ? (
+                  <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
+                    Finishing the Stripe link for invoices and card management...
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+                {hasPortalAccess ? (
+                  <button
+                    type="button"
+                    onClick={() => void handlePortal()}
+                    disabled={redirecting}
+                    className={`${dashboardButtonClassName({ variant: "secondary", size: "sm" })} min-w-[152px]`}
+                  >
+                    {redirecting
+                      ? "Redirecting..."
+                      : status === "past_due"
+                        ? "Update payment"
+                        : hasPaidSubscription
+                          ? "Manage billing"
+                          : "Billing history"}
+                  </button>
+                ) : null}
+                {status === "trial" ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleCheckout()}
+                    disabled={redirecting}
+                    className={`${dashboardButtonClassName({ variant: "success", size: "sm" })} min-w-[152px]`}
+                  >
+                    {redirecting ? "Redirecting..." : "Start plan"}
+                  </button>
+                ) : hasPaidSubscription ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowPauseDialog(true)}
+                      className={`${dashboardButtonClassName({
+                        variant: "warning",
+                        size: "sm",
+                      })} min-w-[152px]`}
+                    >
+                      Pause account
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowCancelPlanDialog(true)}
+                      className={`${dashboardButtonClassName({
+                        variant: "danger",
+                        size: "sm",
+                      })} min-w-[152px]`}
+                    >
+                      Cancel subscription
+                    </button>
+                  </>
+                ) : hasPortalAccess && hasSavedOffboardingState ? (
+                  <button
+                    type="button"
+                    onClick={() => void handlePortal()}
+                    disabled={redirecting}
+                    className={`${dashboardButtonClassName({ variant: "accent", size: "sm" })} min-w-[152px]`}
+                  >
+                    {redirecting ? "Redirecting..." : "Open billing history"}
+                  </button>
+                ) : billingSyncing ? (
+                  <span className="inline-flex min-w-[152px] items-center justify-center rounded-full border border-[#E6DDD0] bg-white px-3 py-1.5 text-[11px] font-medium text-[var(--dash-muted)]">
+                    Syncing Stripe details
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleCheckout()}
+                    disabled={redirecting}
+                    className={`${dashboardButtonClassName({ variant: "success", size: "sm" })} min-w-[152px]`}
+                  >
+                    {redirecting ? "Redirecting..." : "Start plan"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </section>
-
-      <section
-        id="billing"
-        className="overflow-hidden rounded-[16px] border border-[var(--dash-border)] bg-white shadow-[var(--dash-shadow)]"
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-[var(--dash-border)] px-5 py-5">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
-              {billingAccessTitle}
-            </p>
-            <h3 className="mt-2 text-[18px] font-semibold tracking-tight text-[var(--dash-text)]">
-              {hasPaidSubscription
-                ? "Handle payment details in one place"
-                : status === "paused"
-                  ? "Everything stays saved while you're away"
-                  : status === "canceled"
-                    ? "Come back without starting from scratch"
-                    : "Billing starts when you’re ready"}
-            </h3>
-            <p className="mt-2 max-w-[34ch] text-[12px] leading-relaxed text-[var(--dash-muted)]">
-              {billingAccessDescription}
-            </p>
-          </div>
-          <StatusPill status={status} className="shrink-0" />
-        </div>
-
-        <div className="divide-y divide-[var(--dash-border)]">
-          {billingAccessRows.map((row) => (
-            <div key={row.title} className="flex items-start justify-between gap-4 px-5 py-4">
-              <div className="min-w-0">
-                <p className="text-[13px] font-medium text-[var(--dash-text)]">{row.title}</p>
-                <p className="mt-1 text-[12px] leading-relaxed text-[var(--dash-muted)]">{row.detail}</p>
-              </div>
-              <span className="shrink-0 rounded-full border border-[#E6DDD0] bg-[#FCFAF6] px-3 py-1 text-[11px] font-medium text-[var(--dash-text)]">
-                {row.value}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="border-t border-[var(--dash-border)] bg-[#FCFAF6] px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <p
-              className={`max-w-[34ch] text-[12px] leading-relaxed ${
-                status === "past_due" ? "text-[#C04E31]" : "text-[var(--dash-muted)]"
-              }`}
-            >
-              {billingFooterNote}
-            </p>
-            {status === "trial" ? (
-              <button
-                type="button"
-                onClick={() => void handleCheckout()}
-                disabled={redirecting}
-                className={dashboardButtonClassName({ variant: "success", size: "sm" })}
-              >
-                {redirecting ? "Redirecting..." : "Start plan"}
-              </button>
-            ) : hasPaidSubscription ? (
-              <div className="flex w-full max-w-[336px] flex-col gap-2.5 sm:items-end">
-                <div className="grid w-full grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setShowPauseDialog(true)}
-                    className={dashboardButtonClassName({
-                      variant: "warning",
-                      size: "sm",
-                      fullWidth: true,
-                    })}
-                  >
-                    Pause account
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowCancelPlanDialog(true)}
-                    className={dashboardButtonClassName({
-                      variant: "danger",
-                      size: "sm",
-                      fullWidth: true,
-                    })}
-                  >
-                    Cancel subscription
-                  </button>
-                </div>
-              </div>
-            ) : hasPortalAccess && hasSavedOffboardingState ? (
-              <button
-                type="button"
-                onClick={() => void handlePortal()}
-                disabled={redirecting}
-                className={dashboardButtonClassName({ variant: "accent", size: "sm" })}
-              >
-                {redirecting ? "Redirecting..." : "Open billing history"}
-              </button>
-            ) : billingSyncing ? (
-              <span className="rounded-full border border-[#E6DDD0] bg-white px-3 py-1.5 text-[11px] font-medium text-[var(--dash-muted)]">
-                Syncing Stripe details
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void handleCheckout()}
-                disabled={redirecting}
-                className={dashboardButtonClassName({ variant: "success", size: "sm" })}
-              >
-                {redirecting ? "Redirecting..." : "Start plan"}
-              </button>
-            )}
-          </div>
-          {billingActionError ? (
-            <p className="mt-3 text-[12px] leading-relaxed text-[#A6452E]">
-              {billingActionError}
-            </p>
-          ) : null}
-        </div>
-      </section>
-      </div>
+      {billingActionError ? (
+        <p className="mt-3 text-[12px] leading-relaxed text-[#A6452E]">
+          {billingActionError}
+        </p>
+      ) : null}
       <PauseAccountDialog
         open={showPauseDialog}
         onClose={() => setShowPauseDialog(false)}

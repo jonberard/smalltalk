@@ -649,7 +649,7 @@ export default function ReviewFlowSetupPage() {
             actionLabel="Edit timing"
           >
             <div className="rounded-[18px] border border-[var(--dash-border)] bg-[#FFFCF8] px-4 py-4">
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <TimingRailStep
                   label="Day 0"
                   title="Ask"
@@ -657,18 +657,17 @@ export default function ReviewFlowSetupPage() {
                   state="active"
                 />
                 <TimingRailStep
-                  label="Day 2"
-                  title="Nudge"
+                  label="Day 6"
+                  title="Follow-up"
                   subtitle={remindersEnabled ? "10 AM" : "off"}
                   state={remindersEnabled ? "default" : "muted"}
                 />
                 <TimingRailStep
-                  label="Day 5"
-                  title="Last note"
-                  subtitle={remindersEnabled ? "10 AM" : "off"}
-                  state={remindersEnabled ? "default" : "muted"}
+                  label="After that"
+                  title="Stop"
+                  subtitle="no more"
+                  state="muted"
                 />
-                <TimingRailStep label="Day 6" title="Stop" subtitle="no more" state="muted" />
               </div>
             </div>
           </FlowControlCard>

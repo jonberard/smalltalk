@@ -31,7 +31,7 @@ export function getReminderBadgeState(
   }
 
   if (reminder1?.status === "failed") {
-    return { label: "Reminder 1 failed", tone: "warning" };
+    return { label: "Reminder failed", tone: "warning" };
   }
 
   if (reminder2?.status === "sent") {
@@ -43,11 +43,11 @@ export function getReminderBadgeState(
   }
 
   if (reminder1?.status === "sent") {
-    return { label: "Reminder 1 sent", tone: "neutral" };
+    return reminder2 ? { label: "Reminder sent", tone: "neutral" } : { label: "No response", tone: "neutral" };
   }
 
   if (reminder1?.status === "pending") {
-    return { label: "Reminder 1 scheduled", tone: "neutral" };
+    return { label: "Reminder scheduled", tone: "neutral" };
   }
 
   return null;
