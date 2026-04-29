@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { captureServerException } from "@/lib/server-error-reporting";
-import { getSubscriptionCurrentPeriodEnd, mapSubscriptionStatus } from "@/lib/stripe-utils";
+import { recordRequestReloadPurchase } from "@/lib/request-reload-purchases";
+import {
+  getSubscriptionCurrentPeriodEnd,
+  getSubscriptionCurrentPeriodStart,
+  mapSubscriptionStatus,
+} from "@/lib/stripe-utils";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 async function updateByCustomerId(customerId: string, fields: Record<string, unknown>) {
@@ -156,9 +161,52 @@ export async function POST(req: NextRequest) {
       /* ─── Checkout ─── */
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+        const purchaseType = session.metadata?.purchaseType;
         const userId = session.client_reference_id;
         const customerId = session.customer as string | null;
-        const subscriptionId = session.subscription as string | null;
+        const subscriptionId =
+          typeof session.subscription === "string"
+            ? session.subscription
+            : null;
+
+        if (purchaseType === "request_reload") {
+          const businessId = session.metadata?.businessId ?? userId;
+          const credits = Number(session.metadata?.requestCredits ?? "0");
+
+          if (!businessId) {
+            throw new Error("reload checkout missing business identifier");
+          }
+
+          if (!credits) {
+            throw new Error("reload checkout missing credit metadata");
+          }
+
+          await recordRequestReloadPurchase({
+            businessId,
+            stripeCheckoutSessionId: session.id,
+            stripePaymentIntentId:
+              typeof session.payment_intent === "string"
+                ? session.payment_intent
+                : null,
+            credits,
+            amountCents: session.amount_total ?? 0,
+          });
+
+          if (customerId) {
+            const { error: syncCustomerError } = await supabaseAdmin
+              .from("businesses")
+              .update({ stripe_customer_id: customerId })
+              .eq("id", businessId);
+
+            if (syncCustomerError) {
+              throw new Error(
+                `Failed to sync Stripe customer for reload purchase ${session.id}: ${syncCustomerError.message}`,
+              );
+            }
+          }
+
+          break;
+        }
 
         if (!userId) {
           throw new Error("checkout.session.completed missing client_reference_id");
@@ -166,10 +214,19 @@ export async function POST(req: NextRequest) {
 
         let subscriptionStatus = "active";
         let cancelScheduledFor: string | null = null;
+        let currentBillingPeriodStart: string | null = null;
+        let currentBillingPeriodEnd: string | null = null;
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
           subscriptionStatus = mapSubscriptionStatus(subscription.status);
+          const currentPeriodStart = getSubscriptionCurrentPeriodStart(subscription);
           const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(subscription);
+          currentBillingPeriodStart = currentPeriodStart
+            ? new Date(currentPeriodStart * 1000).toISOString()
+            : null;
+          currentBillingPeriodEnd = currentPeriodEnd
+            ? new Date(currentPeriodEnd * 1000).toISOString()
+            : null;
           cancelScheduledFor = subscription.cancel_at_period_end
             && currentPeriodEnd
             ? new Date(currentPeriodEnd * 1000).toISOString()
@@ -178,6 +235,8 @@ export async function POST(req: NextRequest) {
 
         const updateFields: Record<string, string | null> = {
           subscription_status: subscriptionStatus,
+          current_billing_period_start: currentBillingPeriodStart,
+          current_billing_period_end: currentBillingPeriodEnd,
           cancel_scheduled_for: cancelScheduledFor,
         };
 
@@ -210,6 +269,18 @@ export async function POST(req: NextRequest) {
         await updateByCustomerId(customerId, {
           stripe_subscription_id: sub.id,
           subscription_status: status,
+          current_billing_period_start: (() => {
+            const currentPeriodStart = getSubscriptionCurrentPeriodStart(sub);
+            return currentPeriodStart
+              ? new Date(currentPeriodStart * 1000).toISOString()
+              : null;
+          })(),
+          current_billing_period_end: (() => {
+            const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(sub);
+            return currentPeriodEnd
+              ? new Date(currentPeriodEnd * 1000).toISOString()
+              : null;
+          })(),
           paused_until: null,
           cancel_scheduled_for: sub.cancel_at_period_end
             ? (() => {
@@ -231,6 +302,18 @@ export async function POST(req: NextRequest) {
         await updateByCustomerId(customerId, {
           stripe_subscription_id: sub.id,
           subscription_status: status,
+          current_billing_period_start: (() => {
+            const currentPeriodStart = getSubscriptionCurrentPeriodStart(sub);
+            return currentPeriodStart
+              ? new Date(currentPeriodStart * 1000).toISOString()
+              : null;
+          })(),
+          current_billing_period_end: (() => {
+            const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(sub);
+            return currentPeriodEnd
+              ? new Date(currentPeriodEnd * 1000).toISOString()
+              : null;
+          })(),
           paused_until: null,
           cancel_scheduled_for: sub.cancel_at_period_end
             ? (() => {
@@ -270,6 +353,18 @@ export async function POST(req: NextRequest) {
 
         await updateByCustomerId(customerId, {
           subscription_status: status,
+          current_billing_period_start: (() => {
+            const currentPeriodStart = getSubscriptionCurrentPeriodStart(sub);
+            return currentPeriodStart
+              ? new Date(currentPeriodStart * 1000).toISOString()
+              : null;
+          })(),
+          current_billing_period_end: (() => {
+            const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(sub);
+            return currentPeriodEnd
+              ? new Date(currentPeriodEnd * 1000).toISOString()
+              : null;
+          })(),
           paused_until: null,
           cancel_scheduled_for: sub.cancel_at_period_end
             ? (() => {

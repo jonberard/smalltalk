@@ -25,11 +25,13 @@ export function getSubscriptionCurrentPeriodEnd(
   subscription: Stripe.Subscription,
 ) {
   const subscriptionWithPeriodEnd = subscription as Stripe.Subscription & {
+    current_period_start?: number | null;
     current_period_end?: number | null;
     trial_end?: number | null;
     cancel_at?: number | null;
     items?: {
       data?: Array<{
+        current_period_start?: number | null;
         current_period_end?: number | null;
       }>;
     } | null;
@@ -53,6 +55,33 @@ export function getSubscriptionCurrentPeriodEnd(
 
   if (itemPeriodEnds.length > 0) {
     return Math.max(...itemPeriodEnds);
+  }
+
+  return null;
+}
+
+export function getSubscriptionCurrentPeriodStart(
+  subscription: Stripe.Subscription,
+) {
+  const subscriptionWithPeriodStart = subscription as Stripe.Subscription & {
+    current_period_start?: number | null;
+    items?: {
+      data?: Array<{
+        current_period_start?: number | null;
+      }>;
+    } | null;
+  };
+
+  if (typeof subscriptionWithPeriodStart.current_period_start === "number") {
+    return subscriptionWithPeriodStart.current_period_start;
+  }
+
+  const itemPeriodStarts = (subscriptionWithPeriodStart.items?.data ?? [])
+    .map((item) => item.current_period_start)
+    .filter((value): value is number => typeof value === "number");
+
+  if (itemPeriodStarts.length > 0) {
+    return Math.min(...itemPeriodStarts);
   }
 
   return null;

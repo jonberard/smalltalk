@@ -1,6 +1,7 @@
 import "server-only";
 
 import Stripe from "stripe";
+import { isStripeMissingResourceError } from "@/lib/stripe-customer";
 
 const CANCELABLE_STATUSES = new Set([
   "trialing",
@@ -64,11 +65,21 @@ async function findManagedSubscription(
     return null;
   }
 
-  const subscriptions = await stripe.subscriptions.list({
-    customer: customerId,
-    status: "all",
-    limit: 10,
-  });
+  let subscriptions: Stripe.ApiList<Stripe.Subscription>;
+
+  try {
+    subscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 10,
+    });
+  } catch (error) {
+    if (isStripeMissingResourceError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
 
   return pickManagedSubscription(subscriptions.data);
 }

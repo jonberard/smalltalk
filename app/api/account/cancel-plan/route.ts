@@ -3,7 +3,10 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { captureServerException } from "@/lib/server-error-reporting";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { scheduleStripeBillingCancellation } from "@/lib/stripe-billing";
+import {
+  findManagedCustomerAndSubscriptionByEmail,
+  scheduleStripeBillingCancellation,
+} from "@/lib/stripe-billing";
 import { getSubscriptionCurrentPeriodEnd, mapSubscriptionStatus } from "@/lib/stripe-utils";
 
 async function getAuthenticatedUser(req: NextRequest) {
@@ -58,10 +61,42 @@ export async function POST(req: NextRequest) {
     }
 
     const stripe = new Stripe(STRIPE_SECRET_KEY);
+    let stripeCustomerId = business.stripe_customer_id ?? null;
+    let stripeSubscriptionId = business.stripe_subscription_id ?? null;
+
+    if (user.email) {
+      const emailMatch = await findManagedCustomerAndSubscriptionByEmail(
+        stripe,
+        user.email,
+      );
+
+      if (emailMatch) {
+        stripeCustomerId = emailMatch.customerId;
+        stripeSubscriptionId = emailMatch.subscription.id;
+      }
+    }
+
+    if (
+      stripeCustomerId !== business.stripe_customer_id ||
+      stripeSubscriptionId !== business.stripe_subscription_id
+    ) {
+      const { error: syncError } = await supabaseAdmin
+        .from("businesses")
+        .update({
+          stripe_customer_id: stripeCustomerId,
+          stripe_subscription_id: stripeSubscriptionId,
+        })
+        .eq("id", user.id);
+
+      if (syncError) {
+        throw new Error(syncError.message);
+      }
+    }
+
     const scheduledSubscription = await scheduleStripeBillingCancellation(
       stripe,
-      business.stripe_customer_id ?? null,
-      business.stripe_subscription_id ?? null,
+      stripeCustomerId,
+      stripeSubscriptionId,
     );
 
     if (!scheduledSubscription) {

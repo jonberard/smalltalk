@@ -124,6 +124,10 @@ function getFriendlyPublicFlowError(
     return "This review link needs a quick pause before trying again.";
   }
 
+  if (message.includes("isn’t taking new drafts right now")) {
+    return "This review link needs a quick pause before trying again.";
+  }
+
   if (
     message.includes("reached the limit for this review") ||
     message.includes("use your current draft") ||

@@ -8,6 +8,11 @@ export type ReviewRequestBusiness = {
   subscription_status: string;
   trial_requests_remaining: number;
   trial_ends_at: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  current_billing_period_start: string | null;
+  current_billing_period_end: string | null;
+  extra_request_credits: number;
   reminder_sequence_enabled: boolean | null;
   quiet_hours_start: number | null;
   quiet_hours_end: number | null;
@@ -20,7 +25,7 @@ export type ReviewRequestBusiness = {
 };
 
 export const REVIEW_REQUEST_BUSINESS_SELECT =
-  "id, name, subscription_status, trial_requests_remaining, trial_ends_at, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone, batch_initial_sms_enabled, batch_initial_sms_hour, review_request_sms_template, review_request_email_subject_template, review_request_email_intro_template";
+  "id, name, subscription_status, trial_requests_remaining, trial_ends_at, stripe_customer_id, stripe_subscription_id, current_billing_period_start, current_billing_period_end, extra_request_credits, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone, batch_initial_sms_enabled, batch_initial_sms_hour, review_request_sms_template, review_request_email_subject_template, review_request_email_intro_template";
 
 export function isBusinessAllowedToCreateReviewRequest(
   business: ReviewRequestBusiness,

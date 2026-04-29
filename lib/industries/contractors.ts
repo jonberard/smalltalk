@@ -51,7 +51,7 @@ export const contractorsData: IndustryPageData = {
       {
         icon: "dollar",
         heading: "One price, every project size",
-        body: "Whether you finish 6 projects a year or 60, it’s $79/month. Unlimited review requests. No contracts. No per-project fees.",
+        body: "Whether you finish 6 projects a year or 60, it’s still $79/month with 500 customer requests included. If one month runs especially full, add 100 more without changing the whole setup.",
       },
     ],
   },

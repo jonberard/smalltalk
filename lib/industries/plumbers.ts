@@ -51,7 +51,7 @@ export const plumbersData: IndustryPageData = {
       {
         icon: "wrench",
         heading: "Emergency volume, scheduled volume, one flat price",
-        body: "Unlimited review requests. Send 400 after a busy month of burst pipes. Send 80 during a slow stretch. No per-request fees. No seasonal penalties.",
+        body: "You get 500 customer requests each month. Plenty for the everyday work, enough room for a spike, and if a brutal week of burst pipes pushes you past that, add 100 more and keep moving.",
       },
     ],
   },

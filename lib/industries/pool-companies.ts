@@ -129,7 +129,7 @@ export const poolCompaniesData: IndustryPageData = {
     },
     {
       question: "What about seasonal businesses? Do I pay for months I’m not working?",
-      answer: "Yes, it’s a flat $79/month year-round. But unlimited review requests means you can send 300 in summer and 20 in winter for the same price. Most pool businesses still run equipment sales, heater installs, and repair work year-round anyway — so the requests don’t really stop.",
+      answer: "Yes, it’s a flat $79/month year-round with 500 customer requests included each month. That gives most pool businesses plenty of room for the busy season, and if one stretch runs hotter than expected, you can add 100 more without switching plans.",
     },
     {
       question: "Can I include the tech’s name in the review?",

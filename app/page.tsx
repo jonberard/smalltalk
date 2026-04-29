@@ -680,7 +680,7 @@ export default function LandingPage() {
                 "Detailed drafts built from what your customer really said",
                 "One thoughtful follow-up, timed for when the work has had a chance to settle in",
                 "A real private-feedback path when someone is unhappy",
-                "Flat monthly pricing, without add-ons or per-review fees",
+                "500 customer requests each month, with an optional 100-request add-on for $25 that stays on your account until you use it",
                 "Copy the review and open Google in one tap",
               ].map((f) => (
                 <li key={f} className="flex items-start gap-3 text-[14px] text-text">

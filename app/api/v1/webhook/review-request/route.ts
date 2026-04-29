@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { handleReviewRequest } from "@/lib/integrations/core";
 import { hashIntegrationApiKey } from "@/lib/integration-api-key";
 import {
-  decrementTrialIfNeeded,
   isBusinessAllowedToCreateReviewRequest,
   REVIEW_REQUEST_BUSINESS_SELECT,
   type ReviewRequestBusiness,
 } from "@/lib/review-request-eligibility";
+import {
+  consumeRequestAllowance,
+  hydrateBillingCycleWindow,
+} from "@/lib/request-allowance";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 /* ═══════════════════════════════════════════════════
@@ -49,11 +52,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (
-    !isBusinessAllowedToCreateReviewRequest(
-      business as ReviewRequestBusiness,
-    )
-  ) {
+  const billingAwareBusiness = await hydrateBillingCycleWindow(
+    business as ReviewRequestBusiness,
+  );
+
+  if (!isBusinessAllowedToCreateReviewRequest(billingAwareBusiness as ReviewRequestBusiness)) {
     return NextResponse.json(
       {
         error:
@@ -103,7 +106,7 @@ export async function POST(req: NextRequest) {
   // 4. Create review request
   try {
     const result = await handleReviewRequest({
-      businessId: business.id,
+      businessId: billingAwareBusiness.id,
       customerName,
       customerPhone,
       customerEmail,
@@ -112,15 +115,40 @@ export async function POST(req: NextRequest) {
       source: "webhook",
     });
 
-    const remainingTrialRequests = await decrementTrialIfNeeded(
-      business as ReviewRequestBusiness,
-    );
+    const allowance = await consumeRequestAllowance({
+      businessId: billingAwareBusiness.id,
+      source: "personalized_request",
+      reviewLinkId: result.reviewLinkId,
+    });
+
+    if (!allowance.ok) {
+      await supabaseAdmin
+        .from("review_links")
+        .delete()
+        .eq("id", result.reviewLinkId);
+
+      return NextResponse.json(
+        {
+          error:
+            allowance.plan_kind === "trial"
+              ? "This business has used the review requests in its free trial."
+              : "This business has used this cycle’s 500 included requests and has no add-on requests left.",
+        },
+        { status: 403 },
+      );
+    }
 
     return NextResponse.json({
       success: true,
       review_url: result.reviewUrl,
       review_link_id: result.reviewLinkId,
-      remaining_trial_requests: remainingTrialRequests,
+      remaining_trial_requests:
+        allowance.plan_kind === "trial"
+          ? allowance.remaining
+          : billingAwareBusiness.trial_requests_remaining,
+      request_allowance_remaining: allowance.remaining,
+      request_allowance_total: allowance.total,
+      request_allowance_reset_at: allowance.cycle_end ?? null,
     });
   } catch (err) {
     const message =

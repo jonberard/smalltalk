@@ -7,6 +7,10 @@ import {
   type StoredPublicTopicAnswer,
 } from "@/lib/public-review-flow";
 import { consumePublicRateLimit, getClientIp } from "@/lib/public-rate-limit";
+import {
+  consumeRequestAllowance,
+  releaseRequestAllowance,
+} from "@/lib/request-allowance";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 type GenerateBody = {
@@ -157,6 +161,34 @@ export async function POST(
     return NextResponse.json({ error: "Review link not found" }, { status: 404 });
   }
 
+  let consumedAllowance:
+    | {
+        already_counted?: boolean;
+      }
+    | null = null;
+
+  if (sessionContext.reviewLink.is_generic) {
+    const allowance = await consumeRequestAllowance({
+      businessId: sessionContext.reviewLink.business_id,
+      source: "shared_public_draft",
+      reviewSessionId: sessionContext.session.id,
+    });
+
+    if (!allowance.ok) {
+      return NextResponse.json(
+        {
+          error:
+            "This review link isn’t taking new drafts right now. Please let the business know and try again soon.",
+        },
+        { status: 403 },
+      );
+    }
+
+    consumedAllowance = {
+      already_counted: allowance.already_counted,
+    };
+  }
+
   try {
     const result = await generateReview({
       star_rating: body.star_rating,
@@ -192,6 +224,17 @@ export async function POST(
     const message =
       error instanceof Error ? error.message : "Failed to generate review";
     const status = error instanceof AiRoutingError ? error.statusCode : 500;
+
+    if (
+      sessionContext.reviewLink.is_generic &&
+      consumedAllowance &&
+      !consumedAllowance.already_counted
+    ) {
+      await releaseRequestAllowance({
+        businessId: sessionContext.reviewLink.business_id,
+        reviewSessionId: sessionContext.session.id,
+      });
+    }
 
     return NextResponse.json({ error: message }, { status });
   }

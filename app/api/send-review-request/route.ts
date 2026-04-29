@@ -8,15 +8,23 @@ import {
 } from "@/lib/review-request-messages";
 import { getAppBaseUrl } from "@/lib/app-url";
 import {
-  decrementTrialIfNeeded,
   isBusinessAllowedToCreateReviewRequest,
   REVIEW_REQUEST_BUSINESS_SELECT,
   type ReviewRequestBusiness,
 } from "@/lib/review-request-eligibility";
+import {
+  consumeRequestAllowance,
+  hydrateBillingCycleWindow,
+  releaseRequestAllowance,
+} from "@/lib/request-allowance";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendReviewSms } from "@/lib/twilio-send";
 import { serverCapture } from "@/lib/posthog-server";
-import { DEFAULT_BUSINESS_TIME_ZONE, getNextBatchSendAt, sanitizeTimeZone } from "@/lib/quiet-hours";
+import {
+  DEFAULT_BUSINESS_TIME_ZONE,
+  getNextBatchSendAt,
+  sanitizeTimeZone,
+} from "@/lib/quiet-hours";
 import { queueReminderDeliveries } from "@/lib/review-message-deliveries";
 import { consumeBusinessRateLimit } from "@/lib/business-rate-limit";
 import { captureServerException } from "@/lib/server-error-reporting";
@@ -33,6 +41,7 @@ type SendRequestBody = {
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function generateCode() {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   const bytes = crypto.getRandomValues(new Uint8Array(8));
@@ -43,6 +52,35 @@ function generateCode() {
   }
 
   return code;
+}
+
+function formatResetDate(dateStr: string | null | undefined) {
+  if (!dateStr) return null;
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(dateStr));
+}
+
+function buildAllowanceErrorMessage(allowance: {
+  reason?: string;
+  plan_kind?: "trial" | "paid";
+  cycle_end?: string | null;
+}) {
+  if (allowance.reason === "missing_billing_period") {
+    return "We couldn’t confirm your billing window right now. Please try again in a moment.";
+  }
+
+  if (allowance.plan_kind === "trial") {
+    return "You’ve used the review requests in your free trial. Start the plan to keep sending live requests.";
+  }
+
+  const resetLabel = formatResetDate(allowance.cycle_end);
+
+  return resetLabel
+    ? `You’ve used this cycle’s 500 included requests, and there aren’t any add-on requests left. Add 100 more, or wait until ${resetLabel}.`
+    : "You’ve used this cycle’s 500 included requests, and there aren’t any add-on requests left. Add 100 more to keep sending.";
 }
 
 async function getAuthenticatedUserId(req: NextRequest) {
@@ -62,6 +100,21 @@ async function getAuthenticatedUserId(req: NextRequest) {
   } = await supabase.auth.getUser(authHeader);
 
   return user?.id ?? null;
+}
+
+async function cleanupUnusedReviewRequest(
+  reviewLinkId: string,
+  deliveryId: string,
+) {
+  await supabaseAdmin
+    .from("review_message_deliveries")
+    .delete()
+    .eq("id", deliveryId);
+
+  await supabaseAdmin
+    .from("review_links")
+    .delete()
+    .eq("id", reviewLinkId);
 }
 
 export async function POST(req: NextRequest) {
@@ -93,7 +146,11 @@ export async function POST(req: NextRequest) {
 
   const normalizedPhone = normalizePhone(customerContact);
   const normalizedEmail = customerContact.toLowerCase();
-  const channel = normalizedPhone ? "sms" : EMAIL_REGEX.test(normalizedEmail) ? "email" : null;
+  const channel = normalizedPhone
+    ? "sms"
+    : EMAIL_REGEX.test(normalizedEmail)
+      ? "email"
+      : null;
 
   if (!channel) {
     return NextResponse.json(
@@ -102,23 +159,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data: business, error: businessError } = await supabaseAdmin
+  const { data: rawBusiness, error: businessError } = await supabaseAdmin
     .from("businesses")
     .select(REVIEW_REQUEST_BUSINESS_SELECT)
     .eq("id", userId)
     .single();
 
-  if (businessError || !business) {
+  if (businessError || !rawBusiness) {
     return NextResponse.json({ error: "Business not found" }, { status: 404 });
   }
 
-  if (
-    !isBusinessAllowedToCreateReviewRequest(
-      business as ReviewRequestBusiness,
-    )
-  ) {
+  const business = (await hydrateBillingCycleWindow(
+    rawBusiness as ReviewRequestBusiness,
+  )) as ReviewRequestBusiness;
+
+  if (!isBusinessAllowedToCreateReviewRequest(business)) {
     return NextResponse.json(
-      { error: "Your subscription is inactive. Please subscribe to send review links." },
+      {
+        error:
+          "Your subscription is inactive. Please subscribe to send review links.",
+      },
       { status: 403 },
     );
   }
@@ -235,11 +295,14 @@ export async function POST(req: NextRequest) {
   }
 
   if (!reviewLink) {
-    captureServerException(new Error("Could not generate a unique review link after retries"), {
-      route: "/api/send-review-request",
-      tags: { business_id: business.id, channel },
-      extras: { stage: "generate_unique_code" },
-    });
+    captureServerException(
+      new Error("Could not generate a unique review link after retries"),
+      {
+        route: "/api/send-review-request",
+        tags: { business_id: business.id, channel },
+        extras: { stage: "generate_unique_code" },
+      },
+    );
     return NextResponse.json(
       { error: "Could not generate a unique review link. Please try again." },
       { status: 500 },
@@ -274,45 +337,76 @@ export async function POST(req: NextRequest) {
         ).toISOString()
       : new Date().toISOString();
 
-  const { data: initialDelivery, error: initialDeliveryError } = await supabaseAdmin
-    .from("review_message_deliveries")
-    .insert({
-      review_link_id: reviewLink.id,
-      business_id: business.id,
-      channel,
-      kind: "initial",
-      status: "pending",
-      scheduled_for: scheduledFor,
-      to_address: customerContact,
-      normalized_phone: normalizedPhone,
-      message_body: initialMessageBody,
-    })
-    .select("id")
-    .single();
+  const { data: initialDelivery, error: initialDeliveryError } =
+    await supabaseAdmin
+      .from("review_message_deliveries")
+      .insert({
+        review_link_id: reviewLink.id,
+        business_id: business.id,
+        channel,
+        kind: "initial",
+        status: "pending",
+        scheduled_for: scheduledFor,
+        to_address: customerContact,
+        normalized_phone: normalizedPhone,
+        message_body: initialMessageBody,
+      })
+      .select("id")
+      .single();
 
   if (initialDeliveryError || !initialDelivery) {
     captureServerException(
-      new Error(initialDeliveryError?.message || "Failed to create initial delivery record"),
+      new Error(
+        initialDeliveryError?.message ||
+          "Failed to create initial delivery record",
+      ),
       {
         route: "/api/send-review-request",
         tags: { business_id: business.id, channel },
-        extras: { stage: "log_initial_delivery", review_link_id: reviewLink.id },
+        extras: {
+          stage: "log_initial_delivery",
+          review_link_id: reviewLink.id,
+        },
       },
     );
     return NextResponse.json(
-      { error: `Failed to log delivery: ${initialDeliveryError?.message || "unknown error"}` },
+      {
+        error: `Failed to log delivery: ${
+          initialDeliveryError?.message || "unknown error"
+        }`,
+      },
       { status: 500 },
     );
   }
 
+  const allowance = await consumeRequestAllowance({
+    businessId: business.id,
+    source: "personalized_request",
+    reviewLinkId: reviewLink.id,
+  });
+
+  if (!allowance.ok) {
+    await cleanupUnusedReviewRequest(reviewLink.id, initialDelivery.id);
+
+    return NextResponse.json(
+      {
+        error: buildAllowanceErrorMessage(allowance),
+        request_allowance_remaining: allowance.remaining,
+        request_allowance_total: allowance.total,
+        request_allowance_reset_at: allowance.cycle_end ?? null,
+      },
+      { status: 403 },
+    );
+  }
+
   const sentAt = new Date().toISOString();
+  const remainingTrialRequests =
+    allowance.plan_kind === "trial"
+      ? allowance.remaining
+      : business.trial_requests_remaining;
 
   if (channel === "sms") {
     if (batchInitialSmsEnabled) {
-      const remainingTrialRequests = await decrementTrialIfNeeded(
-        business as ReviewRequestBusiness,
-      );
-
       serverCapture(userId, "review_request_queued", {
         business_id: business.id,
         scheduled_for: scheduledFor,
@@ -327,6 +421,9 @@ export async function POST(req: NextRequest) {
         review_link_url: reviewLinkUrl,
         unique_code: reviewLink.unique_code,
         remaining_trial_requests: remainingTrialRequests,
+        request_allowance_remaining: allowance.remaining,
+        request_allowance_total: allowance.total,
+        request_allowance_reset_at: allowance.cycle_end ?? null,
       });
     }
 
@@ -352,7 +449,10 @@ export async function POST(req: NextRequest) {
         .update({ initial_sent_at: sentAt })
         .eq("id", reviewLink.id);
 
-      serverCapture(userId, "review_request_sent", { channel, business_id: business.id });
+      serverCapture(userId, "review_request_sent", {
+        channel,
+        business_id: business.id,
+      });
 
       if (reminderSequenceEnabled) {
         const { error: reminderError } = await queueReminderDeliveries({
@@ -374,10 +474,6 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const remainingTrialRequests = await decrementTrialIfNeeded(
-        business as ReviewRequestBusiness,
-      );
-
       return NextResponse.json({
         success: true,
         channel,
@@ -386,8 +482,16 @@ export async function POST(req: NextRequest) {
         review_link_url: reviewLinkUrl,
         unique_code: reviewLink.unique_code,
         remaining_trial_requests: remainingTrialRequests,
+        request_allowance_remaining: allowance.remaining,
+        request_allowance_total: allowance.total,
+        request_allowance_reset_at: allowance.cycle_end ?? null,
       });
     }
+
+    const refundedAllowance = await releaseRequestAllowance({
+      businessId: business.id,
+      reviewLinkId: reviewLink.id,
+    });
 
     if (sendResult.skippedReason) {
       await supabaseAdmin
@@ -408,7 +512,13 @@ export async function POST(req: NextRequest) {
         review_link_id: reviewLink.id,
         review_link_url: reviewLinkUrl,
         unique_code: reviewLink.unique_code,
-        remaining_trial_requests: business.trial_requests_remaining,
+        remaining_trial_requests:
+          refundedAllowance.plan_kind === "trial"
+            ? refundedAllowance.remaining
+            : business.trial_requests_remaining,
+        request_allowance_remaining: allowance.remaining,
+        request_allowance_total: allowance.total,
+        request_allowance_reset_at: allowance.cycle_end ?? null,
       });
     }
 
@@ -429,7 +539,13 @@ export async function POST(req: NextRequest) {
       review_link_id: reviewLink.id,
       review_link_url: reviewLinkUrl,
       unique_code: reviewLink.unique_code,
-      remaining_trial_requests: business.trial_requests_remaining,
+      remaining_trial_requests:
+        refundedAllowance.plan_kind === "trial"
+          ? refundedAllowance.remaining
+          : business.trial_requests_remaining,
+      request_allowance_remaining: allowance.remaining,
+      request_allowance_total: allowance.total,
+      request_allowance_reset_at: allowance.cycle_end ?? null,
     });
   }
 
@@ -458,10 +574,10 @@ export async function POST(req: NextRequest) {
       .update({ initial_sent_at: sentAt })
       .eq("id", reviewLink.id);
 
-    serverCapture(userId, "review_request_sent", { channel, business_id: business.id });
-    const remainingTrialRequests = await decrementTrialIfNeeded(
-      business as ReviewRequestBusiness,
-    );
+    serverCapture(userId, "review_request_sent", {
+      channel,
+      business_id: business.id,
+    });
 
     return NextResponse.json({
       success: true,
@@ -471,8 +587,16 @@ export async function POST(req: NextRequest) {
       review_link_url: reviewLinkUrl,
       unique_code: reviewLink.unique_code,
       remaining_trial_requests: remainingTrialRequests,
+      request_allowance_remaining: allowance.remaining,
+      request_allowance_total: allowance.total,
+      request_allowance_reset_at: allowance.cycle_end ?? null,
     });
   }
+
+  const refundedAllowance = await releaseRequestAllowance({
+    businessId: business.id,
+    reviewLinkId: reviewLink.id,
+  });
 
   await supabaseAdmin
     .from("review_message_deliveries")
@@ -491,6 +615,12 @@ export async function POST(req: NextRequest) {
     review_link_id: reviewLink.id,
     review_link_url: reviewLinkUrl,
     unique_code: reviewLink.unique_code,
-    remaining_trial_requests: business.trial_requests_remaining,
+    remaining_trial_requests:
+      refundedAllowance.plan_kind === "trial"
+        ? refundedAllowance.remaining
+        : business.trial_requests_remaining,
+    request_allowance_remaining: allowance.remaining,
+    request_allowance_total: allowance.total,
+    request_allowance_reset_at: allowance.cycle_end ?? null,
   });
 }

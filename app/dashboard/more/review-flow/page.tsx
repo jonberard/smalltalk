@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { dashboardButtonClassName } from "@/components/dashboard/button";
 import { SetupPageShell } from "@/components/dashboard/setup-shell";
 import { useToast } from "@/components/dashboard/toast";
+import { useRequestAllowanceSummary } from "@/lib/request-allowance-client";
 import { REPLY_VOICES } from "@/lib/reply-generator";
 import { buildInitialSmsMessage } from "@/lib/review-request-messages";
 import { getNextBatchSendAt } from "@/lib/quiet-hours";
@@ -315,6 +316,8 @@ function getVoicePreview(voiceId: string, businessName: string, customReplyVoice
 export default function ReviewFlowSetupPage() {
   const { business } = useAuth();
   const { toast } = useToast();
+  const { summary: allowanceSummary, loading: allowanceLoading } =
+    useRequestAllowanceSummary(Boolean(business));
   const [links, setLinks] = useState<ReviewFlowLinkRow[]>([]);
   const [topics, setTopics] = useState<ReviewFlowTopicRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -387,6 +390,15 @@ export default function ReviewFlowSetupPage() {
   const quietStart = business.quiet_hours_start ?? 21;
   const quietEnd = business.quiet_hours_end ?? 9;
   const remindersEnabled = business.reminder_sequence_enabled ?? true;
+  const paidAllowanceSummary =
+    allowanceSummary?.kind === "paid" ? allowanceSummary : null;
+  const includedUsed = paidAllowanceSummary?.used ?? 0;
+  const includedTotal = paidAllowanceSummary?.included ?? 500;
+  const includedRemaining = paidAllowanceSummary?.included_remaining ?? 0;
+  const includedProgressPercent = Math.max(
+    0,
+    Math.min(Math.round((includedUsed / includedTotal) * 100), 100),
+  );
 
   const previewMessage = buildInitialSmsMessage({
     customerName: "Sarah",
@@ -576,6 +588,105 @@ export default function ReviewFlowSetupPage() {
             </Link>
           </div>
         </section>
+
+        {paidAllowanceSummary ? (
+          <section className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="max-w-[52ch]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--dash-muted)]">
+                  Request runway
+                </p>
+                <h2 className="mt-2 text-balance font-heading text-[24px] font-semibold leading-[1.02] tracking-[-0.03em] text-[var(--dash-text)]">
+                  See how the 500 is moving.
+                </h2>
+                <p className="mt-2 text-[14px] leading-relaxed text-[var(--dash-muted)]">
+                  This is the clearest view of what you&apos;ve already used in the current cycle, what&apos;s still included, and whether your add-on bank is in play.
+                </p>
+              </div>
+              <Link
+                href="/dashboard/more/account#billing"
+                className={dashboardButtonClassName({ size: "sm" })}
+              >
+                Open billing
+              </Link>
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.28fr)_minmax(260px,0.72fr)]">
+              <div className="rounded-[18px] border border-[#E8DCC8] bg-[#FCF8F1] p-4">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[var(--dash-muted)]">
+                      Included this cycle
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-1">
+                      <span className="font-heading text-[42px] font-semibold leading-none tracking-[-0.05em] text-[var(--dash-text)]">
+                        {allowanceLoading ? "—" : includedUsed}
+                      </span>
+                      <span className="pb-1 text-[13px] text-[var(--dash-muted)]">
+                        of {includedTotal} used
+                      </span>
+                    </div>
+                  </div>
+                  <div className="rounded-full border border-[#E5D4BC] bg-white px-3 py-1.5 text-[12px] font-medium text-[var(--dash-text)] shadow-[0_1px_0_rgba(229,212,188,0.7)]">
+                    {allowanceLoading
+                      ? "Checking..."
+                      : `${includedRemaining} left in this cycle`}
+                  </div>
+                </div>
+
+                <div className="mt-4 overflow-hidden rounded-full bg-[#F1E7D6]">
+                  <div
+                    className="h-3 rounded-full bg-[#D96443] transition-[width] duration-300 ease-out"
+                    style={{ width: `${allowanceLoading ? 0 : includedProgressPercent}%` }}
+                  />
+                </div>
+
+                <p className="mt-3 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                  {allowanceLoading
+                    ? "Pulling the latest request count..."
+                    : includedRemaining > 0
+                      ? `${includedRemaining} request${includedRemaining === 1 ? "" : "s"} are still included before the add-on bank needs to kick in.`
+                      : "The included 500 are spoken for, so the next requests will come from your add-on bank."}
+                </p>
+              </div>
+
+              <div className="rounded-[18px] border border-[#E8DCC8] bg-white p-4">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[var(--dash-muted)]">
+                  Add-on bank
+                </p>
+                <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-1">
+                  <span className="font-heading text-[42px] font-semibold leading-none tracking-[-0.05em] text-[var(--dash-text)]">
+                    {allowanceLoading ? "—" : paidAllowanceSummary.extra}
+                  </span>
+                  <span className="pb-1 text-[13px] text-[var(--dash-muted)]">
+                    saved now
+                  </span>
+                </div>
+                <p className="mt-3 text-[13px] leading-relaxed text-[var(--dash-muted)]">
+                  {allowanceLoading
+                    ? "Checking whether any add-on requests are waiting..."
+                    : paidAllowanceSummary.extra > 0
+                      ? `These extra requests stay on your account until you use them. As the bank gets used, this number counts down.`
+                      : "No add-on requests are saved right now. If you need more room after the 500, billing is where you can add another 100."}
+                </p>
+                <div className="mt-4 rounded-[14px] bg-[#FCF6EE] px-3 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--dash-muted)]">
+                    What happens next
+                  </p>
+                  <p className="mt-2 text-[12px] leading-relaxed text-[var(--dash-text)]">
+                    {allowanceLoading
+                      ? "We’ll show the next step here once the latest numbers load."
+                      : paidAllowanceSummary.extra > 0 && includedRemaining <= 0
+                        ? "You’re already drawing from the add-on bank."
+                        : paidAllowanceSummary.extra > 0
+                          ? "The add-on bank stays parked until the included 500 run out."
+                          : "Once the included 500 are used, the page will show the add-on countdown here as soon as you buy one."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className="rounded-[var(--dash-radius)] border border-[var(--dash-border)] bg-white p-5 shadow-[var(--dash-shadow)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

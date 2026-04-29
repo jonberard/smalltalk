@@ -3,7 +3,12 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { getRequestAwareAppBaseUrl } from "@/lib/app-url";
 import { captureServerException } from "@/lib/server-error-reporting";
-import { getSubscriptionCurrentPeriodEnd, mapSubscriptionStatus } from "@/lib/stripe-utils";
+import { resolveStripeCustomer } from "@/lib/stripe-customer";
+import {
+  getSubscriptionCurrentPeriodEnd,
+  getSubscriptionCurrentPeriodStart,
+  mapSubscriptionStatus,
+} from "@/lib/stripe-utils";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 function pickMostRelevantSubscription(subscriptions: Stripe.Subscription[]) {
@@ -62,7 +67,7 @@ export async function POST(req: NextRequest) {
   try {
     const { data: business, error: businessError } = await supabaseAdmin
       .from("businesses")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, stripe_subscription_id")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -74,17 +79,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to load billing state" }, { status: 500 });
     }
 
-    let stripeCustomerId = business?.stripe_customer_id ?? null;
+    const resolvedCustomer = await resolveStripeCustomer(stripe, {
+      storedCustomerId: business?.stripe_customer_id ?? null,
+      storedSubscriptionId: business?.stripe_subscription_id ?? null,
+      email: user.email ?? null,
+    });
 
-    if (!stripeCustomerId && user.email) {
-      const existingCustomers = await stripe.customers.list({
-        email: user.email,
-        limit: 10,
-      });
+    let stripeCustomerId = resolvedCustomer.customerId;
 
-      const matchingCustomer = existingCustomers.data.find((customer) => customer.email === user.email);
-      if (matchingCustomer) {
-        stripeCustomerId = matchingCustomer.id;
+    if (
+      stripeCustomerId !== (business?.stripe_customer_id ?? null) ||
+      (resolvedCustomer.subscriptionId ?? null) !==
+        (business?.stripe_subscription_id ?? null)
+    ) {
+      const { error: syncError } = await supabaseAdmin
+        .from("businesses")
+        .update({
+          stripe_customer_id: stripeCustomerId,
+          stripe_subscription_id:
+            resolvedCustomer.subscriptionId ??
+            (business?.stripe_subscription_id ?? null),
+        })
+        .eq("id", user.id);
+
+      if (syncError) {
+        captureServerException(new Error(syncError.message), {
+          route: "/api/checkout",
+          tags: { business_id: user.id, sync_state: "stripe_customer" },
+        });
       }
     }
 
@@ -103,6 +125,9 @@ export async function POST(req: NextRequest) {
         const currentPeriodEnd = existingSubscription
           ? getSubscriptionCurrentPeriodEnd(existingSubscription)
           : null;
+        const currentPeriodStart = existingSubscription
+          ? getSubscriptionCurrentPeriodStart(existingSubscription)
+          : null;
         const cancelScheduledFor = existingSubscription?.cancel_at_period_end && currentPeriodEnd
           ? new Date(currentPeriodEnd * 1000).toISOString()
           : null;
@@ -111,6 +136,12 @@ export async function POST(req: NextRequest) {
           stripe_customer_id: stripeCustomerId,
           stripe_subscription_id: existingSubscription?.id ?? null,
           subscription_status: existingStatus,
+          current_billing_period_start: currentPeriodStart
+            ? new Date(currentPeriodStart * 1000).toISOString()
+            : null,
+          current_billing_period_end: currentPeriodEnd
+            ? new Date(currentPeriodEnd * 1000).toISOString()
+            : null,
           cancel_scheduled_for: cancelScheduledFor,
         };
 
@@ -162,9 +193,8 @@ export async function POST(req: NextRequest) {
       route: "/api/checkout",
       tags: { business_id: user.id },
     });
-    const stripeErr = err as { message?: string };
     return NextResponse.json(
-      { error: stripeErr.message || "Failed to create checkout session" },
+      { error: "We couldn't open Stripe right now. Please try again in a moment." },
       { status: 500 },
     );
   }

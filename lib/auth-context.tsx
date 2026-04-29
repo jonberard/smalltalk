@@ -21,6 +21,36 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+const AUTH_BUSINESS_SELECT =
+  "id, name, owner_email, logo_url, google_review_url, google_place_id, business_city, neighborhoods, subscription_status, trial_requests_remaining, trial_ends_at, paused_until, cancel_scheduled_for, reply_voice_id, custom_reply_voice, review_request_sms_template, review_request_email_subject_template, review_request_email_intro_template, connected_crms, created_at, stripe_customer_id, stripe_subscription_id, onboarding_completed, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone, batch_initial_sms_enabled, batch_initial_sms_hour";
+
+function normalizeAuthError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    return {
+      code:
+        typeof record.code === "string" ? record.code : undefined,
+      message:
+        typeof record.message === "string" ? record.message : undefined,
+      details:
+        typeof record.details === "string" ? record.details : undefined,
+      hint: typeof record.hint === "string" ? record.hint : undefined,
+      status:
+        typeof record.status === "number" ? record.status : undefined,
+    };
+  }
+
+  return { message: String(error) };
+}
+
 export function useAuth() {
   return useContext(AuthContext);
 }
@@ -91,14 +121,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data, error } = await supabase
       .from("businesses")
-      .select("id, name, owner_email, logo_url, google_review_url, google_place_id, business_city, neighborhoods, subscription_status, trial_requests_remaining, trial_ends_at, paused_until, cancel_scheduled_for, reply_voice_id, custom_reply_voice, review_request_sms_template, review_request_email_subject_template, review_request_email_intro_template, connected_crms, created_at, stripe_customer_id, stripe_subscription_id, onboarding_completed, reminder_sequence_enabled, quiet_hours_start, quiet_hours_end, business_timezone, batch_initial_sms_enabled, batch_initial_sms_hour")
+      .select(AUTH_BUSINESS_SELECT)
       .eq("id", userId)
       .single();
 
     if (!error && data) {
       if (isStale()) return;
 
-      const biz = data as Business;
+      const biz = {
+        ...(data as Omit<
+          Business,
+          | "current_billing_period_start"
+          | "current_billing_period_end"
+          | "extra_request_credits"
+        >),
+        current_billing_period_start: null,
+        current_billing_period_end: null,
+        extra_request_credits: 0,
+      } as Business;
       setNoBusiness(false);
       setBusiness(biz);
       setSetupMessage(
@@ -128,7 +168,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (recoveryError) {
         if (isStale()) return;
 
-        console.error("[auth] Failed to recover business profile:", recoveryError);
+        console.error(
+          "[auth] Failed to recover business profile:",
+          normalizeAuthError(recoveryError),
+        );
         const recoveryStatus =
           recoveryError instanceof Error &&
           "status" in recoveryError &&
@@ -149,7 +192,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else if (error) {
       if (isStale()) return;
 
-      console.error("[auth] Failed to fetch business:", error);
+      console.error(
+        "[auth] Failed to fetch business:",
+        normalizeAuthError(error),
+      );
       setSetupMessage(
         "We signed you in, but couldn’t load your business profile right now. Please try again in a moment.",
       );

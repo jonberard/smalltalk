@@ -37,7 +37,7 @@ export function dashboardButtonClassName({
           ? "border-[#E4BF63] bg-[#F1CF6A] text-[#584106] shadow-[0_2px_0_rgba(207,170,79,0.26),0_10px_18px_rgba(177,137,33,0.14)] hover:-translate-y-[1px] hover:border-[#D7AE49] hover:bg-[#E9C45A] hover:shadow-[0_3px_0_rgba(207,170,79,0.28),0_12px_22px_rgba(177,137,33,0.16)]"
         : variant === "danger"
           ? "border-[#D93636] bg-[#D93636] text-white shadow-[0_2px_0_rgba(198,40,40,0.18),0_10px_18px_rgba(217,54,54,0.10)] hover:-translate-y-[1px] hover:border-[#C62828] hover:bg-[#C62828] hover:shadow-[0_3px_0_rgba(198,40,40,0.2),0_12px_22px_rgba(217,54,54,0.12)]"
-          : "border-[#DDD2C3] bg-white text-[var(--dash-text)] shadow-[0_1px_0_rgba(221,210,195,0.9),0_6px_14px_rgba(26,29,32,0.04)] hover:-translate-y-[1px] hover:border-[#CFC1AF] hover:bg-[#FBF7F1] hover:shadow-[0_1px_0_rgba(221,210,195,0.9),0_8px_16px_rgba(26,29,32,0.05)]";
+          : "border-[#DDD2C3] bg-white text-[var(--dash-text)] shadow-[0_1px_0_rgba(221,210,195,0.9),0_6px_14px_rgba(26,29,32,0.04)] hover:-translate-y-[1px] hover:border-[#D7C28C] hover:bg-[#FBF7F1] hover:!text-[#6F5516] hover:shadow-[0_1px_0_rgba(221,210,195,0.9),0_8px_16px_rgba(26,29,32,0.05)]";
 
   return `${base} ${sizeClasses} ${variantClasses} ${fullWidth ? "w-full" : ""}`;
 }

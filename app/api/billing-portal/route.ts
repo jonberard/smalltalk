@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { getRequestAwareAppBaseUrl } from "@/lib/app-url";
 import { captureServerException } from "@/lib/server-error-reporting";
+import { resolveStripeCustomer } from "@/lib/stripe-customer";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(req: NextRequest) {
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   // Derive stripe_customer_id from the authenticated user's business record
   const { data: business, error: businessError } = await supabaseAdmin
     .from("businesses")
-    .select("stripe_customer_id")
+    .select("stripe_customer_id, stripe_subscription_id")
     .eq("id", user.id)
     .single();
 
@@ -38,12 +39,45 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to load billing state" }, { status: 500 });
   }
 
-  const stripe_customer_id = business?.stripe_customer_id;
-  if (!stripe_customer_id) {
-    return NextResponse.json({ error: "No Stripe customer found" }, { status: 400 });
+  const stripe = new Stripe(STRIPE_SECRET_KEY);
+  const resolvedCustomer = await resolveStripeCustomer(stripe, {
+    storedCustomerId: business?.stripe_customer_id ?? null,
+    storedSubscriptionId: business?.stripe_subscription_id ?? null,
+    email: user.email ?? null,
+  });
+
+  const syncFields: Record<string, string | null> = {};
+
+  if (resolvedCustomer.customerId !== (business?.stripe_customer_id ?? null)) {
+    syncFields.stripe_customer_id = resolvedCustomer.customerId;
   }
 
-  const stripe = new Stripe(STRIPE_SECRET_KEY);
+  if (Object.keys(syncFields).length > 0) {
+    const { error: syncError } = await supabaseAdmin
+      .from("businesses")
+      .update(syncFields)
+      .eq("id", user.id);
+
+    if (syncError) {
+      captureServerException(new Error(syncError.message), {
+        route: "/api/billing-portal",
+        tags: { business_id: user.id, sync_state: "stripe_customer" },
+      });
+      return NextResponse.json(
+        { error: "We couldn't refresh your billing profile right now." },
+        { status: 500 },
+      );
+    }
+  }
+
+  const stripe_customer_id = resolvedCustomer.customerId;
+  if (!stripe_customer_id) {
+    return NextResponse.json(
+      { error: "We couldn't find your billing profile right now." },
+      { status: 400 },
+    );
+  }
+
   const appBaseUrl = getRequestAwareAppBaseUrl(req.nextUrl.origin);
 
   try {
@@ -58,9 +92,8 @@ export async function POST(req: NextRequest) {
       route: "/api/billing-portal",
       tags: { business_id: user.id },
     });
-    const stripeErr = err as { message?: string };
     return NextResponse.json(
-      { error: stripeErr.message || "Failed to create portal session" },
+      { error: "We couldn't open billing right now. Please try again in a moment." },
       { status: 500 },
     );
   }

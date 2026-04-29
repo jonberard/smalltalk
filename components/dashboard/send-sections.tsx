@@ -820,7 +820,7 @@ export function Paywall({ hadTrial }: { hadTrial: boolean }) {
       <div>
         <h3 className="text-[18px] font-bold text-[var(--dash-text)]">{heading}</h3>
         <p className="mx-auto mt-2 max-w-[360px] text-[14px] leading-relaxed text-[var(--dash-muted)]">
-          Unlimited review links and everything you need to grow your reviews.
+          500 customer requests each month, plus an optional 100-request add-on for $25 that stays on your account until you use it.
         </p>
       </div>
       <button

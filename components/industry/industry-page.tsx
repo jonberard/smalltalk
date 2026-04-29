@@ -15,7 +15,7 @@ const PRICING_FEATURES = [
   "A real private-feedback option when someone is unhappy",
   "Real-time alerts when a negative review comes in",
   "See who opened, started, and finished",
-  "Flat monthly pricing, without add-ons or per-review fees",
+  "500 customer requests each month, with an optional 100-request add-on for $25 that stays on your account until you use it",
   "Copy the review and open Google in one tap",
 ];
 

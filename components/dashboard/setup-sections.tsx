@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import type { Business } from "@/lib/types";
 import { supabase, fetchWithAuth } from "@/lib/supabase";
+import { useRequestAllowanceSummary } from "@/lib/request-allowance-client";
 import { REPLY_VOICES } from "@/lib/reply-generator";
 import {
   buildInitialSmsMessage,
@@ -1892,10 +1893,40 @@ export function BillingSummarySection({ business }: { business: Business }) {
   const [redirecting, setRedirecting] = useState(false);
   const [billingActionError, setBillingActionError] = useState("");
   const [billingSyncing, setBillingSyncing] = useState(false);
+  const [allowanceSyncing, setAllowanceSyncing] = useState(false);
+  const [allowanceFallback, setAllowanceFallback] = useState<{
+    current_billing_period_start: string | null;
+    current_billing_period_end: string | null;
+    extra_request_credits: number;
+  } | null>(null);
+  const [reloadNotice, setReloadNotice] = useState("");
   const [showPauseDialog, setShowPauseDialog] = useState(false);
   const [showCancelPlanDialog, setShowCancelPlanDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const hasAttemptedBillingSync = useRef(false);
+  const hasHandledReloadReturn = useRef(false);
+  const hasAttemptedSilentReloadSync = useRef(false);
+  const hasAttemptedAllowanceSync = useRef(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const {
+    summary: allowanceSummary,
+    loading: allowanceLoading,
+    refresh: refreshAllowance,
+  } = useRequestAllowanceSummary(Boolean(business));
+
+  function formatBillingActionError(message: string | undefined, fallback: string) {
+    if (!message) {
+      return fallback;
+    }
+
+    if (/No such customer/i.test(message)) {
+      return "We couldn't reconnect your billing profile just yet. Please try again in a moment.";
+    }
+
+    return message;
+  }
 
   useEffect(() => {
     async function fetchUsage() {
@@ -1928,6 +1959,50 @@ export function BillingSummarySection({ business }: { business: Business }) {
 
     void fetchUsage();
   }, [business.id]);
+
+  useEffect(() => {
+    if (!business?.id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchAllowanceFallback() {
+      const { data, error } = await supabase
+        .from("businesses")
+        .select(
+          "current_billing_period_start, current_billing_period_end, extra_request_credits",
+        )
+        .eq("id", business.id)
+        .single();
+
+      if (cancelled || error || !data) {
+        return;
+      }
+
+      setAllowanceFallback({
+        current_billing_period_start:
+          (data as { current_billing_period_start?: string | null })
+            .current_billing_period_start ?? null,
+        current_billing_period_end:
+          (data as { current_billing_period_end?: string | null })
+            .current_billing_period_end ?? null,
+        extra_request_credits: Math.max(
+          0,
+          Number(
+            (data as { extra_request_credits?: number | null })
+              .extra_request_credits ?? 0,
+          ),
+        ),
+      });
+    }
+
+    void fetchAllowanceFallback();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [business.id, reloadNotice]);
 
   const status = business.subscription_status ?? "none";
   const pausedUntil = business.paused_until ? new Date(business.paused_until) : null;
@@ -1970,6 +2045,58 @@ export function BillingSummarySection({ business }: { business: Business }) {
       });
   }, [business.stripe_customer_id, hasPaidSubscription, status]);
 
+  useEffect(() => {
+    if (searchParams.get("reload") !== "success" || hasHandledReloadReturn.current) {
+      return;
+    }
+
+    hasHandledReloadReturn.current = true;
+
+    const sessionId = searchParams.get("session_id");
+
+    async function finalizeReloadReturn() {
+      setBillingActionError("");
+      setReloadNotice("Finishing up your add-on and updating the request count...");
+
+      if (sessionId) {
+        const res = await fetchWithAuth("/api/checkout/reload/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+
+        const data = (await res.json().catch(() => ({}))) as {
+          confirmed?: boolean;
+          error?: string;
+          extra?: number;
+        };
+
+        if (!res.ok) {
+          throw new Error(
+            data.error ||
+              "We saw the purchase, but couldn't finish crediting it just yet. Please refresh in a moment.",
+          );
+        }
+      }
+
+      await refreshAllowance();
+      setReloadNotice("100 more requests are now sitting on your account.");
+      toast("100 more requests are ready to use.", "success");
+      router.replace("/dashboard/more/account");
+    }
+
+    void finalizeReloadReturn().catch((error) => {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "We saw the purchase, but couldn't finish crediting it just yet. Please refresh in a moment.";
+
+      setReloadNotice("");
+      setBillingActionError(message);
+      router.replace("/dashboard/more/account");
+    });
+  }, [refreshAllowance, router, searchParams, toast]);
+
   async function handleCheckout() {
     setBillingActionError("");
     setRedirecting(true);
@@ -1980,7 +2107,10 @@ export function BillingSummarySection({ business }: { business: Business }) {
         window.location.href = data.url;
       } else {
         setBillingActionError(
-          data.error || "We couldn't open Stripe right now. Please try again in a moment.",
+          formatBillingActionError(
+            data.error,
+            "We couldn't open Stripe right now. Please try again in a moment.",
+          ),
         );
         setRedirecting(false);
       }
@@ -2001,7 +2131,10 @@ export function BillingSummarySection({ business }: { business: Business }) {
         window.location.href = data.url;
       } else {
         setBillingActionError(
-          data.error || "We couldn't open the billing portal right now. Please try again in a moment.",
+          formatBillingActionError(
+            data.error,
+            "We couldn't open billing right now. Please try again in a moment.",
+          ),
         );
         setRedirecting(false);
       }
@@ -2013,12 +2146,76 @@ export function BillingSummarySection({ business }: { business: Business }) {
     }
   }
 
+  async function handleReload() {
+    setBillingActionError("");
+    setRedirecting(true);
+    try {
+      const res = await fetchWithAuth("/api/checkout/reload", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        setBillingActionError(
+          formatBillingActionError(
+            data.error,
+            "We couldn't open the add-on checkout right now. Please try again in a moment.",
+          ),
+        );
+        setRedirecting(false);
+      }
+    } catch {
+      setBillingActionError(
+        "We couldn't open the reload checkout right now. Please try again in a moment.",
+      );
+      setRedirecting(false);
+    }
+  }
+
   const trialEndsAt = business.trial_ends_at ? new Date(business.trial_ends_at) : null;
   const daysRemaining = trialEndsAt ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 0;
   const isFreeTrial = status === "trial";
   const isStripeTrial = status === "trialing";
   const trialRequestsRemaining = Math.max(0, business.trial_requests_remaining);
+  const paidAllowanceSummary =
+    allowanceSummary?.kind === "paid" ? allowanceSummary : null;
+  const fallbackExtraCredits = Math.max(
+    0,
+    allowanceFallback?.extra_request_credits ?? 0,
+  );
+  const visibleExtraCredits = paidAllowanceSummary?.extra ?? fallbackExtraCredits;
   const trialRequestLimit = 10;
+  const paidResetLabel =
+    paidAllowanceSummary
+      ? new Date(paidAllowanceSummary.resetAt).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })
+      : null;
+  const showReloadOffer = hasPaidSubscription || Boolean(paidAllowanceSummary);
+  const reloadReturnPending = searchParams.get("reload") === "success";
+  const isResolvingReloadOffer =
+    showReloadOffer &&
+    hasPaidSubscription &&
+    !paidAllowanceSummary &&
+    visibleExtraCredits === 0 &&
+    (
+      allowanceLoading ||
+      allowanceSyncing ||
+      allowanceFallback === null ||
+      reloadReturnPending ||
+      reloadNotice.startsWith("Finishing")
+    );
+  const accountActionToneClassNames = {
+    billing:
+      "border-[#C9D7CF] bg-[#E6EEE9] !text-[#6F5516] shadow-[0_1px_0_rgba(201,215,207,0.95),0_8px_18px_rgba(54,83,71,0.08)] hover:border-[#B6C7BE] hover:bg-[#DDE8E1] hover:!text-[#6F5516] hover:shadow-[0_1px_0_rgba(201,215,207,0.95),0_10px_20px_rgba(54,83,71,0.1)]",
+    pause:
+      "border-[#E7D7A7] bg-[#F8E9B4] text-[#6F5516] shadow-[0_1px_0_rgba(231,215,167,0.95),0_8px_18px_rgba(177,137,33,0.08)] hover:border-[#DCC68A] hover:bg-[#F3E0A0] hover:text-[#5F4811] hover:shadow-[0_1px_0_rgba(231,215,167,0.95),0_10px_20px_rgba(177,137,33,0.1)]",
+    cancel:
+      "border-[#E5B6B0] bg-[#F2B1AA] !text-[#6F5516] shadow-[0_1px_0_rgba(229,182,176,0.95),0_8px_18px_rgba(166,69,46,0.08)] hover:border-[#DDA19A] hover:bg-[#ECA39C] hover:!text-[#6F5516] hover:shadow-[0_1px_0_rgba(229,182,176,0.95),0_10px_20px_rgba(166,69,46,0.1)]",
+  } as const;
+  const offerPrimaryTextClassName = "!text-[#6F5516]";
+  const offerSecondaryTextClassName = "!text-[#6F5516]";
   const planName =
     status === "trial"
       ? "Trial"
@@ -2065,14 +2262,36 @@ export function BillingSummarySection({ business }: { business: Business }) {
         : status === "past_due" || status === "canceled"
           ? "bg-[#FBE3DA] text-[#A6452E]"
           : status === "paused"
-            ? "bg-[#EEF1ED] text-[#4A5D53]"
+          ? "bg-[#EEF1ED] text-[#4A5D53]"
           : "bg-[#F4EFE5] text-[var(--dash-muted)]";
   const usageTiles = [
     {
-      label: "Requests this month",
-      value: loading ? "—" : usageCount.toLocaleString("en-US"),
+      label:
+        allowanceSummary?.kind === "paid"
+          ? "Used this cycle"
+          : visibleExtraCredits > 0
+            ? "Request runway"
+            : "Requests this month",
+      value:
+        allowanceSummary?.kind === "paid"
+          ? allowanceLoading
+            ? "—"
+            : allowanceSummary.used.toLocaleString("en-US")
+          : loading
+            ? "—"
+            : usageCount.toLocaleString("en-US"),
       detail:
-        isFreeTrial
+        allowanceSummary?.kind === "paid"
+          ? allowanceLoading
+            ? "Checking your current cycle..."
+            : allowanceSummary.extra > 0
+              ? allowanceSummary.included_remaining > 0
+                ? `${allowanceSummary.included_remaining} left in this cycle · ${allowanceSummary.extra} add-on request${allowanceSummary.extra === 1 ? "" : "s"} saved`
+                : `${allowanceSummary.extra} add-on request${allowanceSummary.extra === 1 ? "" : "s"} saved on your account`
+              : `${allowanceSummary.remaining} left of this cycle's 500`
+        : visibleExtraCredits > 0
+          ? `${visibleExtraCredits} add-on request${visibleExtraCredits === 1 ? "" : "s"} saved on your account while the exact cycle view finishes syncing`
+        : isFreeTrial
           ? `${trialRequestsRemaining} of ${trialRequestLimit} live request${trialRequestsRemaining === 1 ? "" : "s"} left`
           : isStripeTrial
             ? "Live review requests unlocked"
@@ -2092,6 +2311,14 @@ export function BillingSummarySection({ business }: { business: Business }) {
   const billingFooterNote =
     isCancellationScheduled && cancelScheduledFor
       ? `Subscribed through ${cancelScheduledFor.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
+      : allowanceSummary?.kind === "paid" && paidResetLabel
+        ? allowanceSummary.remaining > 0
+        ? allowanceSummary.extra > 0 && allowanceSummary.included_remaining <= 0
+          ? `This cycle's 500 are already used. ${allowanceSummary.extra} add-on request${allowanceSummary.extra === 1 ? " is" : "s are"} still saved on your account, and ${allowanceSummary.extra === 1 ? "it stays" : "they stay"} there until you use ${allowanceSummary.extra === 1 ? "it" : "them"}.`
+          : `${allowanceSummary.included} requests are included each billing cycle. ${allowanceSummary.included_remaining} left in this cycle${allowanceSummary.extra > 0 ? `, plus ${allowanceSummary.extra} add-on request${allowanceSummary.extra === 1 ? "" : "s"} saved on your account` : ""}.`
+        : `This cycle's 500 are used, and there aren't any add-on requests left. Add 100 more, or wait until ${paidResetLabel}.`
+      : hasPaidSubscription && visibleExtraCredits > 0
+        ? `${visibleExtraCredits} add-on request${visibleExtraCredits === 1 ? "" : "s"} are already saved on your account.`
       : status === "active"
       ? "Your subscription is active."
         : status === "trial" || status === "trialing"
@@ -2110,7 +2337,91 @@ export function BillingSummarySection({ business }: { business: Business }) {
           ? "Payment update needed to keep sending live."
           : status === "canceled"
             ? "Subscription canceled. Your data stays saved."
-            : "Start the plan when you're ready to send live requests.";
+      : "Start the plan when you're ready to send live requests.";
+
+  useEffect(() => {
+    if (
+      !hasPaidSubscription ||
+      allowanceLoading ||
+      paidAllowanceSummary ||
+      hasAttemptedAllowanceSync.current
+    ) {
+      return;
+    }
+
+    hasAttemptedAllowanceSync.current = true;
+    setAllowanceSyncing(true);
+
+    fetchWithAuth("/api/verify-subscription", { method: "POST" })
+      .catch(() => null)
+      .then(() => refreshAllowance())
+      .catch(() => null)
+      .finally(() => {
+        setAllowanceSyncing(false);
+      });
+  }, [
+    allowanceLoading,
+    hasPaidSubscription,
+    paidAllowanceSummary,
+    refreshAllowance,
+  ]);
+
+  useEffect(() => {
+    if (
+      !hasPaidSubscription ||
+      allowanceLoading ||
+      visibleExtraCredits > 0 ||
+      hasAttemptedSilentReloadSync.current ||
+      searchParams.get("reload") === "success"
+    ) {
+      return;
+    }
+
+    hasAttemptedSilentReloadSync.current = true;
+    setAllowanceSyncing(true);
+
+    async function trySilentReloadSync() {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const res = await fetchWithAuth("/api/checkout/reload/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+
+        const data = (await res.json().catch(() => ({}))) as {
+          confirmed?: boolean;
+          extra?: number;
+        };
+
+        if (res.ok && data.confirmed && data.extra && data.extra > 0) {
+          await refreshAllowance();
+          setReloadNotice(
+            `${data.extra} extra request${data.extra === 1 ? "" : "s"} are now sitting on your account.`,
+          );
+          toast("Your add-on requests are now ready to use.", "success");
+          setAllowanceSyncing(false);
+          return;
+        }
+
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      }
+
+      setAllowanceSyncing(false);
+    }
+
+    void trySilentReloadSync().catch(() => {
+      setAllowanceSyncing(false);
+    });
+  }, [
+    allowanceLoading,
+    hasPaidSubscription,
+    visibleExtraCredits,
+    refreshAllowance,
+    searchParams,
+    toast,
+  ]);
 
   return (
     <>
@@ -2158,22 +2469,196 @@ export function BillingSummarySection({ business }: { business: Business }) {
           </div>
 
           <div className="mt-6 border-t border-dashed border-[#D9CFB6] pt-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-[560px]">
+            <div className="flex flex-col gap-4">
+              <div className="max-w-none">
                 <p className="text-[13px] text-[var(--dash-text)]">{billingFooterNote}</p>
                 {billingSyncing && !business.stripe_customer_id ? (
                   <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
                     Finishing the Stripe link for invoices and card management...
                   </p>
+                ) : allowanceSyncing ? (
+                  <p className="mt-1 text-[12px] text-[var(--dash-muted)]">
+                    Finishing the request allowance details for this billing cycle...
+                  </p>
+                ) : null}
+                {showReloadOffer ? (
+                  <div className="relative mt-4 overflow-hidden rounded-[18px] border border-[#E9D6B7] bg-[linear-gradient(135deg,#FFF8EE_0%,#FFF1E4_54%,#FCF7EF_100%)] px-5 py-5 shadow-[0_14px_28px_rgba(224,90,61,0.08)]">
+                    <div className="pointer-events-none absolute -right-10 -top-14 h-36 w-36 rounded-full bg-[radial-gradient(circle,rgba(224,90,61,0.18)_0%,rgba(224,90,61,0.06)_44%,transparent_74%)]" />
+                    <div className="pointer-events-none absolute -bottom-10 left-[-14px] h-28 w-28 rounded-full bg-[radial-gradient(circle,rgba(241,207,106,0.18)_0%,rgba(241,207,106,0.05)_46%,transparent_74%)]" />
+                    {isResolvingReloadOffer ? (
+                      <div className="relative animate-pulse">
+                        <p className={`text-[12px] font-semibold uppercase tracking-[0.16em] ${offerSecondaryTextClassName}`}>
+                          Checking request runway
+                        </p>
+                        <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_220px]">
+                          <div className="rounded-[16px] border border-white/75 bg-white/70 px-4 py-4 shadow-[0_8px_18px_rgba(224,90,61,0.05)]">
+                            <div className="h-11 w-36 rounded-[18px] bg-white/86 shadow-[inset_0_0_0_1px_rgba(229,212,188,0.72)]" />
+                            <div className="mt-3 h-4 w-full max-w-[24ch] rounded-full bg-white/72" />
+                            <div className="mt-2 h-4 w-full max-w-[19ch] rounded-full bg-white/62" />
+                          </div>
+                          <div className="rounded-[16px] border border-white/72 bg-white/62 px-4 py-4 shadow-[0_8px_18px_rgba(224,90,61,0.04)]">
+                            <div className="h-4 w-full max-w-[25ch] rounded-full bg-white/72" />
+                            <div className="mt-2 h-4 w-full max-w-[21ch] rounded-full bg-white/62" />
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {[92, 158, 118].map((width) => (
+                                <span
+                                  key={width}
+                                  className="h-8 rounded-full bg-white/78 shadow-[inset_0_0_0_1px_rgba(229,212,188,0.66)]"
+                                  style={{ width }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <div className="rounded-[16px] border border-white/82 bg-white/84 px-4 py-4 shadow-[0_10px_20px_rgba(26,29,32,0.05)]">
+                            <div className="h-11 w-full rounded-[14px] bg-white/92 shadow-[inset_0_0_0_1px_rgba(229,212,188,0.7)]" />
+                            <div className="mt-3 h-4 w-full max-w-[14ch] rounded-full bg-white/68" />
+                            <div className="mt-2 h-4 w-full max-w-[11ch] rounded-full bg-white/58" />
+                          </div>
+                        </div>
+                      </div>
+                    ) : visibleExtraCredits > 0 ? (
+                      <div className="relative">
+                        <p className={`text-[12px] font-semibold uppercase tracking-[0.16em] ${offerSecondaryTextClassName}`}>
+                          Add-on bank
+                        </p>
+                        <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.98fr)_220px]">
+                          <div className="rounded-[16px] border border-white/75 bg-white/70 px-4 py-4 shadow-[0_8px_18px_rgba(224,90,61,0.05)]">
+                            <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+                              <span className={`font-heading text-[54px] font-semibold leading-[0.88] tracking-[-0.06em] ${offerPrimaryTextClassName}`}>
+                                {visibleExtraCredits}
+                              </span>
+                              <div className="pb-1">
+                                <p className={`text-[16px] font-medium leading-tight ${offerPrimaryTextClassName}`}>
+                                  extra request{visibleExtraCredits === 1 ? "" : "s"} ready
+                                </p>
+                                <p className={`mt-1 text-[12px] leading-relaxed ${offerSecondaryTextClassName}`}>
+                                  Already yours. They stay put until you use them.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="rounded-[16px] border border-white/72 bg-white/62 px-4 py-4 shadow-[0_8px_18px_rgba(224,90,61,0.04)]">
+                            <p className={`max-w-[30ch] text-[14px] leading-relaxed ${offerPrimaryTextClassName}`}>
+                              Your included 500 are still used first. This bank picks up automatically after that.
+                            </p>
+                            <div className={`mt-3 flex flex-wrap items-center gap-2 text-[12px] font-medium ${offerSecondaryTextClassName}`}>
+                              <span className="rounded-full border border-[#E5D4BC] bg-white/82 px-3 py-1.5 shadow-[0_1px_0_rgba(229,212,188,0.7)]">
+                                {visibleExtraCredits} left
+                              </span>
+                              <span className="rounded-full border border-[#E5D4BC] bg-white/68 px-3 py-1.5 shadow-[0_1px_0_rgba(229,212,188,0.62)]">
+                                stays until used
+                              </span>
+                              <span className="rounded-full border border-[#E5D4BC] bg-white/68 px-3 py-1.5 shadow-[0_1px_0_rgba(229,212,188,0.62)]">
+                                no reset pressure
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="rounded-[16px] border border-white/82 bg-white/84 px-4 py-4 shadow-[0_10px_20px_rgba(26,29,32,0.05)]">
+                            <button
+                              type="button"
+                              onClick={() => void handleReload()}
+                              disabled={redirecting}
+                              className={`${dashboardButtonClassName({ variant: "secondary", size: "sm", fullWidth: true })} border-[#E5D4BC] bg-white/92 ${offerPrimaryTextClassName} hover:bg-white`}
+                            >
+                              {redirecting ? "Opening checkout..." : "Add another 100"}
+                            </button>
+                            <p className={`mt-3 text-[12px] leading-relaxed ${offerSecondaryTextClassName}`}>
+                              Refill only if you need more room.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1.14fr)_minmax(280px,0.86fr)] xl:items-end">
+                        <div>
+                          <p className={`text-[12px] font-semibold uppercase tracking-[0.16em] ${offerSecondaryTextClassName}`}>
+                            Need a little more room?
+                          </p>
+                          <h3 className={`mt-3 max-w-[12ch] font-heading text-[30px] font-semibold leading-[0.95] tracking-[-0.04em] ${offerPrimaryTextClassName}`}>
+                            Keep the busy stretch moving.
+                          </h3>
+                          <p className={`mt-3 max-w-[42ch] text-[14px] leading-relaxed ${offerPrimaryTextClassName}`}>
+                            Add 100 more customer requests for $25. No plan change. No pressure to use them before reset. They stay on your account until you need them.
+                          </p>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {["100 more requests", "$25 one-time", "stays until used"].map((item) => (
+                              <span
+                                key={item}
+                                className={`rounded-full border border-[#E5D4BC] bg-white/82 px-3 py-1.5 text-[11px] font-medium tracking-[-0.01em] ${offerPrimaryTextClassName} shadow-[0_1px_0_rgba(229,212,188,0.7)] backdrop-blur-sm`}
+                              >
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="mt-5 flex flex-col gap-3 xl:flex-row xl:items-center">
+                            <button
+                              type="button"
+                              onClick={() => void handleReload()}
+                              disabled={redirecting}
+                              className={`${dashboardButtonClassName({ variant: "primary", size: "sm" })} min-w-[190px]`}
+                            >
+                              {redirecting ? "Opening checkout..." : "Get 100 more requests"}
+                            </button>
+                            <p className={`max-w-[28ch] text-[12px] leading-relaxed ${offerSecondaryTextClassName}`}>
+                              Best for a run of finished jobs, a seasonal spike, or a month that fills up faster than expected.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-[16px] border border-white/80 bg-white/82 p-4 shadow-[0_10px_20px_rgba(26,29,32,0.05)] backdrop-blur-sm">
+                          <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${offerSecondaryTextClassName}`}>
+                            What it adds
+                          </p>
+                          <dl className="mt-4 space-y-3">
+                            <div className="flex items-baseline justify-between gap-4 border-b border-dashed border-[#E8DCC8] pb-3">
+                              <dt className={`text-[12px] ${offerSecondaryTextClassName}`}>Request pack</dt>
+                              <dd className={`font-heading text-[30px] font-semibold leading-none tracking-[-0.04em] ${offerPrimaryTextClassName} tabular-nums`}>
+                                100
+                              </dd>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-4 border-b border-dashed border-[#E8DCC8] pb-3">
+                              <dt className={`text-[12px] ${offerSecondaryTextClassName}`}>Price</dt>
+                              <dd className={`font-heading text-[24px] font-semibold leading-none tracking-[-0.03em] ${offerPrimaryTextClassName} tabular-nums`}>
+                                $25
+                              </dd>
+                            </div>
+                            <div className="rounded-[12px] bg-[#FCF6EE] px-3 py-3">
+                              <dt className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${offerSecondaryTextClassName}`}>
+                                Good to know
+                              </dt>
+                              <dd className={`mt-2 text-[12px] leading-relaxed ${offerPrimaryTextClassName}`}>
+                                The extra requests stay on your account until you use them. No race against the billing reset.
+                              </dd>
+                            </div>
+                          </dl>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+                {allowanceSummary?.kind === "paid" && allowanceSummary.warningLevel !== "none" ? (
+                  <p className="mt-2 text-[12px] leading-relaxed text-[#A6452E]">
+                    {allowanceSummary.warningLevel === "heads_up"
+                      ? allowanceSummary.extra > 0
+                        ? `${allowanceSummary.remaining} requests are ready to use, including ${allowanceSummary.extra} add-on request${allowanceSummary.extra === 1 ? "" : "s"} saved on your account.`
+                        : `${allowanceSummary.remaining} requests left before this cycle resets on ${paidResetLabel}.`
+                      : allowanceSummary.warningLevel === "almost_full"
+                        ? allowanceSummary.extra > 0 && allowanceSummary.included_remaining <= 0
+                          ? `This cycle's 500 are used, but ${allowanceSummary.extra} add-on request${allowanceSummary.extra === 1 ? " is" : "s are"} still ready to go.`
+                          : `Almost there — only ${allowanceSummary.remaining} request${allowanceSummary.remaining === 1 ? "" : "s"} left before this cycle resets on ${paidResetLabel}.`
+                        : `You've used this cycle's 500, and there aren't any add-on requests left. Add 100 more, or wait until ${paidResetLabel}.`}
+                  </p>
                 ) : null}
               </div>
-              <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+              <div className="grid w-full gap-2.5 md:grid-cols-2 xl:grid-cols-3">
                 {hasPortalAccess ? (
                   <button
                     type="button"
                     onClick={() => void handlePortal()}
                     disabled={redirecting}
-                    className={`${dashboardButtonClassName({ variant: "secondary", size: "sm" })} min-w-[152px]`}
+                    className={`${dashboardButtonClassName({ variant: "success", size: "sm", fullWidth: true })} min-w-0 ${accountActionToneClassNames.billing}`}
                   >
                     {redirecting
                       ? "Redirecting..."
@@ -2189,7 +2674,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
                     type="button"
                     onClick={() => void handleCheckout()}
                     disabled={redirecting}
-                    className={`${dashboardButtonClassName({ variant: "success", size: "sm" })} min-w-[152px]`}
+                    className={`${dashboardButtonClassName({ variant: "success", size: "sm", fullWidth: true })} min-w-0`}
                   >
                     {redirecting ? "Redirecting..." : "Start plan"}
                   </button>
@@ -2201,7 +2686,8 @@ export function BillingSummarySection({ business }: { business: Business }) {
                       className={`${dashboardButtonClassName({
                         variant: "warning",
                         size: "sm",
-                      })} min-w-[152px]`}
+                        fullWidth: true,
+                      })} min-w-0 ${accountActionToneClassNames.pause}`}
                     >
                       Pause account
                     </button>
@@ -2211,7 +2697,8 @@ export function BillingSummarySection({ business }: { business: Business }) {
                       className={`${dashboardButtonClassName({
                         variant: "danger",
                         size: "sm",
-                      })} min-w-[152px]`}
+                        fullWidth: true,
+                      })} min-w-0 md:col-span-2 xl:col-span-1 ${accountActionToneClassNames.cancel}`}
                     >
                       Cancel subscription
                     </button>
@@ -2221,12 +2708,12 @@ export function BillingSummarySection({ business }: { business: Business }) {
                     type="button"
                     onClick={() => void handlePortal()}
                     disabled={redirecting}
-                    className={`${dashboardButtonClassName({ variant: "accent", size: "sm" })} min-w-[152px]`}
+                    className={`${dashboardButtonClassName({ variant: "accent", size: "sm", fullWidth: true })} min-w-0`}
                   >
                     {redirecting ? "Redirecting..." : "Open billing history"}
                   </button>
                 ) : billingSyncing ? (
-                  <span className="inline-flex min-w-[152px] items-center justify-center rounded-full border border-[#E6DDD0] bg-white px-3 py-1.5 text-[11px] font-medium text-[var(--dash-muted)]">
+                  <span className="inline-flex min-w-0 items-center justify-center rounded-full border border-[#E6DDD0] bg-white px-3 py-1.5 text-center text-[11px] font-medium text-[var(--dash-muted)]">
                     Syncing Stripe details
                   </span>
                 ) : (
@@ -2234,7 +2721,7 @@ export function BillingSummarySection({ business }: { business: Business }) {
                     type="button"
                     onClick={() => void handleCheckout()}
                     disabled={redirecting}
-                    className={`${dashboardButtonClassName({ variant: "success", size: "sm" })} min-w-[152px]`}
+                    className={`${dashboardButtonClassName({ variant: "success", size: "sm", fullWidth: true })} min-w-0`}
                   >
                     {redirecting ? "Redirecting..." : "Start plan"}
                   </button>
@@ -2247,6 +2734,11 @@ export function BillingSummarySection({ business }: { business: Business }) {
       {billingActionError ? (
         <p className="mt-3 text-[12px] leading-relaxed text-[#A6452E]">
           {billingActionError}
+        </p>
+      ) : null}
+      {reloadNotice ? (
+        <p className="mt-3 text-[12px] leading-relaxed text-[#6F5516]">
+          {reloadNotice}
         </p>
       ) : null}
       <PauseAccountDialog

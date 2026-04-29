@@ -16,6 +16,9 @@ export type Business = {
   subscription_status: string;
   trial_requests_remaining: number;
   trial_ends_at: string | null;
+  current_billing_period_start: string | null;
+  current_billing_period_end: string | null;
+  extra_request_credits: number;
   paused_until: string | null;
   cancel_scheduled_for: string | null;
   api_key: string | null;
@@ -51,6 +54,9 @@ export type BusinessInsert = {
   subscription_status?: string;
   trial_requests_remaining?: number;
   trial_ends_at?: string | null;
+  current_billing_period_start?: string | null;
+  current_billing_period_end?: string | null;
+  extra_request_credits?: number;
   paused_until?: string | null;
   cancel_scheduled_for?: string | null;
   api_key?: string | null;

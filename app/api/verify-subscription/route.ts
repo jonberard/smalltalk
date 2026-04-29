@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { captureServerException } from "@/lib/server-error-reporting";
-import { getSubscriptionCurrentPeriodEnd, mapSubscriptionStatus } from "@/lib/stripe-utils";
+import {
+  getSubscriptionCurrentPeriodEnd,
+  getSubscriptionCurrentPeriodStart,
+  mapSubscriptionStatus,
+} from "@/lib/stripe-utils";
+import { resolveStripeCustomer } from "@/lib/stripe-customer";
 
 const SUBSCRIPTION_PRIORITY: Record<string, number> = {
   active: 6,
@@ -125,7 +130,7 @@ export async function POST(req: NextRequest) {
   // Fetch current business record
   const { data: business, error: bizError } = await supabaseAdmin
     .from("businesses")
-    .select("id, stripe_customer_id, stripe_subscription_id, subscription_status, paused_until, cancel_scheduled_for")
+    .select("id, stripe_customer_id, stripe_subscription_id, subscription_status, current_billing_period_start, current_billing_period_end, paused_until, cancel_scheduled_for")
     .eq("id", user.id)
     .single();
 
@@ -135,9 +140,21 @@ export async function POST(req: NextRequest) {
 
   const stripe = new Stripe(STRIPE_SECRET_KEY);
 
-  let customerId = business.stripe_customer_id as string | null;
-  let subscriptionId = business.stripe_subscription_id as string | null;
+  const resolvedCustomer = await resolveStripeCustomer(stripe, {
+    storedCustomerId: business.stripe_customer_id as string | null,
+    storedSubscriptionId: business.stripe_subscription_id as string | null,
+    email: user.email ?? null,
+  });
+
+  let customerId = resolvedCustomer.customerId;
+  let subscriptionId =
+    resolvedCustomer.subscriptionId ??
+    (business.stripe_subscription_id as string | null);
   let status = business.subscription_status as string;
+  let currentBillingPeriodStart =
+    business.current_billing_period_start as string | null;
+  let currentBillingPeriodEnd =
+    business.current_billing_period_end as string | null;
   const pausedUntil = business.paused_until as string | null;
   let cancelScheduledFor = business.cancel_scheduled_for as string | null;
 
@@ -161,7 +178,14 @@ export async function POST(req: NextRequest) {
     if (sub) {
       subscriptionId = sub.id;
       status = mapSubscriptionStatus(sub.status);
+      const currentPeriodStart = getSubscriptionCurrentPeriodStart(sub);
       const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(sub);
+      currentBillingPeriodStart = currentPeriodStart
+        ? new Date(currentPeriodStart * 1000).toISOString()
+        : null;
+      currentBillingPeriodEnd = currentPeriodEnd
+        ? new Date(currentPeriodEnd * 1000).toISOString()
+        : null;
       cancelScheduledFor = sub.cancel_at_period_end
         && currentPeriodEnd
         ? new Date(currentPeriodEnd * 1000).toISOString()
@@ -176,7 +200,16 @@ export async function POST(req: NextRequest) {
         customerId = emailMatch.customerId;
         subscriptionId = emailMatch.subscription.id;
         status = mapSubscriptionStatus(emailMatch.subscription.status);
+        const currentPeriodStart = getSubscriptionCurrentPeriodStart(
+          emailMatch.subscription,
+        );
         const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(emailMatch.subscription);
+        currentBillingPeriodStart = currentPeriodStart
+          ? new Date(currentPeriodStart * 1000).toISOString()
+          : null;
+        currentBillingPeriodEnd = currentPeriodEnd
+          ? new Date(currentPeriodEnd * 1000).toISOString()
+          : null;
         cancelScheduledFor = emailMatch.subscription.cancel_at_period_end
           && currentPeriodEnd
           ? new Date(currentPeriodEnd * 1000).toISOString()
@@ -195,7 +228,14 @@ export async function POST(req: NextRequest) {
         if (subscriptionId) {
           const sub = await stripe.subscriptions.retrieve(subscriptionId);
           status = mapSubscriptionStatus(sub.status);
+          const currentPeriodStart = getSubscriptionCurrentPeriodStart(sub);
           const currentPeriodEnd = getSubscriptionCurrentPeriodEnd(sub);
+          currentBillingPeriodStart = currentPeriodStart
+            ? new Date(currentPeriodStart * 1000).toISOString()
+            : null;
+          currentBillingPeriodEnd = currentPeriodEnd
+            ? new Date(currentPeriodEnd * 1000).toISOString()
+            : null;
           cancelScheduledFor = sub.cancel_at_period_end
             && currentPeriodEnd
             ? new Date(currentPeriodEnd * 1000).toISOString()
@@ -222,6 +262,8 @@ export async function POST(req: NextRequest) {
 
   const updateFields: Record<string, string | null> = {
     subscription_status: status,
+    current_billing_period_start: currentBillingPeriodStart,
+    current_billing_period_end: currentBillingPeriodEnd,
     cancel_scheduled_for: cancelScheduledFor,
   };
   if (customerId) updateFields.stripe_customer_id = customerId;
@@ -255,6 +297,8 @@ export async function POST(req: NextRequest) {
     subscription_status: status,
     stripe_customer_id: customerId,
     stripe_subscription_id: subscriptionId,
+    current_billing_period_start: currentBillingPeriodStart,
+    current_billing_period_end: currentBillingPeriodEnd,
     cancel_scheduled_for: cancelScheduledFor,
   });
 }

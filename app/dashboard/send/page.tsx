@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { dashboardButtonClassName } from "@/components/dashboard/button";
+import { useRequestAllowanceSummary } from "@/lib/request-allowance-client";
 import {
   Paywall,
   QRBlock,
@@ -93,8 +95,61 @@ function SendEntryCard({
   );
 }
 
+function RequestAllowanceBanner({
+  remaining,
+  includedRemaining,
+  extra,
+  resetAt,
+  warningLevel,
+}: {
+  remaining: number;
+  includedRemaining: number;
+  extra: number;
+  resetAt: string;
+  warningLevel: "none" | "heads_up" | "almost_full" | "exhausted";
+}) {
+  const resetLabel = new Date(resetAt).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+  });
+
+  const toneClassName =
+    warningLevel === "exhausted"
+      ? "border-[#F1CEC3] bg-[#FFF2ED] text-[#A6452E]"
+      : warningLevel === "almost_full"
+        ? "border-[#E8D9B7] bg-[#FBF1D7] text-[#8A651F]"
+        : "border-[#E7DCC8] bg-[#FCF8F1] text-[var(--dash-text)]";
+
+  const message =
+    warningLevel === "exhausted"
+      ? `You've used this cycle's 500 included requests, and there aren't any add-on requests left. Add 100 more customer requests for $25, or wait until ${resetLabel}.`
+      : extra > 0 && includedRemaining <= 0
+        ? `${remaining} add-on request${remaining === 1 ? " is" : "s are"} still saved on your account. This cycle's 500 are already used, but the paid add-on stays with you until you use it.`
+        : extra > 0
+          ? `${remaining} requests are ready to go. ${includedRemaining} ${includedRemaining === 1 ? "is" : "are"} still from this cycle, and ${extra} add-on request${extra === 1 ? " is" : "s are"} saved on your account.`
+          : warningLevel === "almost_full"
+          ? `Almost there — ${remaining} request${remaining === 1 ? "" : "s"} left from this cycle's 500. If you need more room, there’s a 100-request add-on for $25 that stays on your account until you use it.`
+          : `${remaining} requests left in this cycle. Plenty for now, but if this month turns busier than expected, there’s a 100-request add-on for $25 that stays on your account until you use it.`;
+
+  return (
+    <div className={`flex flex-wrap items-center justify-between gap-3 rounded-[var(--dash-radius-sm)] border px-4 py-3 ${toneClassName}`}>
+      <p className="text-[13px] leading-relaxed">{message}</p>
+      <Link
+        href="/dashboard/more/account#billing"
+        className="text-[12px] font-semibold text-[#BC4A2F] transition-colors hover:text-[#A43F27]"
+      >
+        {warningLevel === "exhausted"
+          ? "See the 100-request add-on"
+          : "See billing details"}
+      </Link>
+    </div>
+  );
+}
+
 export default function SendPage() {
   const { business } = useAuth();
+  const { summary: allowanceSummary, loading: allowanceLoading, refresh: refreshAllowance } =
+    useRequestAllowanceSummary(Boolean(business));
   const {
     services,
     employees,
@@ -155,6 +210,17 @@ export default function SendPage() {
 
         <div className="space-y-5">
           {effectiveTier === "trial" ? <TrialRemainingBanner trialRemaining={trialRemaining} /> : null}
+          {allowanceSummary?.kind === "paid" &&
+          !allowanceLoading &&
+          allowanceSummary.warningLevel !== "none" ? (
+            <RequestAllowanceBanner
+              remaining={allowanceSummary.remaining}
+              includedRemaining={allowanceSummary.included_remaining}
+              extra={allowanceSummary.extra}
+              resetAt={allowanceSummary.resetAt}
+              warningLevel={allowanceSummary.warningLevel}
+            />
+          ) : null}
 
           {effectiveTier === "expired" ? (
             <div className="rounded-[20px] border border-[var(--dash-border)] bg-white p-6 shadow-[var(--dash-shadow)]">
@@ -192,7 +258,10 @@ export default function SendPage() {
                           services={services}
                           employees={employees}
                           businessId={business.id}
-                          onSend={handleSingleSend}
+                          onSend={async (result) => {
+                            await handleSingleSend(result);
+                            await refreshAllowance();
+                          }}
                           onServiceCreated={(service) => setServices((prev) => [...prev, service])}
                           onEmployeeCreated={(employee) => setEmployees((prev) => [...prev, employee])}
                         />

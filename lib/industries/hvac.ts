@@ -51,7 +51,7 @@ export const hvacData: IndustryPageData = {
       {
         icon: "calendar",
         heading: "Summer volume, winter calm, one flat price",
-        body: "Unlimited review requests means send 400 in August and 60 in February. No per-review fees. No seasonal overage charges. Your review pipeline matches your business.",
+        body: "You get 500 customer requests each month. Run hot in August, coast a little in February, and if one stretch gets especially busy, add 100 more without changing your whole plan.",
       },
     ],
   },
