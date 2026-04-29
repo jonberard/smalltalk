@@ -166,7 +166,8 @@ const JSON_LD = {
       "@type": "Organization",
       name: "small Talk",
       url: "https://usesmalltalk.com",
-      description: "AI-powered Google review collection software for home service businesses. Guides customers through a 30-second conversation to create detailed, honest reviews.",
+      description:
+        "small Talk helps local service businesses get better Google reviews by helping customers actually write them.",
       logo: "https://usesmalltalk.com/favicon.svg",
     },
     {
@@ -174,7 +175,8 @@ const JSON_LD = {
       name: "small Talk",
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
-      description: "Google review management software that helps home service businesses collect detailed reviews through an AI-guided conversation flow.",
+      description:
+        "Guided Google review-writing software for local service businesses. small Talk turns a customer’s real answers into a draft they can edit and post themselves.",
       offers: {
         "@type": "Offer",
         price: "79",
@@ -651,7 +653,7 @@ export default function LandingPage() {
           <SectionLabel>Pricing</SectionLabel>
           <Heading>One plan. One price.</Heading>
           <p className="mx-auto mt-4 max-w-[480px] text-[17px] leading-[1.6] text-muted">
-            Everything included. No tiers. No add-ons.
+            Built to help real customers finish the review, without turning your follow-up into another dashboard chore.
           </p>
         </div>
 
@@ -662,7 +664,7 @@ export default function LandingPage() {
                 small Talk
               </h3>
               <p className="mt-2 text-[15px] text-muted">
-                Everything you need. Nothing you don&rsquo;t.
+                Simple enough to use after every job. Strong enough to be worth sending.
               </p>
             </div>
             <div className="mb-8 flex items-baseline justify-center gap-1">
@@ -671,11 +673,11 @@ export default function LandingPage() {
             </div>
             <ul className="mb-10 flex flex-col gap-4">
               {[
-                "Unlimited review requests",
-                "Unlimited AI reply drafting",
-                "Automated SMS reminders",
-                "Honest private feedback channel",
-                "All core features included",
+                "Guided review links customers can actually finish",
+                "Detailed drafts built from what your customer really said",
+                "Simple follow-up by text, with reminders included",
+                "A real private-feedback path when someone is unhappy",
+                "Flat monthly pricing, without add-ons or per-review fees",
                 "Copy the review and open Google in one tap",
               ].map((f) => (
                 <li key={f} className="flex items-start gap-3 text-[14px] text-text">
@@ -688,7 +690,7 @@ export default function LandingPage() {
             </ul>
             <PricingButton />
             <p className="mt-4 text-center text-[13px] text-muted">
-              No annual contract. No setup fee. No review gating.
+              No annual contract. No setup fee. No shady filtering.
             </p>
             <p className="mt-2 text-center text-[12px] leading-relaxed text-muted">
               {getReviewRequestHourlyCapCopy()}
@@ -703,7 +705,7 @@ export default function LandingPage() {
       <section id="faq" data-fade className="mx-auto max-w-[800px] px-6 pb-[160px] scroll-mt-16">
         <div className="mb-12 text-center">
           <SectionLabel>FAQ</SectionLabel>
-          <Heading>Google Review Management FAQ</Heading>
+          <Heading>Questions owners ask before they start.</Heading>
         </div>
 
         <div className="flex flex-col">

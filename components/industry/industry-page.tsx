@@ -9,13 +9,13 @@ import { INDUSTRY_ICONS } from "./industry-icons";
 const BORDER = "border border-[#D1C4B0]";
 
 const PRICING_FEATURES = [
-  "Unlimited review requests",
-  "Detailed, genuine reviews that sound different every time",
-  "Unlimited AI reply drafting for every review",
-  "Reviews with more service, location, and trust context",
-  "Honest negative review handling with private feedback option",
-  "Real-time alerts when negative reviews are submitted",
-  "See exactly who opened, started, and finished",
+  "Guided review links customers can actually finish",
+  "Detailed reviews built from what the customer really said",
+  "Simple follow-up by text, with reminders included",
+  "A real private-feedback option when someone is unhappy",
+  "Real-time alerts when a negative review comes in",
+  "See who opened, started, and finished",
+  "Flat monthly pricing, without add-ons or per-review fees",
   "Copy the review and open Google in one tap",
 ];
 
